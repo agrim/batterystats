@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct AppCommands: Commands {
-    let refreshAction: () -> Void
-
     @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
@@ -13,11 +11,6 @@ struct AppCommands: Commands {
                 NSApp.activate(ignoringOtherApps: true)
             }
             .keyboardShortcut("1", modifiers: [.command])
-
-            Button("Refresh") {
-                refreshAction()
-            }
-            .keyboardShortcut("r", modifiers: [.command])
 
             Divider()
 

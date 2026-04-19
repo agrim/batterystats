@@ -51,6 +51,14 @@ enum BatteryCalculations {
         return (Double(voltageMillivolts) * Double(signedCurrentMilliamps)) / 1_000_000
     }
 
+    static func chargeRateMilliamps(from signedCurrentMilliamps: Int?) -> Int? {
+        guard let signedCurrentMilliamps, signedCurrentMilliamps > 40 else {
+            return nil
+        }
+
+        return signedCurrentMilliamps
+    }
+
     static func dischargeRateWatts(voltageMillivolts: Int?, signedCurrentMilliamps: Int?) -> Double? {
         guard let voltageMillivolts,
               let signedCurrentMilliamps,
@@ -75,6 +83,49 @@ enum BatteryCalculations {
         }
 
         return minutes
+    }
+
+    static func estimatedTimeToFullMinutes(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        chargeCurrentMilliamps: Int?,
+        reportedTimeToFullMinutes: Int?
+    ) -> Int? {
+        guard let currentChargeMilliampHours,
+              let fullChargeCapacityMilliampHours,
+              let chargeCurrentMilliamps,
+              chargeCurrentMilliamps > 40 else {
+            return reportedTimeToFullMinutes
+        }
+
+        if currentChargeMilliampHours >= fullChargeCapacityMilliampHours {
+            return 0
+        }
+
+        let totalCapacity = Double(fullChargeCapacityMilliampHours)
+        let startRatio = max(0, min(0.995, Double(currentChargeMilliampHours) / totalCapacity))
+        let remainingRatio = 1 - startRatio
+
+        guard remainingRatio > 0 else {
+            return 0
+        }
+
+        let steps = 40
+        let sliceCapacity = (totalCapacity * remainingRatio) / Double(steps)
+        var accumulatedMinutes = 0.0
+
+        for step in 0..<steps {
+            let progress = (Double(step) + 0.5) / Double(steps)
+            let chargePercent = (startRatio + (progress * remainingRatio)) * 100
+            accumulatedMinutes += (sliceCapacity / Double(chargeCurrentMilliamps)) * 60 * chargeTaperMultiplier(forPercent: chargePercent)
+        }
+
+        let estimatedMinutes = Int(accumulatedMinutes.rounded())
+        guard (1...1_440).contains(estimatedMinutes) else {
+            return reportedTimeToFullMinutes
+        }
+
+        return estimatedMinutes
     }
 
     static func smoothedDischargeRate(_ samples: [Int], fallback: Int?) -> Int? {
@@ -150,5 +201,20 @@ enum BatteryCalculations {
         }
 
         return isExternalPowerConnected ? .connectedNotCharging : .unknown
+    }
+
+    private static func chargeTaperMultiplier(forPercent chargePercent: Double) -> Double {
+        switch chargePercent {
+        case ..<70:
+            return 1.0
+        case ..<85:
+            return 1.08
+        case ..<92:
+            return 1.18
+        case ..<97:
+            return 1.38
+        default:
+            return 1.75
+        }
     }
 }

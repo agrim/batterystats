@@ -46,6 +46,7 @@ struct BatteryReadingService {
         let designCapacityMilliampHours = smartBattery?.designCapacityMilliampHours
         let voltageMillivolts = smartBattery?.voltageMillivolts
         let signedCurrentMilliamps = smartBattery?.signedCurrentMilliamps
+        let reportedTimeToFullMinutes = sanitized(publicSnapshot.timeToFullMinutes)
 
         let powerState = BatteryCalculations.derivePowerState(
             isCharging: publicSnapshot.isCharging,
@@ -90,7 +91,12 @@ struct BatteryReadingService {
                 dischargeRateMilliamps: BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps)
             ),
             systemTimeRemainingMinutes: sanitized(publicSnapshot.systemTimeRemainingMinutes),
-            timeToFullMinutes: sanitized(publicSnapshot.timeToFullMinutes),
+            timeToFullMinutes: BatteryCalculations.estimatedTimeToFullMinutes(
+                currentChargeMilliampHours: currentChargeMilliampHours,
+                fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+                chargeCurrentMilliamps: BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps),
+                reportedTimeToFullMinutes: reportedTimeToFullMinutes
+            ),
             cycleCount: smartBattery?.cycleCount,
             manufactureDate: smartBattery?.manufactureDate,
             batteryAgeComponents: BatteryCalculations.batteryAgeComponents(from: smartBattery?.manufactureDate, now: now),

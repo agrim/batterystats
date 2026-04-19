@@ -5,29 +5,16 @@ struct MenuBarBatteryView: View {
     @Bindable var monitor: BatteryMonitor
     @Bindable var preferences: PreferencesStore
 
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let content = VStack(alignment: .leading, spacing: 12) {
             if let snapshot = monitor.snapshot {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label(snapshot.powerState.displayTitle, systemImage: snapshot.powerState.symbolName)
-                        .font(.headline)
-
-                    Text(BatteryFormatting.summaryText(for: snapshot))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-
-                    Divider()
-
-                    MetricRowView(title: "Battery", value: BatteryFormatting.percent(snapshot.stateOfChargePercent))
-                    MetricRowView(title: "Current charge", value: BatteryFormatting.milliampHours(snapshot.currentChargeMilliampHours))
-                    MetricRowView(title: "Time", value: BatteryFormatting.duration(minutes: snapshot.displayedTimeMinutes))
-                    MetricRowView(title: "Temperature", value: BatteryFormatting.temperature(snapshot.temperatureCelsius, unitPreference: preferences.temperatureUnitPreference))
-                    MetricRowView(title: "Cycle count", value: snapshot.cycleCount.map(String.init) ?? "Unavailable")
-                }
+                BatterySummaryGridView(
+                    snapshot: snapshot,
+                    compact: true,
+                    temperatureUnitPreference: preferences.temperatureUnitPreference
+                )
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Battery Unavailable", systemImage: "battery.0")
@@ -49,14 +36,8 @@ struct MenuBarBatteryView: View {
 
                 Spacer()
 
-                Button("Refresh") {
-                    monitor.refresh()
-                }
-            }
-
-            HStack {
-                Button("Settings") {
-                    openSettings()
+                SettingsLink {
+                    Text("Settings")
                 }
 
                 Spacer()
@@ -65,11 +46,19 @@ struct MenuBarBatteryView: View {
                     NSApp.terminate(nil)
                 }
             }
+            .font(.caption)
         }
-        .padding(16)
-        .frame(width: 320)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+        .frame(width: 264)
         .onAppear {
             monitor.start()
+        }
+
+        if #available(macOS 15.0, *) {
+            content.containerBackground(.ultraThinMaterial, for: .window)
+        } else {
+            content
         }
     }
 }
@@ -79,19 +68,40 @@ struct MenuBarBatteryLabelView: View {
     let displayMode: MenuBarDisplayMode
 
     var body: some View {
-        let symbolName = snapshot?.powerState.symbolName ?? "battery.0"
+        let symbolName = snapshot?.batterySymbolName ?? "battery.0"
+        let symbolTint = snapshot.map { BatterySummaryGridView.tint(for: $0.chargeTone) } ?? .secondary
 
         switch displayMode {
         case .iconOnly:
             Image(systemName: symbolName)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(symbolTint)
         case .iconAndPercentage:
-            Label(BatteryFormatting.percent(snapshot?.stateOfChargePercent), systemImage: symbolName)
+            Label {
+                Text(BatteryFormatting.percent(snapshot?.stateOfChargePercent))
+            } icon: {
+                Image(systemName: symbolName)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(symbolTint)
+            }
                 .monospacedDigit()
         case .iconAndHealth:
-            Label(BatteryFormatting.percent(snapshot?.healthPercent, decimals: 0), systemImage: symbolName)
+            Label {
+                Text(BatteryFormatting.percent(snapshot?.healthPercent, decimals: 0))
+            } icon: {
+                Image(systemName: symbolName)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(symbolTint)
+            }
                 .monospacedDigit()
         case .iconAndFullCharge:
-            Label(abbreviatedCapacity(snapshot?.fullChargeCapacityMilliampHours), systemImage: symbolName)
+            Label {
+                Text(abbreviatedCapacity(snapshot?.fullChargeCapacityMilliampHours))
+            } icon: {
+                Image(systemName: symbolName)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(symbolTint)
+            }
                 .monospacedDigit()
         }
     }

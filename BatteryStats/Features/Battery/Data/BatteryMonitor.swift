@@ -16,7 +16,6 @@ final class BatteryMonitor {
     var lastUpdated: Date?
     var rawSnapshotText = ""
     var parsedSnapshotText = ""
-    var statusMessage: String?
     var isRefreshing = false
 
     @ObservationIgnored private let service: BatteryReadingService
@@ -64,12 +63,12 @@ final class BatteryMonitor {
         }
 
         if refreshTimer == nil {
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            refreshTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
                 Task { @MainActor in
                     self?.refresh()
                 }
             }
-            refreshTimer?.tolerance = 5
+            refreshTimer?.tolerance = 0
         }
 
         refresh()
@@ -90,12 +89,10 @@ final class BatteryMonitor {
             availabilityState = .unsupported
             self.snapshot = nil
             dischargeSamples.removeAll()
-            statusMessage = "BatteryStats works on Mac laptops with an internal battery."
             return
         }
 
         availabilityState = .available
-        statusMessage = snapshot.notes.first
 
         if let dischargeRate = snapshot.dischargeRateMilliamps {
             dischargeSamples.append(dischargeRate)

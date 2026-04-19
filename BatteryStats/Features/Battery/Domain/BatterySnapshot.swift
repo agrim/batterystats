@@ -1,5 +1,13 @@
 import Foundation
 
+enum BatteryLevelTone: String, Equatable, Sendable {
+    case red
+    case yellow
+    case greenYellow
+    case midGreen
+    case green
+}
+
 struct BatterySnapshot: Equatable, Sendable {
     let timestamp: Date
     let powerState: BatteryPowerState
@@ -41,6 +49,102 @@ struct BatterySnapshot: Equatable, Sendable {
             return timeToFullMinutes
         default:
             return systemTimeRemainingMinutes
+        }
+    }
+
+    var statusDisplayTitle: String {
+        switch powerState {
+        case .onBattery:
+            if let stateOfChargePercent, stateOfChargePercent <= 20 {
+                return "On Battery Low Power"
+            }
+            return "On Battery"
+        case .charging:
+            return "Charging"
+        case .connectedNotCharging, .fullOnAC:
+            return "Plugged In"
+        case .unknown:
+            return "Unknown"
+        }
+    }
+
+    var statusSecondaryText: String? {
+        switch powerState {
+        case .onBattery:
+            return "Using internal battery"
+        case .charging:
+            return chargeRateWatts.map { "Charging at \(BatteryFormatting.watts($0))" } ?? "External power connected"
+        case .connectedNotCharging, .fullOnAC:
+            return "External power connected"
+        case .unknown:
+            return nil
+        }
+    }
+
+    var healthTone: BatteryLevelTone {
+        guard let healthPercent else {
+            return .green
+        }
+
+        if healthPercent > 95 {
+            return .green
+        }
+
+        if healthPercent >= 90 {
+            return .midGreen
+        }
+
+        if healthPercent >= 85 {
+            return .greenYellow
+        }
+
+        if healthPercent >= 80 {
+            return .yellow
+        }
+
+        return .red
+    }
+
+    var chargeTone: BatteryLevelTone {
+        guard let stateOfChargePercent else {
+            return .green
+        }
+
+        if stateOfChargePercent > 70 {
+            return .green
+        }
+
+        if stateOfChargePercent >= 40 {
+            return .midGreen
+        }
+
+        if stateOfChargePercent >= 20 {
+            return .greenYellow
+        }
+
+        if stateOfChargePercent >= 10 {
+            return .yellow
+        }
+
+        return .red
+    }
+
+    var batterySymbolName: String {
+        guard let stateOfChargePercent else {
+            return "battery.0"
+        }
+
+        switch stateOfChargePercent {
+        case ..<10:
+            return "battery.0"
+        case ..<37.5:
+            return "battery.25"
+        case ..<62.5:
+            return "battery.50"
+        case ..<87.5:
+            return "battery.75"
+        default:
+            return "battery.100"
         }
     }
 

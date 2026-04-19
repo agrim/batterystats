@@ -1,164 +1,103 @@
+import AppKit
 import Observation
 import SwiftUI
 
 struct BatteryDashboardView: View {
+    private static let windowWidth: CGFloat = 250
+    private static let windowHeight: CGFloat = 235
+    private static let titleBarHeight: CGFloat = 26
+    private static let titleBarLeadingInset: CGFloat = 76
+    private static let titleBarTrailingInset: CGFloat = 10
+
     @Bindable var monitor: BatteryMonitor
     @Bindable var preferences: PreferencesStore
-
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Group {
-            switch monitor.availabilityState {
-            case .loading:
-                ProgressView("Reading battery information…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .unsupported:
-                UnsupportedBatteryView()
-            case .available:
-                if let snapshot = monitor.snapshot {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 18) {
-                            overviewHeader(snapshot)
-                            heroMetric(snapshot)
-                            chargeSection(snapshot)
-                            capacitySection(snapshot)
-                            electricalSection(snapshot)
-
-                            if let statusMessage = monitor.statusMessage {
-                                Text(statusMessage)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 4)
-                            }
-                        }
-                        .padding(20)
-                    }
-                } else {
+        let content = ZStack(alignment: .topLeading) {
+            Group {
+                switch monitor.availabilityState {
+                case .loading:
+                    ProgressView("Reading battery information…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                case .unsupported:
                     UnsupportedBatteryView()
+                case .available:
+                    if let snapshot = monitor.snapshot {
+                        BatterySummaryGridView(
+                            snapshot: snapshot,
+                            compact: false,
+                            temperatureUnitPreference: preferences.temperatureUnitPreference
+                        )
+                    } else {
+                        UnsupportedBatteryView()
+                    }
                 }
             }
-        }
-        .navigationTitle("BatteryStats")
-        .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    monitor.refresh()
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
+            .padding(.horizontal, 12)
+            .padding(.top, Self.titleBarHeight + 6)
+            .padding(.bottom, 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                Button {
-                    openSettings()
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
+            BatteryDashboardHeaderView {
+                openSettings()
             }
+            .padding(.leading, Self.titleBarLeadingInset)
+            .padding(.trailing, Self.titleBarTrailingInset)
+            .padding(.top, 6)
         }
+        .frame(width: Self.windowWidth, height: Self.windowHeight, alignment: .top)
+        .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             monitor.start()
         }
-    }
+        .background(WindowChromeConfigurator())
 
-    @ViewBuilder
-    private func overviewHeader(_ snapshot: BatterySnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Battery")
-                .font(.title2.weight(.semibold))
-
-            HStack(spacing: 8) {
-                Text(snapshot.powerState.displayTitle)
-                Text("•")
-                    .foregroundStyle(.tertiary)
-                Text(BatteryFormatting.percent(snapshot.stateOfChargePercent))
-                Text("•")
-                    .foregroundStyle(.tertiary)
-                Text(BatteryFormatting.lastUpdated(monitor.lastUpdated))
-                    .foregroundStyle(.secondary)
-            }
-            .font(.subheadline)
-            .monospacedDigit()
+        if #available(macOS 15.0, *) {
+            content
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+                .containerBackground(.ultraThinMaterial, for: .window)
+        } else {
+            content
         }
     }
+}
 
-    @ViewBuilder
-    private func heroMetric(_ snapshot: BatterySnapshot) -> some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Current charge-holding capacity")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+private struct BatteryDashboardHeaderView: View {
+    let openSettings: () -> Void
 
-                Text(BatteryFormatting.milliampHours(snapshot.fullChargeCapacityMilliampHours))
-                    .font(.system(size: 34, weight: .semibold, design: .default))
-                    .monospacedDigit()
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text("BatteryStats")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .lineLimit(1)
 
-                Text("\(BatteryFormatting.wattHours(snapshot.fullChargeCapacityWattHours)) • \(BatteryFormatting.percent(snapshot.healthPercent, decimals: 1)) of design")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+            Spacer(minLength: 8)
+
+            Button(action: openSettings) {
+                Image(systemName: "gearshape")
+                    .imageScale(.medium)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .modifier(NativeSettingsButtonStyle())
+            .help("Settings")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    @ViewBuilder
-    private func chargeSection(_ snapshot: BatterySnapshot) -> some View {
-        BatterySectionView("Charge") {
-            MetricRowView(title: "Current charge", value: BatteryFormatting.milliampHours(snapshot.currentChargeMilliampHours))
-            MetricRowView(title: "Current energy", value: BatteryFormatting.wattHours(snapshot.currentChargeWattHours))
-            MetricRowView(
-                title: "Estimated time remaining",
-                value: snapshot.powerState == .onBattery
-                    ? BatteryFormatting.duration(minutes: snapshot.rateBasedTimeRemainingMinutes)
-                    : "Unavailable"
-            )
-
-            if snapshot.powerState == .charging {
-                MetricRowView(title: "Time to full", value: BatteryFormatting.duration(minutes: snapshot.timeToFullMinutes))
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func capacitySection(_ snapshot: BatterySnapshot) -> some View {
-        BatterySectionView("Capacity") {
-            MetricRowView(title: "Full charge capacity", value: BatteryFormatting.milliampHours(snapshot.fullChargeCapacityMilliampHours))
-            MetricRowView(title: "Full charge energy", value: BatteryFormatting.wattHours(snapshot.fullChargeCapacityWattHours))
-            MetricRowView(title: "Design capacity", value: BatteryFormatting.milliampHours(snapshot.designCapacityMilliampHours))
-            MetricRowView(title: "Design energy", value: BatteryFormatting.wattHours(snapshot.designCapacityWattHours))
-            MetricRowView(title: "Battery health", value: BatteryFormatting.percent(snapshot.healthPercent, decimals: 1))
-        }
-    }
-
-    @ViewBuilder
-    private func electricalSection(_ snapshot: BatterySnapshot) -> some View {
-        BatterySectionView("Electrical & Lifecycle") {
-            MetricRowView(
-                title: "Discharge rate",
-                value: snapshot.powerState == .onBattery
-                    ? BatteryFormatting.milliamps(snapshot.dischargeRateMilliamps)
-                    : "Unavailable"
-            )
-
-            MetricRowView(
-                title: "Charge rate",
-                value: snapshot.powerState == .charging
-                    ? BatteryFormatting.watts(snapshot.chargeRateWatts)
-                    : "Unavailable"
-            )
-
-            MetricRowView(title: "Cycle count", value: snapshot.cycleCount.map(String.init) ?? "Unavailable")
-            MetricRowView(title: "Temperature", value: BatteryFormatting.temperature(snapshot.temperatureCelsius, unitPreference: preferences.temperatureUnitPreference))
-            MetricRowView(title: "Manufacture date", value: BatteryFormatting.date(snapshot.manufactureDate))
-            MetricRowView(title: "Battery age", value: BatteryFormatting.age(snapshot.batteryAgeComponents))
-
-            if preferences.showAdvancedValues {
-                MetricRowView(title: "Voltage", value: BatteryFormatting.millivolts(snapshot.voltageMillivolts))
-                MetricRowView(title: "Signed current", value: BatteryFormatting.signedMilliamps(snapshot.currentMilliampsSigned))
-                MetricRowView(title: "System time remaining", value: BatteryFormatting.duration(minutes: snapshot.systemTimeRemainingMinutes))
-                MetricRowView(title: "Adapter max", value: snapshot.adapterMaxWatts.map { "\($0) W" } ?? "Unavailable")
-            }
+private struct NativeSettingsButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .controlSize(.mini)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+        } else {
+            content
+                .controlSize(.small)
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
         }
     }
 }
@@ -171,4 +110,36 @@ struct BatteryDashboardView: View {
         monitor.lastUpdated = .now
         return monitor
     }(), preferences: PreferencesStore())
+}
+
+private struct WindowChromeConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            configure(window: view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            configure(window: nsView.window)
+        }
+    }
+
+    private func configure(window: NSWindow?) {
+        guard let window else {
+            return
+        }
+
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.title = ""
+        window.toolbarStyle = .unifiedCompact
+        window.toolbar?.showsBaselineSeparator = false
+        window.isMovableByWindowBackground = true
+        window.styleMask.insert(.fullSizeContentView)
+    }
 }

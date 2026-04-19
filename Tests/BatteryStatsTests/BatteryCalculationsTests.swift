@@ -37,4 +37,27 @@ final class BatteryCalculationsTests: XCTestCase {
 
         XCTAssertEqual(smoothedRate, 1_083)
     }
+
+    func testEstimatedTimeToFullUsesChargeTaper() throws {
+        let estimated = try XCTUnwrap(BatteryCalculations.estimatedTimeToFullMinutes(
+            currentChargeMilliampHours: 4_031,
+            fullChargeCapacityMilliampHours: 5_338,
+            chargeCurrentMilliamps: 1_721,
+            reportedTimeToFullMinutes: nil
+        ))
+
+        XCTAssertGreaterThan(estimated, 45)
+        XCTAssertLessThan(estimated, 90)
+    }
+
+    func testEstimatedTimeToFullFallsBackToReportedValue() {
+        let estimated = BatteryCalculations.estimatedTimeToFullMinutes(
+            currentChargeMilliampHours: nil,
+            fullChargeCapacityMilliampHours: 5_338,
+            chargeCurrentMilliamps: 1_721,
+            reportedTimeToFullMinutes: 52
+        )
+
+        XCTAssertEqual(estimated, 52)
+    }
 }

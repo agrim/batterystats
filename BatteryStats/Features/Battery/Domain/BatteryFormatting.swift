@@ -66,6 +66,25 @@ enum BatteryFormatting {
         return DateComponentsFormatter.batteryStatsDuration.string(from: TimeInterval(minutes * 60)) ?? "Unavailable"
     }
 
+    static func compactDuration(minutes: Int?) -> String {
+        guard let minutes else {
+            return "—"
+        }
+
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+
+        if hours > 0 {
+            if remainingMinutes == 0 {
+                return "\(hours)h"
+            }
+
+            return "\(hours)h \(remainingMinutes)m"
+        }
+
+        return "\(remainingMinutes)m"
+    }
+
     static func temperature(_ celsiusValue: Double?, unitPreference: TemperatureUnitPreference) -> String {
         guard let celsiusValue else {
             return "Unavailable"
@@ -103,13 +122,11 @@ enum BatteryFormatting {
         return "\(capacity) • \(health) health"
     }
 
-    static func lastUpdated(_ date: Date?) -> String {
-        guard let date else {
-            return "Waiting for battery data"
+    static func compactCapacityPair(current: Int?, maximum: Int?) -> String {
+        guard let current, let maximum else {
+            return "Unavailable"
         }
 
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return "Updated \(formatter.localizedString(for: date, relativeTo: .now))"
+        return "\(current.formatted(.number.grouping(.automatic))) / \(maximum.formatted(.number.grouping(.automatic))) mAh"
     }
 }
