@@ -5,61 +5,10 @@ struct MenuBarBatteryView: View {
     @Bindable var monitor: BatteryMonitor
     @Bindable var preferences: PreferencesStore
 
-    @Environment(\.openWindow) private var openWindow
-
     var body: some View {
-        let content = VStack(alignment: .leading, spacing: 12) {
-            if let snapshot = monitor.snapshot {
-                BatterySummaryGridView(
-                    snapshot: snapshot,
-                    compact: true,
-                    temperatureUnitPreference: preferences.temperatureUnitPreference
-                )
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Battery Unavailable", systemImage: "battery.0")
-                        .font(.headline)
-
-                    Text("BatteryStats is designed for Mac laptops with an internal battery.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Divider()
-
-            HStack {
-                Button("Open BatteryStats") {
-                    openWindow(id: "main")
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-
-                Spacer()
-
-                SettingsLink {
-                    Text("Settings")
-                }
-
-                Spacer()
-
-                Button("Quit") {
-                    NSApp.terminate(nil)
-                }
-            }
-            .font(.caption)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .frame(width: 264)
-        .onAppear {
-            monitor.start()
-        }
-
-        if #available(macOS 15.0, *) {
-            content.containerBackground(.ultraThinMaterial, for: .window)
-        } else {
-            content
-        }
+        BatterySurfaceView(monitor: monitor, preferences: preferences)
+            .frame(minWidth: BatterySurfaceLayout.minimumWidth, alignment: .topLeading)
+            .containerBackground(.thinMaterial, for: .window)
     }
 }
 

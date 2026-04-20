@@ -3,12 +3,62 @@ import SwiftUI
 
 struct BatterySummaryGridView: View {
     let snapshot: BatterySnapshot
-    let compact: Bool
     let temperatureUnitPreference: TemperatureUnitPreference
 
     var body: some View {
-        summaryContent
+        VStack(alignment: .leading, spacing: 10) {
+            BatteryCapacityBarSectionView(
+                title: "Health",
+                capacityValue: BatteryFormatting.compactCapacityPair(
+                    current: snapshot.fullChargeCapacityMilliampHours,
+                    maximum: snapshot.designCapacityMilliampHours
+                ),
+                percentValue: BatteryFormatting.percent(snapshot.healthPercent, decimals: 0),
+                progress: snapshot.healthPercent,
+                tint: Self.tint(for: snapshot.healthTone)
+            )
+
+            BatteryCapacityBarSectionView(
+                title: "Charge",
+                capacityValue: BatteryFormatting.compactCapacityPair(
+                    current: snapshot.currentChargeMilliampHours,
+                    maximum: snapshot.fullChargeCapacityMilliampHours
+                ),
+                percentValue: BatteryFormatting.percent(snapshot.stateOfChargePercent, decimals: 0),
+                progress: snapshot.stateOfChargePercent,
+                tint: Self.tint(for: snapshot.chargeTone)
+            )
+
+            GroupBox {
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 0) {
+                    BatteryDetailRowView(title: timeTitle, value: timeSummary)
+
+                    Divider()
+                        .gridCellColumns(2)
+
+                    BatteryDetailRowView(title: "Status", value: snapshot.statusDisplayTitle)
+
+                    if let cycleCount = snapshot.cycleCount {
+                        Divider()
+                            .gridCellColumns(2)
+
+                        BatteryDetailRowView(title: "Charge Cycles", value: String(cycleCount))
+                    }
+
+                    if snapshot.temperatureCelsius != nil {
+                        Divider()
+                            .gridCellColumns(2)
+
+                        BatteryDetailRowView(
+                            title: "Temperature",
+                            value: BatteryFormatting.temperature(snapshot.temperatureCelsius, unitPreference: temperatureUnitPreference)
+                        )
+                    }
+                }
+            }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     static func tint(for tone: BatteryLevelTone) -> Color {
@@ -23,62 +73,6 @@ struct BatterySummaryGridView: View {
             return Color(nsColor: .systemYellow)
         case .red:
             return Color(nsColor: .systemRed)
-        }
-    }
-
-    private var summaryContent: some View {
-        VStack(alignment: .leading, spacing: compact ? 9 : 10) {
-            BatteryCapacityBarSectionView(
-                title: "Health",
-                capacityValue: BatteryFormatting.compactCapacityPair(
-                    current: snapshot.fullChargeCapacityMilliampHours,
-                    maximum: snapshot.designCapacityMilliampHours
-                ),
-                percentValue: BatteryFormatting.percent(snapshot.healthPercent, decimals: 0),
-                progress: snapshot.healthPercent,
-                tint: Self.tint(for: snapshot.healthTone),
-                compact: compact
-            )
-
-            BatteryCapacityBarSectionView(
-                title: "Charge",
-                capacityValue: BatteryFormatting.compactCapacityPair(
-                    current: snapshot.currentChargeMilliampHours,
-                    maximum: snapshot.fullChargeCapacityMilliampHours
-                ),
-                percentValue: BatteryFormatting.percent(snapshot.stateOfChargePercent, decimals: 0),
-                progress: snapshot.stateOfChargePercent,
-                tint: Self.tint(for: snapshot.chargeTone),
-                compact: compact
-            )
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 0) {
-                    BatteryDetailRowView(title: timeTitle, value: timeSummary, compact: compact)
-
-                    Divider()
-
-                    BatteryDetailRowView(title: "Status", value: snapshot.statusDisplayTitle, compact: compact)
-
-                    if let cycleCount = snapshot.cycleCount {
-                        Divider()
-
-                        BatteryDetailRowView(title: "Charge Cycles", value: String(cycleCount), compact: compact)
-                    }
-
-                    if snapshot.temperatureCelsius != nil {
-                        Divider()
-
-                        BatteryDetailRowView(
-                            title: "Temperature",
-                            value: BatteryFormatting.temperature(snapshot.temperatureCelsius, unitPreference: temperatureUnitPreference),
-                            compact: compact
-                        )
-                    }
-                }
-                .padding(.horizontal, compact ? 8 : 9)
-                .padding(.vertical, compact ? 2 : 3)
-            }
         }
     }
 
@@ -120,40 +114,43 @@ struct BatterySummaryGridView: View {
 }
 
 private struct BatteryCapacityBarSectionView: View {
+    private static let valueSpacing: CGFloat = 8
+    private static let barSpacing: CGFloat = 10
+    private static let barMinimumWidth: CGFloat = 148
+
     let title: String
     let capacityValue: String
     let percentValue: String
     let progress: Double?
     let tint: Color
-    let compact: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 4 : 5) {
-            LabeledContent {
-                Text(capacityValue)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                    .monospacedDigit()
-            } label: {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: Self.valueSpacing) {
                 Text(title)
-                    .foregroundStyle(.primary)
-            }
-            .font(compact ? .caption : .subheadline)
+                    .lineLimit(1)
 
-            HStack(alignment: .center, spacing: compact ? 8 : 10) {
+                Text(capacityValue)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .layoutPriority(1)
+            }
+            .font(.subheadline)
+
+            HStack(alignment: .firstTextBaseline, spacing: Self.barSpacing) {
                 ProgressView(value: clampedProgress)
-                    .progressViewStyle(.linear)
-                    .controlSize(compact ? .small : .regular)
+                    .controlSize(.small)
                     .tint(tint)
-                    .frame(maxWidth: .infinity)
+                    .frame(minWidth: Self.barMinimumWidth, maxWidth: .infinity)
 
                 Text(percentValue)
-                    .font(compact ? .caption : .callout)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
                     .contentTransition(.numericText())
-                    .frame(minWidth: compact ? 34 : 38, alignment: .trailing)
             }
         }
     }
@@ -166,37 +163,29 @@ private struct BatteryCapacityBarSectionView: View {
 private struct BatteryDetailRowView: View {
     let title: String
     let value: String
-    let compact: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: compact ? 10 : 12) {
+        GridRow {
             Text(title)
-                .font(rowFont)
-                .foregroundStyle(.primary)
                 .lineLimit(1)
-                .minimumScaleFactor(compact ? 0.9 : 0.85)
-
-            Spacer(minLength: compact ? 12 : 16)
+                .minimumScaleFactor(0.85)
 
             Text(value)
-                .font(rowFont)
+                .monospacedDigit()
                 .fontWeight(.semibold)
-                .foregroundStyle(.primary)
                 .multilineTextAlignment(.trailing)
                 .lineLimit(1)
+                .minimumScaleFactor(0.72)
                 .layoutPriority(1)
+                .gridColumnAlignment(.trailing)
                 .contentTransition(.numericText())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, compact ? 4 : 5)
-    }
-
-    private var rowFont: Font {
-        compact ? .caption : .subheadline
+        .font(.subheadline)
+        .padding(.vertical, 4)
     }
 }
 
 #Preview {
-    BatterySummaryGridView(snapshot: .previewDischarging, compact: false, temperatureUnitPreference: .celsius)
+    BatterySummaryGridView(snapshot: .previewDischarging, temperatureUnitPreference: .celsius)
         .padding()
 }

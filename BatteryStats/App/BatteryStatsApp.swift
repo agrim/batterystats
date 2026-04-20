@@ -24,9 +24,14 @@ struct BatteryStatsApp: App {
                     monitor.start()
                 }
         }
-        .defaultSize(width: 250, height: 235)
         .windowResizability(.contentSize)
+        .defaultWindowPlacement { content, _ in
+            WindowPlacement(size: content.sizeThatFits(.unspecified))
+        }
+        .windowIdealSize(.fitToContent)
         .windowStyle(.hiddenTitleBar)
+        .windowBackgroundDragBehavior(.disabled)
+        .restorationBehavior(.disabled)
 
         MenuBarExtra {
             MenuBarBatteryView(monitor: monitor, preferences: preferences)
