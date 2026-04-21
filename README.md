@@ -1,259 +1,134 @@
 # BatteryStats
 
-BatteryStats is a native macOS battery utility for Mac laptops.
+BatteryStats is a native macOS battery utility for Apple Silicon Mac laptops. It gives you a compact battery dashboard, a menu bar view, a settings window, and a small widget without bringing in non-Apple dependencies, Rosetta, or a backend.
 
-It exists for one practical reason: provide the useful battery telemetry people want from apps like Battery Health 2, but with a clean modern Swift/SwiftUI implementation that runs natively on Apple Silicon, does not require Rosetta, and stays inside the Apple ecosystem.
+[Download `BatteryStats-arm64.dmg`](https://github.com/agrim/batterystats/releases/download/v1.0/BatteryStats-arm64.dmg)
 
-## Why this project exists
+## What Ships In v1.0
 
-Older Mac battery utilities can still be useful, but on Apple Silicon they may feel dated, require Rosetta, or expose far more UI than necessary. BatteryStats is meant to be the opposite:
+- Native macOS app built with SwiftUI and Apple frameworks only
+- Apple-Silicon-first DMG release
+- Compact battery window with health, charge, time, status, cycle count, and temperature
+- Menu bar extra with multiple display modes
+- Launch at login support through `SMAppService`
+- Optional iCloud preference sync through `NSUbiquitousKeyValueStore`
+- System small widget with four circular battery indicators
+- Debug actions to copy raw and parsed battery snapshots
 
-- native macOS
-- native Apple Silicon support
-- simple, readable, Apple-like UI
-- no custom backend
-- no separate account system
-- no analytics or tracking
-- no dependency on non-Apple frameworks
+## What The App Shows
 
-The goal is not to build a giant system monitor. The goal is to build the smallest useful battery app that still surfaces the battery numbers that actually matter.
+BatteryStats currently focuses on:
 
-## What BatteryStats should show
-
-BatteryStats is focused on the metrics that matter most for laptop battery health and day-to-day use:
-
-- current charge in **mAh** and **Wh**
-- current charge-holding capacity / full charge capacity in **mAh** and **Wh**
-- design capacity in **mAh** and **Wh**
-- discharge / consumption rate in **mA**
-- charge rate in **W**
-- estimated time remaining at the current discharge rate
-- cycle count
-- manufacture date
-- battery age
+- battery health as full-charge capacity vs design capacity
+- current charge as current charge vs full-charge capacity
+- time left or time to full
+- charging or on-battery state
+- charge cycle count
 - temperature
 
-A derived battery-health percentage should also be shown because it makes the “current charge-holding capacity vs design capacity” relationship easier to understand.
+When the underlying system exposes more data, BatteryStats also calculates:
 
-## Product principles
+- watt-hour values
+- signed current and discharge rate
+- charge wattage
+- manufacture date
+- battery age
+- adapter wattage
 
-BatteryStats should feel like a small first-party Mac utility.
+If a value is unavailable on the current Mac or battery, BatteryStats leaves it unavailable rather than inventing it.
 
-### 1. Native first
-Use Swift, SwiftUI, IOKit, ServiceManagement, UserDefaults, and optional iCloud-backed Apple sync primitives only.
+## Surfaces
 
-### 2. Minimal UI
-No flashy dashboards. No neon colors. No fake gauges. No web views. No Electron-style chrome. No dense card wall.
+### Main Window
 
-### 3. Read-only utility
-BatteryStats is for reading battery information, not modifying charge behavior, controlling fans, installing helpers, or asking for elevated privileges.
+The main window is a compact summary surface, not a giant dashboard. It emphasizes:
 
-### 4. Honest data
-If a metric cannot be read reliably on a given Mac or OS version, show **Unavailable** instead of guessing or inventing values.
+- battery health
+- current charge
+- time left or time to full
+- battery status
 
-### 5. Lightweight
-The app should have very low idle CPU usage, very low memory usage, and should not materially impact battery life itself.
+### Menu Bar Extra
 
-### 6. No backend
-No custom auth. No account signup. No telemetry pipeline. No server. If settings sync is needed, use Apple's existing iCloud infrastructure only.
+The menu bar label can be configured to show:
 
-## High-level architecture
+- icon only
+- icon plus current percentage
+- icon plus health
+- icon plus full-charge capacity
 
-BatteryStats should stay small and use a narrow set of Apple frameworks:
+Opening the menu bar extra shows the same compact battery surface used by the main window.
 
-- **SwiftUI** for the app UI
-- **MenuBarExtra** for the menu bar surface
-- **IOKit / IOKit.ps** for battery and power-source data
-- **IORegistry access through public IOKit APIs** for detailed battery properties
-- **UserDefaults** for local preferences
-- **NSUbiquitousKeyValueStore** for optional iCloud settings sync
-- **ServiceManagement / SMAppService** for optional launch-at-login
-- **OSLog** for logging
-- **Swift Testing / XCTest** for unit tests
+### Settings
 
-## How the app should work
+The settings window supports:
 
-BatteryStats should be a small utility with three main surfaces:
-
-### Menu bar extra
-Fast glanceable summary:
-- current battery percentage
-- charging / on-battery state
-- full charge capacity (key metric)
-- quick action to open the detailed window
-- refresh / settings / quit actions
-
-### Main details window
-A calm, compact battery dashboard showing the full set of core metrics.
-
-The **current charge-holding capacity** should be visually emphasized because that is the key metric for this project.
-
-### Settings window
-A very small settings screen for:
 - launch at login
+- iCloud preference sync
 - menu bar display mode
 - temperature unit
-- optional iCloud settings sync
-- developer / debug actions if needed
+- advanced value toggle
+- copy raw snapshot
+- copy parsed snapshot
+- reset settings
 
-## iCloud strategy
+### Widget
 
-BatteryStats should not create or manage a user account.
+The widget is a `systemSmall` widget named **Battery Circles**. It shows:
 
-If sync is needed, the app should use the system's iCloud account infrastructure that already exists on the Mac. For v1, that should be limited to lightweight settings sync through Apple-provided APIs rather than a custom backend or a complex CloudKit data model.
+- health ring
+- charge ring
+- time ring
+- power-state ring
 
-The app must still work perfectly if iCloud is unavailable or disabled.
+## Platform Notes
 
-## Privacy stance
+- Intended for Mac laptops with an internal battery
+- Best experience on Apple Silicon
+- The DMG published here is arm64 only
+- The current public DMG is locally signed but not Apple-notarized yet
+- Desktop Macs and unsupported battery configurations fall back to a clean unsupported state
 
-BatteryStats should be aggressively private by design:
+## Build From Source
 
-- no analytics
-- no ad SDKs
-- no third-party crash reporter
-- no custom networking
-- no battery data uploaded to developer-owned servers
-- no contact list / calendar / photos / file-system reach
-- no root privileges
-- no helper daemons
+Requirements:
 
-If a future version adds optional sync, that sync should remain inside Apple's own iCloud infrastructure.
+- Xcode 17+
+- `xcodegen`
+- macOS 15+ for the current project and Icon Composer workflow
 
-## Supported hardware and OS
+Generate the project:
 
-Recommended target for v1:
+```bash
+xcodegen generate
+```
 
-- **macOS 14 or later**
-- **Apple Silicon first**
-- Intel support is acceptable if it comes “for free,” but Apple Silicon is the primary validation target
-- Mac laptops with an internal battery are the intended hardware target
+Debug build and run:
 
-On desktop Macs or Macs where no internal notebook battery is exposed, the app should show a clean unsupported state instead of a broken UI.
+```bash
+./script/build_and_run.sh
+```
 
-## Important implementation note
+Run tests:
 
-The public power-source API is good for:
-- charging state
-- change notifications
-- public time remaining info
-- general battery presence / power source state
+```bash
+xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStatsTests test
+```
 
-But detailed metrics like design capacity, full charge capacity, voltage, amperage, temperature, and manufacture date typically come from deeper battery properties exposed through the system power-management stack.
+Release build:
 
-That means BatteryStats needs to be:
-- careful about fallbacks
-- honest about missing values
-- resilient to OS / hardware differences
-- modular in how battery properties are read and parsed
+```bash
+xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStats -configuration Release -derivedDataPath .build/DerivedDataRelease build
+```
 
-## Project scope
+## Repository Layout
 
-### MVP
-- native app shell
-- battery data acquisition
-- menu bar extra
-- main details window
-- settings window
-- launch-at-login toggle
-- optional iCloud settings sync
-- unit tests for parsing / calculations / formatting
+- `BatteryStats/` — main app source
+- `BatteryStatsWidgets/` — widget extension
+- `Tests/BatteryStatsTests/` — unit tests
+- `BatteryStats/Resources/IconLayers/AppIcon.icon` — saved Icon Composer app icon source
+- `dist/BatteryStats-arm64.dmg` — tracked release artifact
 
-### Explicitly not part of MVP
-- fan control
-- charge limiting
-- battery charging overrides
-- battery notifications spam
-- battery history graphs
-- export / CSV
-- widgets
-- helper tools
-- privileged installs
-- Sparkle or other external updater mechanisms
-- non-Apple dependencies
+## Release Notes
 
-## Current repository docs
-
-- `README.md` — project overview
-- `AGENT_INSTRUCTIONS.md` — the implementation source of truth for agentic coding
-
-If there is a conflict between a clever idea and a smaller, safer, more native implementation, the smaller implementation should win.
-
-## Roadmap
-
-### Phase 1
-Ship the read-only native utility:
-- live metrics
-- menu bar experience
-- detailed window
-- settings
-- low overhead
-
-### Phase 2
-Improve polish:
-- better unsupported / unavailable messaging
-- richer formatting
-- improved testing coverage
-- more robust battery-state smoothing
-
-### Phase 3
-Optional additions only if still lightweight:
-- local history snapshots
-- Swift Charts-based history view
-- optional export
-- deeper iCloud sync for history if there is a real product need
-
-## Design language
-
-BatteryStats should feel at home next to built-in macOS apps.
-
-Use:
-- system typography
-- SF Symbols
-- standard materials
-- subtle section grouping
-- monospaced digits for changing numeric values
-- clear labels and calm spacing
-
-Avoid:
-- glossy gauges
-- pseudo-scientific “health scores”
-- skeuomorphic battery graphics
-- crowded dashboards
-- custom icon packs
-- custom color systems
-- animation-heavy UI
-
-## Development philosophy
-
-Build the smallest working version first.
-
-That means:
-1. get real battery data reliably
-2. make the numbers understandable
-3. keep the UI clean
-4. keep the app lightweight
-5. only then add polish
-
-Do not start by designing a huge preference system or a data-sync architecture. Start with the battery reader, the state model, and the UI required to display the core metrics cleanly.
-
-## Caveats and honesty notes
-
-Battery metrics on macOS are not always conceptually simple:
-
-- some APIs expose percentage-oriented values rather than absolute capacity
-- some metrics are derived
-- current and charge-rate values can fluctuate rapidly
-- optimized charging / battery-health management can affect how “full” looks at a given moment
-- some keys may vary by hardware generation or OS version
-
-BatteryStats should explain this with calm, minimal wording where useful, but never overwhelm the interface.
-
-## Non-affiliation
-
-BatteryStats is an independent project inspired by the usefulness of apps like Battery Health 2, but it is not affiliated with Battery Health 2, FIPLAB, or Apple.
-
-## Repository intent
-
-This repository is for building a serious, native, battery-focused Mac utility that feels small, clear, and trustworthy.
-
-If you are contributing or implementing agentically, read **AGENT_INSTRUCTIONS.md** before writing code.
+See [CHANGELOG.md](CHANGELOG.md) for the release summary for `v1.0`.

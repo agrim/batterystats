@@ -3,7 +3,7 @@ set -euo pipefail
 
 MODE="${1:-run}"
 APP_NAME="BatteryStats"
-BUNDLE_ID="com.example.BatteryStats"
+BUNDLE_ID="io.github.agrim.batterystats"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/BatteryStats.xcodeproj"

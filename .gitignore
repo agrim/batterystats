@@ -1,4 +1,8 @@
 .build/
 DerivedData/
-dist/
+build/
+dist/*
+!dist/BatteryStats-arm64.dmg
+BatteryStats.xcodeproj/project.xcworkspace/xcuserdata/
+BatteryStats.xcodeproj/xcuserdata/
 .DS_Store

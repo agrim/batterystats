@@ -45,6 +45,7 @@
 		BDF6313A05A4592934C70973 /* SmartBatteryReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0431FDC746A6DEDD0D4D22A5 /* SmartBatteryReader.swift */; };
 		BF9C6253A46E131B86F0B11A /* BatteryMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A22C59532E2F0BDB9DD6DFE /* BatteryMonitor.swift */; };
 		BFDFE6C6D112A9DC49C83F0A /* BatteryReadingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9CF0240444BFA1009A5E35C /* BatteryReadingService.swift */; };
+		C5356A2E7D97D024F6D17E50 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 61F7F21F0CC183F8E30533FF /* AppIcon.icon */; };
 		C6C2ED164E78301B3ED14230 /* BatteryFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1F633EF43C6C4C041DC7D3 /* BatteryFormatting.swift */; };
 		C753061FD2C43249902FEF52 /* BatteryStatsWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1662A5F02D67F8A8B685FD96 /* BatteryStatsWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D050BD0ABCC9F6AF74A081D8 /* Logger+BatteryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9272316AC90D03FCE4F4BDE /* Logger+BatteryStats.swift */; };
@@ -104,6 +105,7 @@
 		59CBB0CB8177A5BC224BF9D1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		59E381D309A04494394199E3 /* BatterySummaryGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySummaryGridView.swift; sourceTree = "<group>"; };
 		5DD38FC0F86C78105CAE4DD0 /* BatteryStatsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryStatsApp.swift; sourceTree = "<group>"; };
+		61F7F21F0CC183F8E30533FF /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		6DACFF04033985B587295F84 /* ManufactureDateDecoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManufactureDateDecoderTests.swift; sourceTree = "<group>"; };
 		799E0D1E3866EE2E966A215F /* SmartBatteryParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartBatteryParsingTests.swift; sourceTree = "<group>"; };
 		7A22C59532E2F0BDB9DD6DFE /* BatteryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMonitor.swift; sourceTree = "<group>"; };
@@ -211,6 +213,7 @@
 			children = (
 				59CBB0CB8177A5BC224BF9D1 /* Assets.xcassets */,
 				93E9C1F9B2824435601BC06B /* BatteryStats.entitlements */,
+				E09C6DABE4EFA5CC74EF08EB /* IconLayers */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -288,6 +291,14 @@
 				2ACD36752CC21AEBF8A2D90E /* Battery */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		E09C6DABE4EFA5CC74EF08EB /* IconLayers */ = {
+			isa = PBXGroup;
+			children = (
+				61F7F21F0CC183F8E30533FF /* AppIcon.icon */,
+			);
+			path = IconLayers;
 			sourceTree = "<group>";
 		};
 		FDD56C4D196EE5DC8AD07933 /* Domain */ = {
@@ -397,6 +408,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C5356A2E7D97D024F6D17E50 /* AppIcon.icon in Resources */,
 				961F1A4A38944B4362295A06 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -500,7 +512,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStatsTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.agrim.batterystats.tests;
 				PRODUCT_NAME = BatteryStatsTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BatteryStats.app/Contents/MacOS/BatteryStats";
@@ -521,7 +533,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStats.widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.agrim.batterystats.widgets;
 				PRODUCT_NAME = BatteryStatsWidgetsExtension;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -544,7 +556,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStats;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.agrim.batterystats;
 				PRODUCT_NAME = BatteryStats;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -624,7 +636,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStatsTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.agrim.batterystats.tests;
 				PRODUCT_NAME = BatteryStatsTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BatteryStats.app/Contents/MacOS/BatteryStats";
@@ -713,7 +725,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStats.widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.agrim.batterystats.widgets;
 				PRODUCT_NAME = BatteryStatsWidgetsExtension;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -736,7 +748,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStats;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.agrim.batterystats;
 				PRODUCT_NAME = BatteryStats;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;

@@ -27,13 +27,17 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: BatteryStats
+        excludes:
+          - Resources/IconLayers/background.png
+          - Resources/IconLayers/battery.png
+          - Resources/IconLayers/heart.png
     dependencies:
       - target: BatteryStatsWidgetsExtension
         embed: true
     settings:
       base:
         PRODUCT_NAME: BatteryStats
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.BatteryStats
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.agrim.batterystats
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: BatteryStats
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
@@ -64,7 +68,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: BatteryStatsWidgetsExtension
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.BatteryStats.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.agrim.batterystats.widgets
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BatteryStatsWidgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: BatteryStatsWidgets/BatteryStatsWidgets.entitlements
@@ -82,5 +86,5 @@ targets:
     settings:
       base:
         PRODUCT_NAME: BatteryStatsTests
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.BatteryStatsTests
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.agrim.batterystats.tests
         GENERATE_INFOPLIST_FILE: YES
