@@ -27,6 +27,9 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: BatteryStats
+    dependencies:
+      - target: BatteryStatsWidgetsExtension
+        embed: true
     settings:
       base:
         PRODUCT_NAME: BatteryStats
@@ -37,6 +40,35 @@ targets:
         INFOPLIST_KEY_NSPrincipalClass: NSApplication
         CODE_SIGN_ENTITLEMENTS: BatteryStats/Resources/BatteryStats.entitlements
         ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
+
+  BatteryStatsWidgetsExtension:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: BatteryStatsWidgets
+      - path: BatteryStats/Features/Battery/Data/BatteryReadingService.swift
+      - path: BatteryStats/Features/Battery/Data/PowerSourceReader.swift
+      - path: BatteryStats/Features/Battery/Data/PublicPowerSourceSnapshot.swift
+      - path: BatteryStats/Features/Battery/Data/SmartBatteryReader.swift
+      - path: BatteryStats/Features/Battery/Domain/BatteryCalculations.swift
+      - path: BatteryStats/Features/Battery/Domain/BatteryFormatting.swift
+      - path: BatteryStats/Features/Battery/Domain/BatteryPowerState.swift
+      - path: BatteryStats/Features/Battery/Domain/BatterySnapshot.swift
+      - path: BatteryStats/Features/Battery/Domain/ManufactureDateDecoder.swift
+      - path: BatteryStats/Settings/TemperatureUnitPreference.swift
+      - path: BatteryStats/Shared/Logging/Logger+BatteryStats.swift
+      - path: BatteryStats/Shared/Utilities/DateComponentsFormatter+BatteryStats.swift
+      - path: BatteryStats/Shared/Utilities/NSNumber+SignedConversions.swift
+    settings:
+      base:
+        PRODUCT_NAME: BatteryStatsWidgetsExtension
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.BatteryStats.widgets
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: BatteryStatsWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: BatteryStatsWidgets/BatteryStatsWidgets.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
         SWIFT_EMIT_LOC_STRINGS: NO
 
   BatteryStatsTests:

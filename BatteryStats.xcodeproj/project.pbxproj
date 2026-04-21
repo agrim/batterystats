@@ -7,37 +7,55 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		023AD4FE77207BC9081D64E9 /* BatteryStatusWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CA382F1E110D64CE053243 /* BatteryStatusWidgetView.swift */; };
+		063E6808822682C2C70E8CD0 /* BatteryStatusWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A362235767691D9DFCBC28C5 /* BatteryStatusWidget.swift */; };
+		07C5A6EB73EC1B94B2EFA78C /* BatteryCalculations.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB81F3AB5C869E80EE42C77 /* BatteryCalculations.swift */; };
+		09674D5C91D8D154DC420E54 /* PowerSourceReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15016E358DCF29B4A8663341 /* PowerSourceReader.swift */; };
+		2824660F11F178CAAFC14F95 /* TemperatureUnitPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C157C20F6C0DC0985E67EA0 /* TemperatureUnitPreference.swift */; };
+		2B47993249F410C953580780 /* BatteryReadingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9CF0240444BFA1009A5E35C /* BatteryReadingService.swift */; };
+		2B56DD58CD5610A918787ADD /* ManufactureDateDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C84AF2E658242BE33475645 /* ManufactureDateDecoder.swift */; };
 		2C6149882B96DE1A8333567D /* BatteryPowerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C140D2191F110315A06F4868 /* BatteryPowerState.swift */; };
 		2CABF74CA000788063D33B44 /* UnsupportedBatteryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58394EC224CA5A3098F8E14 /* UnsupportedBatteryView.swift */; };
 		337D06DFBE221263223C00C9 /* FormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8479806068B3A19E3F62CD2D /* FormatterTests.swift */; };
 		49569A4A53E911E984B438A8 /* MenuBarBatteryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C702ED14962BF23C8CD2EFB1 /* MenuBarBatteryView.swift */; };
 		54D2C9257DF3BD8DED070F1C /* DateComponentsFormatter+BatteryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E9EF2C16340AE7FFC896AB /* DateComponentsFormatter+BatteryStats.swift */; };
+		5D8AAC43B6E5CC8B49C6D078 /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF4BB36764261AC446DC9DEF /* BatterySnapshot.swift */; };
 		5E5FB0523A0652BFFBA5E48C /* ICloudPreferencesSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D13C4821EC108B1541D39D3 /* ICloudPreferencesSync.swift */; };
 		65DD8B3717E4F5A9AD227868 /* PublicPowerSourceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F397178E6C624A2573665119 /* PublicPowerSourceSnapshot.swift */; };
 		667B861613E526A84182A389 /* LaunchAtLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C01988693F7B11DC6D12EF /* LaunchAtLoginManager.swift */; };
 		67AEF243BFFC43162AB89111 /* MetricRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25CDC8A1131CCE34565C70A /* MetricRowView.swift */; };
 		700F392E81D630EFF3215FB4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CE8BB36FED6A3D01B916AE /* SettingsView.swift */; };
 		71F8AD3F330E0FD245722BBD /* NSNumber+SignedConversions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6C5A88E7E2CB6C99D0FAD94 /* NSNumber+SignedConversions.swift */; };
+		7C1DED7063F5EB861053E7E2 /* BatteryStatsWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED3781E6C39ABE529DD11F2 /* BatteryStatsWidgetsBundle.swift */; };
 		7E35650A10C7A2B986489C2F /* BatterySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF4BB36764261AC446DC9DEF /* BatterySnapshot.swift */; };
 		876F89B0239A6BA9D118FED3 /* ManufactureDateDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C84AF2E658242BE33475645 /* ManufactureDateDecoder.swift */; };
 		895B40B87B44C528FBE2C3ED /* BatterySectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0DA51608112B7C8079510 /* BatterySectionView.swift */; };
+		954B09473FC91F65208508B2 /* SmartBatteryReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0431FDC746A6DEDD0D4D22A5 /* SmartBatteryReader.swift */; };
 		95E283FCB73B3C4DB4DC1553 /* BatteryDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E19E53F66B8E83BD27C500F /* BatteryDashboardView.swift */; };
 		961F1A4A38944B4362295A06 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 59CBB0CB8177A5BC224BF9D1 /* Assets.xcassets */; };
 		97CA060F3B9C10F6C3438C20 /* BatteryFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1F633EF43C6C4C041DC7D3 /* BatteryFormatting.swift */; };
 		9BEE8A3C58B9189217FFF40F /* PowerSourceReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15016E358DCF29B4A8663341 /* PowerSourceReader.swift */; };
 		9E259B91BE0C5B4E37DED56F /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D78A8EEA1CAC14F3024AB7 /* AppCommands.swift */; };
 		A839F50FA02CFD32BAE5F1F5 /* BatterySummaryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59E381D309A04494394199E3 /* BatterySummaryGridView.swift */; };
+		AAF31B89EF09911769F0B484 /* TemperatureUnitPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C157C20F6C0DC0985E67EA0 /* TemperatureUnitPreference.swift */; };
 		AD6D2C6B965AF158D32F6B12 /* Logger+BatteryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9272316AC90D03FCE4F4BDE /* Logger+BatteryStats.swift */; };
 		AD7195AF112F10EFD13C4F80 /* PasteboardCopying.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA38365A13FDB275C8A83D7 /* PasteboardCopying.swift */; };
 		B30E5EF7308EE70D8BB38597 /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1CEFCE03714D1107758BB1 /* PreferencesStore.swift */; };
+		BD9E5D84D9F2905C5A5D9C3A /* PublicPowerSourceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F397178E6C624A2573665119 /* PublicPowerSourceSnapshot.swift */; };
 		BDF6313A05A4592934C70973 /* SmartBatteryReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0431FDC746A6DEDD0D4D22A5 /* SmartBatteryReader.swift */; };
 		BF9C6253A46E131B86F0B11A /* BatteryMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A22C59532E2F0BDB9DD6DFE /* BatteryMonitor.swift */; };
 		BFDFE6C6D112A9DC49C83F0A /* BatteryReadingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9CF0240444BFA1009A5E35C /* BatteryReadingService.swift */; };
+		C6C2ED164E78301B3ED14230 /* BatteryFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1F633EF43C6C4C041DC7D3 /* BatteryFormatting.swift */; };
+		C753061FD2C43249902FEF52 /* BatteryStatsWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1662A5F02D67F8A8B685FD96 /* BatteryStatsWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D050BD0ABCC9F6AF74A081D8 /* Logger+BatteryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9272316AC90D03FCE4F4BDE /* Logger+BatteryStats.swift */; };
 		D364006BB2C751247D7AD9E4 /* BatteryStatsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD38FC0F86C78105CAE4DD0 /* BatteryStatsApp.swift */; };
+		D423B2E00AD40B382F910F6D /* BatteryPowerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C140D2191F110315A06F4868 /* BatteryPowerState.swift */; };
 		D87F6902A2264CE1D40B4B23 /* BatteryCalculationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4C9D88538CE20902A3722C /* BatteryCalculationsTests.swift */; };
 		D92635DA471851E9B53FCF28 /* SmartBatteryParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799E0D1E3866EE2E966A215F /* SmartBatteryParsingTests.swift */; };
 		EAB09975503FCA11ABF3C93A /* BatteryCalculations.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB81F3AB5C869E80EE42C77 /* BatteryCalculations.swift */; };
+		F50D2D5D1E0AD9D339932AE3 /* NSNumber+SignedConversions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6C5A88E7E2CB6C99D0FAD94 /* NSNumber+SignedConversions.swift */; };
 		F965BC5D57996D8821E8245C /* ManufactureDateDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DACFF04033985B587295F84 /* ManufactureDateDecoderTests.swift */; };
+		FF647E75304A5F81B3DD1E65 /* DateComponentsFormatter+BatteryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E9EF2C16340AE7FFC896AB /* DateComponentsFormatter+BatteryStats.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,14 +66,38 @@
 			remoteGlobalIDString = 29ECAB68979D037979EF525B;
 			remoteInfo = BatteryStats;
 		};
+		F7F62D790E11F468D47C1CAC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EFA2840A85B03D5348133428 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9BEC09668E685BF4749D45B0;
+			remoteInfo = BatteryStatsWidgetsExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		851EFC0AE99A08DB16A0B481 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C753061FD2C43249902FEF52 /* BatteryStatsWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0431FDC746A6DEDD0D4D22A5 /* SmartBatteryReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartBatteryReader.swift; sourceTree = "<group>"; };
 		04F06FA9392FF5E60A19153A /* BatteryStatsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BatteryStatsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		07CA382F1E110D64CE053243 /* BatteryStatusWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryStatusWidgetView.swift; sourceTree = "<group>"; };
 		0A5E199EE63FC634B3D89E82 /* BatteryStats.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BatteryStats.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		15016E358DCF29B4A8663341 /* PowerSourceReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerSourceReader.swift; sourceTree = "<group>"; };
+		1662A5F02D67F8A8B685FD96 /* BatteryStatsWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BatteryStatsWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		17E9EF2C16340AE7FFC896AB /* DateComponentsFormatter+BatteryStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DateComponentsFormatter+BatteryStats.swift"; sourceTree = "<group>"; };
+		1C157C20F6C0DC0985E67EA0 /* TemperatureUnitPreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemperatureUnitPreference.swift; sourceTree = "<group>"; };
 		2E4C9D88538CE20902A3722C /* BatteryCalculationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryCalculationsTests.swift; sourceTree = "<group>"; };
 		3E1CEFCE03714D1107758BB1 /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
 		4E19E53F66B8E83BD27C500F /* BatteryDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryDashboardView.swift; sourceTree = "<group>"; };
@@ -65,14 +107,18 @@
 		6DACFF04033985B587295F84 /* ManufactureDateDecoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManufactureDateDecoderTests.swift; sourceTree = "<group>"; };
 		799E0D1E3866EE2E966A215F /* SmartBatteryParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartBatteryParsingTests.swift; sourceTree = "<group>"; };
 		7A22C59532E2F0BDB9DD6DFE /* BatteryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMonitor.swift; sourceTree = "<group>"; };
+		7ED3781E6C39ABE529DD11F2 /* BatteryStatsWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryStatsWidgetsBundle.swift; sourceTree = "<group>"; };
 		8479806068B3A19E3F62CD2D /* FormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatterTests.swift; sourceTree = "<group>"; };
+		8847603EC602C221E1AD1FD5 /* BatteryStatsWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BatteryStatsWidgets.entitlements; sourceTree = "<group>"; };
 		8D13C4821EC108B1541D39D3 /* ICloudPreferencesSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudPreferencesSync.swift; sourceTree = "<group>"; };
 		93E9C1F9B2824435601BC06B /* BatteryStats.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BatteryStats.entitlements; sourceTree = "<group>"; };
 		9AB0DA51608112B7C8079510 /* BatterySectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySectionView.swift; sourceTree = "<group>"; };
 		9C1F633EF43C6C4C041DC7D3 /* BatteryFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryFormatting.swift; sourceTree = "<group>"; };
 		9C84AF2E658242BE33475645 /* ManufactureDateDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManufactureDateDecoder.swift; sourceTree = "<group>"; };
 		A25CDC8A1131CCE34565C70A /* MetricRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricRowView.swift; sourceTree = "<group>"; };
+		A362235767691D9DFCBC28C5 /* BatteryStatusWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryStatusWidget.swift; sourceTree = "<group>"; };
 		A4CE8BB36FED6A3D01B916AE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A9842A893C7AE6D8205211E0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BF4BB36764261AC446DC9DEF /* BatterySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshot.swift; sourceTree = "<group>"; };
 		C140D2191F110315A06F4868 /* BatteryPowerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerState.swift; sourceTree = "<group>"; };
 		C6C5A88E7E2CB6C99D0FAD94 /* NSNumber+SignedConversions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSNumber+SignedConversions.swift"; sourceTree = "<group>"; };
@@ -93,6 +139,7 @@
 			children = (
 				20E05DF5A621604849D7FF57 /* BatteryStats */,
 				8D8D62FF2D61BF49D49A7A52 /* BatteryStatsTests */,
+				B995307D290A36CC3642C264 /* BatteryStatsWidgets */,
 				5DB5E190FFF6206B458AE52C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -116,6 +163,7 @@
 				D6C01988693F7B11DC6D12EF /* LaunchAtLoginManager.swift */,
 				3E1CEFCE03714D1107758BB1 /* PreferencesStore.swift */,
 				A4CE8BB36FED6A3D01B916AE /* SettingsView.swift */,
+				1C157C20F6C0DC0985E67EA0 /* TemperatureUnitPreference.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -144,6 +192,7 @@
 			children = (
 				0A5E199EE63FC634B3D89E82 /* BatteryStats.app */,
 				04F06FA9392FF5E60A19153A /* BatteryStatsTests.xctest */,
+				1662A5F02D67F8A8B685FD96 /* BatteryStatsWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -201,6 +250,18 @@
 				0431FDC746A6DEDD0D4D22A5 /* SmartBatteryReader.swift */,
 			);
 			path = Data;
+			sourceTree = "<group>";
+		};
+		B995307D290A36CC3642C264 /* BatteryStatsWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				8847603EC602C221E1AD1FD5 /* BatteryStatsWidgets.entitlements */,
+				7ED3781E6C39ABE529DD11F2 /* BatteryStatsWidgetsBundle.swift */,
+				A362235767691D9DFCBC28C5 /* BatteryStatusWidget.swift */,
+				07CA382F1E110D64CE053243 /* BatteryStatusWidgetView.swift */,
+				A9842A893C7AE6D8205211E0 /* Info.plist */,
+			);
+			path = BatteryStatsWidgets;
 			sourceTree = "<group>";
 		};
 		BE3E40A19598ECFA4938D620 /* Logging */ = {
@@ -268,10 +329,12 @@
 			buildPhases = (
 				C1478A6E68ECFED710D74A66 /* Sources */,
 				C19F6E27F9A5E1C8B539A7D8 /* Resources */,
+				851EFC0AE99A08DB16A0B481 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CB0D34AABCB7922418EACC60 /* PBXTargetDependency */,
 			);
 			name = BatteryStats;
 			packageProductDependencies = (
@@ -279,6 +342,23 @@
 			productName = BatteryStats;
 			productReference = 0A5E199EE63FC634B3D89E82 /* BatteryStats.app */;
 			productType = "com.apple.product-type.application";
+		};
+		9BEC09668E685BF4749D45B0 /* BatteryStatsWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1002F8C799CE06F3CD852910 /* Build configuration list for PBXNativeTarget "BatteryStatsWidgetsExtension" */;
+			buildPhases = (
+				4FC94CE60CFD9BECFF173552 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BatteryStatsWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = BatteryStatsWidgetsExtension;
+			productReference = 1662A5F02D67F8A8B685FD96 /* BatteryStatsWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -307,6 +387,7 @@
 			targets = (
 				29ECAB68979D037979EF525B /* BatteryStats */,
 				26FA152DAB78DB92FEE1F0B0 /* BatteryStatsTests */,
+				9BEC09668E685BF4749D45B0 /* BatteryStatsWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -323,6 +404,29 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		4FC94CE60CFD9BECFF173552 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				07C5A6EB73EC1B94B2EFA78C /* BatteryCalculations.swift in Sources */,
+				C6C2ED164E78301B3ED14230 /* BatteryFormatting.swift in Sources */,
+				D423B2E00AD40B382F910F6D /* BatteryPowerState.swift in Sources */,
+				2B47993249F410C953580780 /* BatteryReadingService.swift in Sources */,
+				5D8AAC43B6E5CC8B49C6D078 /* BatterySnapshot.swift in Sources */,
+				7C1DED7063F5EB861053E7E2 /* BatteryStatsWidgetsBundle.swift in Sources */,
+				063E6808822682C2C70E8CD0 /* BatteryStatusWidget.swift in Sources */,
+				023AD4FE77207BC9081D64E9 /* BatteryStatusWidgetView.swift in Sources */,
+				FF647E75304A5F81B3DD1E65 /* DateComponentsFormatter+BatteryStats.swift in Sources */,
+				D050BD0ABCC9F6AF74A081D8 /* Logger+BatteryStats.swift in Sources */,
+				2B56DD58CD5610A918787ADD /* ManufactureDateDecoder.swift in Sources */,
+				F50D2D5D1E0AD9D339932AE3 /* NSNumber+SignedConversions.swift in Sources */,
+				09674D5C91D8D154DC420E54 /* PowerSourceReader.swift in Sources */,
+				BD9E5D84D9F2905C5A5D9C3A /* PublicPowerSourceSnapshot.swift in Sources */,
+				954B09473FC91F65208508B2 /* SmartBatteryReader.swift in Sources */,
+				AAF31B89EF09911769F0B484 /* TemperatureUnitPreference.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C1478A6E68ECFED710D74A66 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -352,6 +456,7 @@
 				65DD8B3717E4F5A9AD227868 /* PublicPowerSourceSnapshot.swift in Sources */,
 				700F392E81D630EFF3215FB4 /* SettingsView.swift in Sources */,
 				BDF6313A05A4592934C70973 /* SmartBatteryReader.swift in Sources */,
+				2824660F11F178CAAFC14F95 /* TemperatureUnitPreference.swift in Sources */,
 				2CABF74CA000788063D33B44 /* UnsupportedBatteryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -375,6 +480,11 @@
 			target = 29ECAB68979D037979EF525B /* BatteryStats */;
 			targetProxy = 1D96E238982B7BF97A37B106 /* PBXContainerItemProxy */;
 		};
+		CB0D34AABCB7922418EACC60 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9BEC09668E685BF4749D45B0 /* BatteryStatsWidgetsExtension */;
+			targetProxy = F7F62D790E11F468D47C1CAC /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -396,6 +506,27 @@
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BatteryStats.app/Contents/MacOS/BatteryStats";
 			};
 			name = Release;
+		};
+		3C31CB200FA3A35334992CB6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BatteryStatsWidgets/BatteryStatsWidgets.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BatteryStatsWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStats.widgets;
+				PRODUCT_NAME = BatteryStatsWidgetsExtension;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
 		};
 		5E82D7D35646E04FE1E6517A /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -568,6 +699,27 @@
 			};
 			name = Debug;
 		};
+		A77862A7E5917ABAE114A38E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BatteryStatsWidgets/BatteryStatsWidgets.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BatteryStatsWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.BatteryStats.widgets;
+				PRODUCT_NAME = BatteryStatsWidgetsExtension;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
 		F72523347F349C0A7D3FD013 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -594,6 +746,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1002F8C799CE06F3CD852910 /* Build configuration list for PBXNativeTarget "BatteryStatsWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C31CB200FA3A35334992CB6 /* Debug */,
+				A77862A7E5917ABAE114A38E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		5987CF11071641EF8334F03A /* Build configuration list for PBXProject "BatteryStats" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
