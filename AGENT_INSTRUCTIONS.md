@@ -25,8 +25,11 @@ The app is intentionally compact. It is not a hardware-control tool, fan control
 - Menu bar display modes
 - Launch at login
 - Optional iCloud-backed preference sync
+- Configurable or dynamic refresh cadence with energy-shift probing
+- Optional local alerts for low battery, charge complete, and high temperature
+- Optional local battery history with iCloud key-value sync when enabled
 - Copy raw and parsed battery snapshots for debugging
-- Widget with four circular battery indicators
+- Widget with four circular battery indicators and a labeled medium layout
 
 ## Architecture
 
@@ -69,8 +72,10 @@ Runtime battery data flows through:
      - power-source notification callbacks
      - wake from sleep
      - app activation
-     - a 5-second timer
+     - the selected fixed timer or the dynamic cadence from `BatteryRefreshPolicy`
+     - an energy-shift probe when the selected cadence is slower than the probe interval
    - Smooths discharge samples before computing a rate-based remaining time
+   - Records history and evaluates alert policy after published refreshes
 
 ### Domain Model
 
@@ -102,6 +107,8 @@ The main window and the menu bar extra deliberately share `BatterySurfaceView` s
 ### Settings
 
 - `BatteryStats/Settings/PreferencesStore.swift`
+- `BatteryStats/Settings/RefreshCadencePreference.swift`
+- `BatteryStats/Settings/BatteryAlertPolicy.swift`
 - `BatteryStats/Settings/SettingsView.swift`
 - `BatteryStats/Settings/LaunchAtLoginManager.swift`
 - `BatteryStats/Settings/ICloudPreferencesSync.swift`
@@ -116,6 +123,19 @@ Persisted preferences:
 - `temperatureUnitPreference`
 - `showAdvancedValues`
 - `isICloudSyncEnabled`
+- `refreshCadencePreference`
+- `energyChangeSensitivity`
+- alert toggles
+- history toggles
+
+### History And Alerts
+
+- `BatteryStats/Features/Battery/Data/BatteryHistoryStore.swift`
+- `BatteryStats/Features/Battery/Data/BatteryAlertCoordinator.swift`
+
+History is opt-in and keeps a capped local set of lightweight samples. If history iCloud sync is enabled, it mirrors the compact encoded sample set through `NSUbiquitousKeyValueStore`; avoid large or high-frequency payloads.
+
+Alerts are opt-in local notifications. Keep them threshold-based and avoid repeated notifications while the same condition remains active.
 
 ### Widget
 
@@ -124,13 +144,15 @@ Persisted preferences:
 
 Current widget behavior:
 
-- family: `systemSmall`
+- families: `systemSmall`, `systemMedium`
 - refresh cadence: roughly every 5 minutes
 - metric rings:
   - health
   - charge
   - time
   - power state
+
+The small widget keeps symbol-centered rings. The medium widget can use labels and text values.
 
 The widget reads battery state through `BatteryReadingService` and reuses shared battery domain and data files directly.
 
@@ -195,6 +217,7 @@ Current test coverage is focused on battery math and parsing:
 - `BatteryCalculationsTests.swift`
 - `FormatterTests.swift`
 - `ManufactureDateDecoderTests.swift`
+- `RefreshPolicyTests.swift`
 - `SmartBatteryParsingTests.swift`
 
 ## Release Artifacts

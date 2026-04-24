@@ -45,7 +45,8 @@ struct BatterySurfaceView: View {
                 if let snapshot = monitor.snapshot {
                     BatterySummaryGridView(
                         snapshot: snapshot,
-                        temperatureUnitPreference: preferences.temperatureUnitPreference
+                        temperatureUnitPreference: preferences.temperatureUnitPreference,
+                        showsAdvancedValues: preferences.showAdvancedValues
                     )
                 } else {
                     UnsupportedBatteryView()

@@ -22,6 +22,16 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatteryFormatting.compactDuration(minutes: 45), "45m")
     }
 
+    func testFormatsWidgetDuration() {
+        XCTAssertEqual(BatteryFormatting.compactWidgetDuration(minutes: 45), "45m")
+        XCTAssertEqual(BatteryFormatting.compactWidgetDuration(minutes: 125), "2h")
+        XCTAssertEqual(BatteryFormatting.compactWidgetDuration(minutes: nil), "—")
+    }
+
+    func testFormatsCompactWattHourPair() {
+        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: 40.2, maximum: 65.4), "40.2 / 65.4 Wh")
+    }
+
     func testFormatsFahrenheitTemperature() {
         XCTAssertEqual(BatteryFormatting.temperature(34.2, unitPreference: .fahrenheit), "93.6 °F")
     }

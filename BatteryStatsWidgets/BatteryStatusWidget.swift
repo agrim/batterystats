@@ -44,6 +44,6 @@ struct BatteryStatusWidget: Widget {
         }
         .configurationDisplayName("Battery Circles")
         .description("See battery health, charge, time remaining, and power state at a glance.")
-        .supportedFamilies([.systemSmall])
+        .supportedFamilies([.systemSmall, .systemMedium])
     }
 }

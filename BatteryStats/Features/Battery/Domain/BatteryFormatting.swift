@@ -85,6 +85,19 @@ enum BatteryFormatting {
         return "\(remainingMinutes)m"
     }
 
+    static func compactWidgetDuration(minutes: Int?) -> String {
+        guard let minutes else {
+            return "—"
+        }
+
+        if minutes < 60 {
+            return "\(max(1, minutes))m"
+        }
+
+        let roundedHours = max(1, Int((Double(minutes) / 60).rounded(.toNearestOrAwayFromZero)))
+        return "\(roundedHours)h"
+    }
+
     static func temperature(_ celsiusValue: Double?, unitPreference: TemperatureUnitPreference) -> String {
         guard let celsiusValue else {
             return "Unavailable"
@@ -128,5 +141,15 @@ enum BatteryFormatting {
         }
 
         return "\(current.formatted(.number.grouping(.automatic))) / \(maximum.formatted(.number.grouping(.automatic))) mAh"
+    }
+
+    static func compactWattHourPair(current: Double?, maximum: Double?) -> String {
+        guard let current, let maximum else {
+            return "Unavailable"
+        }
+
+        let currentText = current.formatted(.number.precision(.fractionLength(1)))
+        let maximumText = maximum.formatted(.number.precision(.fractionLength(1)))
+        return "\(currentText) / \(maximumText) Wh"
     }
 }

@@ -41,6 +41,36 @@ struct BatterySnapshot: Equatable, Sendable {
     let adapterMaxWatts: Int?
     let notes: [String]
 
+    var activePowerWatts: Double? {
+        switch powerState {
+        case .charging:
+            return chargeRateWatts
+        case .onBattery:
+            return dischargeRateWatts
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return chargeRateWatts ?? dischargeRateWatts
+        }
+    }
+
+    var activeCurrentMilliamps: Int? {
+        switch powerState {
+        case .charging:
+            return BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned)
+        case .onBattery:
+            return dischargeRateMilliamps
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return currentMilliampsSigned.map(abs)
+        }
+    }
+
+    var energyUseComparisonValue: Double? {
+        if let activePowerWatts {
+            return activePowerWatts
+        }
+
+        return activeCurrentMilliamps.map { Double($0) / 1_000 }
+    }
+
     var displayedTimeMinutes: Int? {
         switch powerState {
         case .onBattery:

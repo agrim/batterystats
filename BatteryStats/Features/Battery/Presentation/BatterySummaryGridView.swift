@@ -4,6 +4,7 @@ import SwiftUI
 struct BatterySummaryGridView: View {
     let snapshot: BatterySnapshot
     let temperatureUnitPreference: TemperatureUnitPreference
+    let showsAdvancedValues: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -53,6 +54,10 @@ struct BatterySummaryGridView: View {
                             title: "Temperature",
                             value: BatteryFormatting.temperature(snapshot.temperatureCelsius, unitPreference: temperatureUnitPreference)
                         )
+                    }
+
+                    if showsAdvancedValues {
+                        advancedRows
                     }
                 }
             }
@@ -110,6 +115,57 @@ struct BatterySummaryGridView: View {
         }
 
         return components.isEmpty ? "—" : components.joined(separator: " / ")
+    }
+
+    @ViewBuilder
+    private var advancedRows: some View {
+        if let activePowerWatts = snapshot.activePowerWatts {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Power", value: BatteryFormatting.watts(activePowerWatts))
+        }
+
+        if snapshot.voltageMillivolts != nil {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Voltage", value: BatteryFormatting.millivolts(snapshot.voltageMillivolts))
+        }
+
+        if snapshot.currentChargeWattHours != nil || snapshot.fullChargeCapacityWattHours != nil {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(
+                title: "Energy",
+                value: BatteryFormatting.compactWattHourPair(
+                    current: snapshot.currentChargeWattHours,
+                    maximum: snapshot.fullChargeCapacityWattHours
+                )
+            )
+        }
+
+        if let adapterMaxWatts = snapshot.adapterMaxWatts {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Adapter", value: "\(adapterMaxWatts) W")
+        }
+
+        if snapshot.manufactureDate != nil {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Made", value: BatteryFormatting.date(snapshot.manufactureDate))
+        }
+
+        if snapshot.batteryAgeComponents != nil {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Age", value: BatteryFormatting.age(snapshot.batteryAgeComponents))
+        }
     }
 }
 
@@ -186,6 +242,6 @@ private struct BatteryDetailRowView: View {
 }
 
 #Preview {
-    BatterySummaryGridView(snapshot: .previewDischarging, temperatureUnitPreference: .celsius)
+    BatterySummaryGridView(snapshot: .previewDischarging, temperatureUnitPreference: .celsius, showsAdvancedValues: true)
         .padding()
 }

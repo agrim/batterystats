@@ -14,6 +14,7 @@ struct BatteryStatsApp: App {
 
     @State private var monitor = BatteryMonitor()
     @State private var preferences = PreferencesStore()
+    @State private var historyStore = BatteryHistoryStore()
 
     var body: some Scene {
         WindowGroup("BatteryStats", id: "main") {
@@ -21,7 +22,17 @@ struct BatteryStatsApp: App {
                 .environment(monitor)
                 .environment(preferences)
                 .onAppear {
+                    configureMonitor()
                     monitor.start()
+                }
+                .onChange(of: preferences.refreshPolicy) { _, policy in
+                    monitor.updateRefreshPolicy(policy)
+                }
+                .onChange(of: preferences.historyPolicy) { _, policy in
+                    monitor.updateHistory(store: historyStore, policy: policy)
+                }
+                .onChange(of: preferences.alertPolicy) { _, policy in
+                    monitor.updateAlerts(policy)
                 }
         }
         .windowResizability(.contentSize)
@@ -34,11 +45,21 @@ struct BatteryStatsApp: App {
         .restorationBehavior(.disabled)
 
         MenuBarExtra {
-            MenuBarBatteryView(monitor: monitor, preferences: preferences)
+            MenuBarBatteryView(monitor: monitor, preferences: preferences, historyStore: historyStore)
                 .environment(monitor)
                 .environment(preferences)
                 .onAppear {
+                    configureMonitor()
                     monitor.start()
+                }
+                .onChange(of: preferences.refreshPolicy) { _, policy in
+                    monitor.updateRefreshPolicy(policy)
+                }
+                .onChange(of: preferences.historyPolicy) { _, policy in
+                    monitor.updateHistory(store: historyStore, policy: policy)
+                }
+                .onChange(of: preferences.alertPolicy) { _, policy in
+                    monitor.updateAlerts(policy)
                 }
         } label: {
             MenuBarBatteryLabelView(snapshot: monitor.snapshot, displayMode: preferences.menuBarDisplayMode)
@@ -46,12 +67,30 @@ struct BatteryStatsApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(preferences: preferences, monitor: monitor)
+            SettingsView(preferences: preferences, monitor: monitor, historyStore: historyStore)
                 .environment(preferences)
                 .environment(monitor)
+                .onAppear {
+                    configureMonitor()
+                }
+                .onChange(of: preferences.refreshPolicy) { _, policy in
+                    monitor.updateRefreshPolicy(policy)
+                }
+                .onChange(of: preferences.historyPolicy) { _, policy in
+                    monitor.updateHistory(store: historyStore, policy: policy)
+                }
+                .onChange(of: preferences.alertPolicy) { _, policy in
+                    monitor.updateAlerts(policy)
+                }
         }
         .commands {
             AppCommands()
         }
+    }
+
+    private func configureMonitor() {
+        monitor.updateRefreshPolicy(preferences.refreshPolicy)
+        monitor.updateHistory(store: historyStore, policy: preferences.historyPolicy)
+        monitor.updateAlerts(preferences.alertPolicy)
     }
 }
