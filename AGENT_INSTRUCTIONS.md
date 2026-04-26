@@ -35,7 +35,7 @@ The app is intentionally compact. It is not a hardware-control tool, fan control
 
 ### App Entry
 
-- `BatteryStats/App/BatteryStatsApp.swift`
+- `Platforms/macOS/App/App/BatteryStatsApp.swift`
 
 Creates three scenes:
 
@@ -50,22 +50,22 @@ Creates three scenes:
 Runtime battery data flows through:
 
 1. `PowerSourceReader`
-   - File: `BatteryStats/Features/Battery/Data/PowerSourceReader.swift`
+   - File: `Platforms/macOS/App/Features/Battery/Data/PowerSourceReader.swift`
    - Uses `IOKit.ps`
    - Reads public power-source state and registers change notifications
 
 2. `SmartBatteryReader`
-   - File: `BatteryStats/Features/Battery/Data/SmartBatteryReader.swift`
+   - File: `Platforms/macOS/App/Features/Battery/Data/SmartBatteryReader.swift`
    - Reads `AppleSmartBattery` properties through IOKit
    - Provides deeper fields like capacities, signed current, cycle count, manufacture date, and temperature
 
 3. `BatteryReadingService`
-   - File: `BatteryStats/Features/Battery/Data/BatteryReadingService.swift`
+   - File: `Platforms/macOS/App/Features/Battery/Data/BatteryReadingService.swift`
    - Merges public and smart-battery reads into one `BatterySnapshot`
    - Computes derived values and fallback notes
 
 4. `BatteryMonitor`
-   - File: `BatteryStats/Features/Battery/Data/BatteryMonitor.swift`
+   - File: `Platforms/macOS/App/Features/Battery/Data/BatteryMonitor.swift`
    - Owns refresh cadence and app-facing state
    - Refreshes on:
      - app start
@@ -77,13 +77,16 @@ Runtime battery data flows through:
    - Smooths discharge samples before computing a rate-based remaining time
    - Records history and evaluates alert policy after published refreshes
 
-### Domain Model
+### Shared Battery Core
 
-- `BatteryStats/Features/Battery/Domain/BatterySnapshot.swift`
-- `BatteryStats/Features/Battery/Domain/BatteryCalculations.swift`
-- `BatteryStats/Features/Battery/Domain/BatteryFormatting.swift`
-- `BatteryStats/Features/Battery/Domain/BatteryPowerState.swift`
-- `BatteryStats/Features/Battery/Domain/ManufactureDateDecoder.swift`
+- `Shared/BatteryCore/Domain/BatterySnapshot.swift`
+- `Shared/BatteryCore/Domain/BatteryCalculations.swift`
+- `Shared/BatteryCore/Domain/BatteryFormatting.swift`
+- `Shared/BatteryCore/Domain/BatteryPowerState.swift`
+- `Shared/BatteryCore/Domain/ManufactureDateDecoder.swift`
+- `Shared/BatteryCore/Policies/BatteryAlertPolicy.swift`
+- `Shared/BatteryCore/Policies/RefreshCadencePreference.swift`
+- `Shared/BatteryCore/Settings/TemperatureUnitPreference.swift`
 
 `BatterySnapshot` is the central view model for both the app UI and the widget. Keep it stable and additive where possible.
 
@@ -97,22 +100,22 @@ Important computed fields:
 
 ### Presentation
 
-- `BatteryStats/Features/Battery/Presentation/BatteryDashboardView.swift`
-- `BatteryStats/Features/Battery/Presentation/BatterySummaryGridView.swift`
-- `BatteryStats/Features/Battery/Presentation/MenuBarBatteryView.swift`
-- `BatteryStats/Features/Battery/Presentation/UnsupportedBatteryView.swift`
+- `Platforms/macOS/App/Features/Battery/Presentation/BatteryDashboardView.swift`
+- `Platforms/macOS/App/Features/Battery/Presentation/BatterySummaryGridView.swift`
+- `Platforms/macOS/App/Features/Battery/Presentation/MenuBarBatteryView.swift`
+- `Platforms/macOS/App/Features/Battery/Presentation/UnsupportedBatteryView.swift`
 
 The main window and the menu bar extra deliberately share `BatterySurfaceView` so the compact battery summary stays consistent across surfaces.
 
 ### Settings
 
-- `BatteryStats/Settings/PreferencesStore.swift`
-- `BatteryStats/Settings/RefreshCadencePreference.swift`
-- `BatteryStats/Settings/BatteryAlertPolicy.swift`
-- `BatteryStats/Settings/SettingsView.swift`
-- `BatteryStats/Settings/LaunchAtLoginManager.swift`
-- `BatteryStats/Settings/ICloudPreferencesSync.swift`
-- `BatteryStats/Settings/TemperatureUnitPreference.swift`
+- `Platforms/macOS/App/Settings/PreferencesStore.swift`
+- `Platforms/macOS/App/Settings/SettingsView.swift`
+- `Platforms/macOS/App/Settings/LaunchAtLoginManager.swift`
+- `Shared/BatteryCore/Policies/RefreshCadencePreference.swift`
+- `Shared/BatteryCore/Policies/BatteryAlertPolicy.swift`
+- `Shared/BatteryCore/Settings/TemperatureUnitPreference.swift`
+- `Shared/Support/Settings/ICloudPreferencesSync.swift`
 
 `PreferencesStore` is the single source of truth for user-configurable settings.
 
@@ -130,8 +133,8 @@ Persisted preferences:
 
 ### History And Alerts
 
-- `BatteryStats/Features/Battery/Data/BatteryHistoryStore.swift`
-- `BatteryStats/Features/Battery/Data/BatteryAlertCoordinator.swift`
+- `Platforms/macOS/App/Features/Battery/Data/BatteryHistoryStore.swift`
+- `Platforms/macOS/App/Features/Battery/Data/BatteryAlertCoordinator.swift`
 
 History is opt-in and keeps a capped local set of lightweight samples. If history iCloud sync is enabled, it mirrors the compact encoded sample set through `NSUbiquitousKeyValueStore`; avoid large or high-frequency payloads.
 
@@ -139,8 +142,8 @@ Alerts are opt-in local notifications. Keep them threshold-based and avoid repea
 
 ### Widget
 
-- `BatteryStatsWidgets/BatteryStatusWidget.swift`
-- `BatteryStatsWidgets/BatteryStatusWidgetView.swift`
+- `Platforms/macOS/Widgets/BatteryStatusWidget.swift`
+- `Platforms/macOS/Widgets/BatteryStatusWidgetView.swift`
 
 Current widget behavior:
 
@@ -155,6 +158,23 @@ Current widget behavior:
 The small widget keeps symbol-centered rings. The medium widget can use labels and text values.
 
 The widget reads battery state through `BatteryReadingService` and reuses shared battery domain and data files directly.
+
+## Multi-Device Work
+
+All iOS, iPadOS, and watchOS exploration belongs on the `multi-device` branch. Keep `main` focused on the shipping macOS release line until a multi-device target is ready to merge.
+
+Repository lanes:
+
+- `Platforms/macOS/App/` keeps the current Mac app and Mac-only IOKit readers
+- `Platforms/macOS/Widgets/` keeps the current macOS WidgetKit extension
+- `Platforms/iOS/App/` is reserved for the future universal iPhone app target
+- `Platforms/iPadOS/` is reserved for iPad-specific presentation, navigation, and pointer/keyboard behavior
+- `Platforms/watchOS/App/` is reserved for the future watch app shell
+- `Platforms/watchOS/Extension/` is reserved for watch runtime code, complications, and WatchConnectivity integration
+- `Shared/BatteryCore/` is the cross-platform model/calculation/policy surface
+- `Shared/Support/` is reusable Apple-platform support that each target must opt into deliberately
+
+When adding a new platform target, define it in `project.yml`, regenerate with `xcodegen generate`, and keep platform-only APIs outside `Shared/BatteryCore`.
 
 ## Design Constraints
 
@@ -224,9 +244,9 @@ Current test coverage is focused on battery math and parsing:
 
 - Tracked DMG: `dist/BatteryStats-arm64.dmg`
 - Tracked checksum: `dist/BatteryStats-arm64.dmg.sha256`
-- Saved app icon source: `BatteryStats/Resources/IconLayers/AppIcon.icon`
+- Saved app icon source: `Platforms/macOS/App/Resources/IconLayers/AppIcon.icon`
 
-The app icon is authored in Icon Composer and stored as a `.icon` package. The raw editable layer PNGs live in `BatteryStats/Resources/IconLayers/`, but they are excluded from the app target so they do not ship inside the final app bundle.
+The app icon is authored in Icon Composer and stored as a `.icon` package. The raw editable layer PNGs live in `Platforms/macOS/App/Resources/IconLayers/`, but they are excluded from the app target so they do not ship inside the final app bundle.
 
 ## Packaging Notes
 

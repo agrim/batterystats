@@ -137,10 +137,17 @@ xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStats -configuration R
 
 ## Repository Layout
 
-- `BatteryStats/` — main app source
-- `BatteryStatsWidgets/` — widget extension
+- `Platforms/macOS/App/` — shipping macOS app source
+- `Platforms/macOS/Widgets/` — shipping macOS widget extension
+- `Platforms/iOS/App/` — staging area for the universal iPhone app target
+- `Platforms/iPadOS/` — staging area for iPad-specific presentation and interaction code
+- `Platforms/watchOS/App/` — staging area for the watchOS app shell
+- `Platforms/watchOS/Extension/` — staging area for watch-specific runtime code
+- `Shared/BatteryCore/` — cross-platform battery models, calculations, policies, formatting, and utilities
+- `Shared/Support/` — reusable Apple-platform support code that targets opt into deliberately
 - `Tests/BatteryStatsTests/` — unit tests
-- `BatteryStats/Resources/IconLayers/AppIcon.icon` — saved Icon Composer app icon source
+- `docs/multi-device-architecture.md` — multi-device branch and target strategy
+- `Platforms/macOS/App/Resources/IconLayers/AppIcon.icon` — saved Icon Composer app icon source
 - `dist/BatteryStats-arm64.dmg` — tracked notarized release artifact
 - `dist/BatteryStats-arm64.dmg.sha256` — SHA-256 checksum for the tracked release artifact
 
