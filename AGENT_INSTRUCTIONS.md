@@ -252,7 +252,7 @@ Notarization requires:
 
 If the machine only has `Sign to Run Locally` or no valid signing identities, you cannot complete notarization from this repo alone.
 
-Current maintainer-machine status during the `v1.0.1` release pass:
+Current maintainer-machine status during the `v1.0.2` release pass:
 
 - Developer ID Application identity exists for team `Q293G85PG5`
 - `notarytool` profile `BatteryStats` is stored in Keychain

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.2
+
+Distribution metadata correction.
+
+- Rebuilt the notarized DMG with the app bundle version set to `1.0.2`
+- Kept the same v1.0.1 app functionality and release checks
+- Supersedes v1.0.1, whose release artifact was notarized but still reported app version `1.0`
+
 ## v1.0.1
 
 Distribution and usability update.
