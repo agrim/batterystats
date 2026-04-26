@@ -6,4 +6,6 @@ dist/*
 !dist/BatteryStats-arm64.dmg.sha256
 BatteryStats.xcodeproj/project.xcworkspace/xcuserdata/
 BatteryStats.xcodeproj/xcuserdata/
+*.xcresult
+*.xcuserstate
 .DS_Store

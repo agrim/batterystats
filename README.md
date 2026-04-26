@@ -2,11 +2,11 @@
 
 BatteryStats is a native macOS battery utility for Apple Silicon Mac laptops. It gives you a compact battery dashboard, a menu bar view, a settings window, and a small widget without bringing in non-Apple dependencies, Rosetta, or a backend.
 
-[Download `BatteryStats-arm64.dmg`](https://github.com/agrim/batterystats/releases/download/v1.0.2/BatteryStats-arm64.dmg)
+[Download `BatteryStats-arm64.dmg`](https://github.com/agrim/batterystats/releases/download/v1.0.3/BatteryStats-arm64.dmg)
 
-SHA-256 checksum: [`BatteryStats-arm64.dmg.sha256`](https://github.com/agrim/batterystats/releases/download/v1.0.2/BatteryStats-arm64.dmg.sha256)
+SHA-256 checksum: [`BatteryStats-arm64.dmg.sha256`](https://github.com/agrim/batterystats/releases/download/v1.0.3/BatteryStats-arm64.dmg.sha256)
 
-## What Ships In v1.0.2
+## What Ships In v1.0.3
 
 - Native macOS app built with SwiftUI and Apple frameworks only
 - Apple-Silicon-first Developer ID signed and notarized DMG release
@@ -144,4 +144,4 @@ xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStats -configuration R
 
 ## Release Notes
 
-See [CHANGELOG.md](CHANGELOG.md) for the release summary for `v1.0.2`.
+See [CHANGELOG.md](CHANGELOG.md) for the release summary for `v1.0.3`.

@@ -11,6 +11,10 @@ DERIVED_DATA_PATH="$ROOT_DIR/.build/DerivedData"
 APP_BUNDLE="$DERIVED_DATA_PATH/Build/Products/Debug/$APP_NAME.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
+usage() {
+  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]"
+}
+
 build_app() {
   xcodebuild \
     -project "$PROJECT_PATH" \
@@ -24,6 +28,13 @@ build_app() {
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }
+
+case "$MODE" in
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+esac
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -50,7 +61,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    usage >&2
     exit 2
     ;;
 esac

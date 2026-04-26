@@ -16,6 +16,7 @@ struct SettingsView: View {
             updatesSection
             alertsSection
             advancedSection
+            aboutSection
         }
         .formStyle(.grouped)
         .padding(20)
@@ -125,6 +126,14 @@ struct SettingsView: View {
             Button("Reset Settings") {
                 preferences.reset()
             }
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            Text(ReleaseVersion.from(Bundle.main.infoDictionary)?.displayText ?? "Version unavailable")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 

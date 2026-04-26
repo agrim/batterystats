@@ -6,6 +6,6 @@ name = "BatteryStats"
 script = ""
 
 [[actions]]
-name = "Run"
+name = "Run BatteryStats"
 icon = "run"
 command = "./script/build_and_run.sh"

@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.3
+
+Repository presentation and release metadata cleanup.
+
+- Cleaned the GitHub file-list commit descriptions through the v1.0.3 release commit
+- Added an app version readout in Settings
+- Added a widget bundle info string for release metadata consistency
+- Added explicit help handling to the build/run script
+- Rebuilt, Developer ID signed, notarized, stapled, and validated the Apple-Silicon DMG
+
 ## v1.0.2
 
 Distribution metadata correction.
