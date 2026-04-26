@@ -3,6 +3,7 @@ DerivedData/
 build/
 dist/*
 !dist/BatteryStats-arm64.dmg
+!dist/BatteryStats-arm64.dmg.sha256
 BatteryStats.xcodeproj/project.xcworkspace/xcuserdata/
 BatteryStats.xcodeproj/xcuserdata/
 .DS_Store

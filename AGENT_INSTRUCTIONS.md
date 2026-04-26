@@ -10,7 +10,7 @@ BatteryStats is a small native macOS battery utility for Apple Silicon Mac lapto
 - a menu bar extra
 - a settings window
 - a `systemSmall` widget extension
-- an Apple-Silicon DMG release artifact
+- a Developer ID signed and notarized Apple-Silicon DMG release artifact
 
 The app is intentionally compact. It is not a hardware-control tool, fan controller, charging limiter, or general-purpose system monitor.
 
@@ -223,6 +223,7 @@ Current test coverage is focused on battery math and parsing:
 ## Release Artifacts
 
 - Tracked DMG: `dist/BatteryStats-arm64.dmg`
+- Tracked checksum: `dist/BatteryStats-arm64.dmg.sha256`
 - Saved app icon source: `BatteryStats/Resources/IconLayers/AppIcon.icon`
 
 The app icon is authored in Icon Composer and stored as a `.icon` package. The raw editable layer PNGs live in `BatteryStats/Resources/IconLayers/`, but they are excluded from the app target so they do not ship inside the final app bundle.
@@ -231,14 +232,18 @@ The app icon is authored in Icon Composer and stored as a `.icon` package. The r
 
 Current release packaging approach:
 
-1. Build the release app
-2. Verify signatures
+1. Build the release app with Developer ID settings
+2. Verify signatures, hardened runtime, and nested widget signing
 3. Copy the app plus an `Applications` alias into a staging folder
 4. Create `dist/BatteryStats-arm64.dmg` with `hdiutil`
+5. Sign the DMG with the Developer ID Application identity
+6. Submit the DMG with `xcrun notarytool submit --wait`
+7. Staple and validate the ticket with `xcrun stapler`
+8. Publish `dist/BatteryStats-arm64.dmg.sha256` beside the DMG
 
 The DMG currently targets Apple Silicon release builds.
 
-## Notarization Reality
+## Notarization
 
 Notarization requires:
 
@@ -247,11 +252,12 @@ Notarization requires:
 
 If the machine only has `Sign to Run Locally` or no valid signing identities, you cannot complete notarization from this repo alone.
 
-Current maintainer-machine status during the `v1.0` release pass:
+Current maintainer-machine status during the `v1.0.1` release pass:
 
-- `security find-identity -v -p codesigning` returned `0 valid identities found`
-- the release app is therefore ad-hoc signed rather than Developer ID signed
-- notarization is blocked until a real Developer ID certificate and notarization credentials are installed on the machine performing the release
+- Developer ID Application identity exists for team `Q293G85PG5`
+- `notarytool` profile `BatteryStats` is stored in Keychain
+- `dist/BatteryStats-arm64.dmg` is Developer ID signed, notarized, and stapled
+- `spctl -a -t open --context context:primary-signature -vv dist/BatteryStats-arm64.dmg` should report `accepted`
 
 ## Practical Agent Guidance
 

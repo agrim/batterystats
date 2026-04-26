@@ -2,17 +2,22 @@
 
 BatteryStats is a native macOS battery utility for Apple Silicon Mac laptops. It gives you a compact battery dashboard, a menu bar view, a settings window, and a small widget without bringing in non-Apple dependencies, Rosetta, or a backend.
 
-[Download `BatteryStats-arm64.dmg`](https://github.com/agrim/batterystats/releases/download/v1.0/BatteryStats-arm64.dmg)
+[Download `BatteryStats-arm64.dmg`](https://github.com/agrim/batterystats/releases/download/v1.0.1/BatteryStats-arm64.dmg)
 
-## What Ships In v1.0
+SHA-256 checksum: [`BatteryStats-arm64.dmg.sha256`](https://github.com/agrim/batterystats/releases/download/v1.0.1/BatteryStats-arm64.dmg.sha256)
+
+## What Ships In v1.0.1
 
 - Native macOS app built with SwiftUI and Apple frameworks only
-- Apple-Silicon-first DMG release
+- Apple-Silicon-first Developer ID signed and notarized DMG release
 - Compact battery window with health, charge, time, status, cycle count, and temperature
-- Menu bar extra with multiple display modes
+- Menu bar extra with multiple display modes, including remaining-time display
 - Launch at login support through `SMAppService`
 - Optional iCloud preference sync through `NSUbiquitousKeyValueStore`
-- System small widget with four circular battery indicators
+- Configurable or dynamic refresh cadence with out-of-cycle refreshes for large energy-use shifts
+- Optional local battery history with a history summary in Settings
+- Optional local alerts for low battery, charge complete, and high temperature
+- System small and medium widgets with circular battery indicators
 - Debug actions to copy raw and parsed battery snapshots
 
 ## What The App Shows
@@ -56,6 +61,7 @@ The menu bar label can be configured to show:
 - icon plus current percentage
 - icon plus health
 - icon plus full-charge capacity
+- icon plus remaining time
 
 Opening the menu bar extra shows the same compact battery surface used by the main window.
 
@@ -66,27 +72,33 @@ The settings window supports:
 - launch at login
 - iCloud preference sync
 - menu bar display mode
+- refresh cadence
+- energy-change sensitivity
 - temperature unit
+- local alert policy
+- local battery history
 - advanced value toggle
 - copy raw snapshot
 - copy parsed snapshot
 - reset settings
 
-### Widget
+### Widgets
 
-The widget is a `systemSmall` widget named **Battery Circles**. It shows:
+The widgets are named **Battery Circles**. They show:
 
 - health ring
 - charge ring
 - time ring
 - power-state ring
 
+The small widget keeps the four-ring compact layout. The medium widget adds labels and text values.
+
 ## Platform Notes
 
 - Intended for Mac laptops with an internal battery
 - Best experience on Apple Silicon
 - The DMG published here is arm64 only
-- The current public DMG is locally signed but not Apple-notarized yet
+- The public DMG is Developer ID signed, notarized by Apple, and stapled
 - Desktop Macs and unsupported battery configurations fall back to a clean unsupported state
 
 ## Build From Source
@@ -128,7 +140,8 @@ xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStats -configuration R
 - `Tests/BatteryStatsTests/` — unit tests
 - `BatteryStats/Resources/IconLayers/AppIcon.icon` — saved Icon Composer app icon source
 - `dist/BatteryStats-arm64.dmg` — tracked release artifact
+- `dist/BatteryStats-arm64.dmg.sha256` — SHA-256 checksum for the tracked release artifact
 
 ## Release Notes
 
-See [CHANGELOG.md](CHANGELOG.md) for the release summary for `v1.0`.
+See [CHANGELOG.md](CHANGELOG.md) for the release summary for `v1.0.1`.
