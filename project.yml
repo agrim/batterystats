@@ -19,6 +19,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
 targets:
   BatteryStats:
@@ -52,6 +53,7 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: BatteryStatsWidgets
+      - path: BatteryStats/Features/Battery/Data/BatteryReadingClient.swift
       - path: BatteryStats/Features/Battery/Data/BatteryReadingService.swift
       - path: BatteryStats/Features/Battery/Data/PowerSourceReader.swift
       - path: BatteryStats/Features/Battery/Data/PublicPowerSourceSnapshot.swift
@@ -60,7 +62,9 @@ targets:
       - path: BatteryStats/Features/Battery/Domain/BatteryFormatting.swift
       - path: BatteryStats/Features/Battery/Domain/BatteryPowerState.swift
       - path: BatteryStats/Features/Battery/Domain/BatterySnapshot.swift
+      - path: BatteryStats/Features/Battery/Domain/BatterySnapshot+Preview.swift
       - path: BatteryStats/Features/Battery/Domain/ManufactureDateDecoder.swift
+      - path: BatteryStats/Features/Battery/Presentation/BatteryPresentationStyle.swift
       - path: BatteryStats/Settings/TemperatureUnitPreference.swift
       - path: BatteryStats/Shared/Logging/Logger+BatteryStats.swift
       - path: BatteryStats/Shared/Utilities/DateComponentsFormatter+BatteryStats.swift
@@ -72,6 +76,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BatteryStatsWidgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: BatteryStatsWidgets/BatteryStatsWidgets.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SWIFT_EMIT_LOC_STRINGS: NO
 

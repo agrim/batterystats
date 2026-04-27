@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct BatterySummaryGridView: View {
@@ -16,7 +15,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatteryFormatting.percent(snapshot.healthPercent, decimals: 0),
                 progress: snapshot.healthPercent,
-                tint: Self.tint(for: snapshot.healthTone)
+                tint: BatteryPresentationStyle.tint(for: snapshot.healthTone)
             )
 
             BatteryCapacityBarSectionView(
@@ -27,7 +26,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatteryFormatting.percent(snapshot.stateOfChargePercent, decimals: 0),
                 progress: snapshot.stateOfChargePercent,
-                tint: Self.tint(for: snapshot.chargeTone)
+                tint: BatteryPresentationStyle.tint(for: snapshot.chargeTone)
             )
 
             GroupBox {
@@ -64,21 +63,6 @@ struct BatterySummaryGridView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    static func tint(for tone: BatteryLevelTone) -> Color {
-        switch tone {
-        case .green:
-            return Color(nsColor: .systemGreen)
-        case .midGreen:
-            return Color(nsColor: .systemGreen)
-        case .greenYellow:
-            return Color(nsColor: .systemYellow)
-        case .yellow:
-            return Color(nsColor: .systemYellow)
-        case .red:
-            return Color(nsColor: .systemRed)
-        }
     }
 
     private var timeTitle: String {

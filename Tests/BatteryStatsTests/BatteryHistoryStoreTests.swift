@@ -31,6 +31,17 @@ final class BatteryHistoryStoreTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(stats.maximumTemperatureCelsius), 35.2, accuracy: 0.01)
     }
 
+    func testHistoryKeepsEntriesChronologicalWhenOlderSampleArrivesLater() {
+        let store = makeStore()
+        let firstTimestamp = Date(timeIntervalSince1970: 1_000)
+        store.updatePolicy(BatteryHistoryPolicy(isEnabled: true, syncsToICloud: false))
+
+        store.record(makeSnapshot(timestamp: firstTimestamp.addingTimeInterval(301), chargePercent: 81, powerWatts: 15, temperatureCelsius: 32.0))
+        store.record(makeSnapshot(timestamp: firstTimestamp, chargePercent: 88, powerWatts: 10, temperatureCelsius: 29.5))
+
+        XCTAssertEqual(store.entries.map(\.timestamp), [firstTimestamp, firstTimestamp.addingTimeInterval(301)])
+    }
+
     private func makeStore() -> BatteryHistoryStore {
         let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

@@ -2,12 +2,12 @@ import Foundation
 import IOKit.ps
 import OSLog
 
-final class PowerSourceReader {
+final class PowerSourceReader: @unchecked Sendable {
     final class NotificationToken {
         private final class CallbackBox {
-            let handler: () -> Void
+            let handler: @Sendable () -> Void
 
-            init(handler: @escaping () -> Void) {
+            init(handler: @escaping @Sendable () -> Void) {
                 self.handler = handler
             }
         }
@@ -15,7 +15,7 @@ final class PowerSourceReader {
         private let callbackBox: Unmanaged<CallbackBox>
         private let runLoopSource: CFRunLoopSource
 
-        init?(handler: @escaping () -> Void) {
+        init?(handler: @escaping @Sendable () -> Void) {
             let callbackBox = Unmanaged.passRetained(CallbackBox(handler: handler))
             self.callbackBox = callbackBox
 
@@ -42,7 +42,7 @@ final class PowerSourceReader {
         }
     }
 
-    func makeNotificationToken(handler: @escaping () -> Void) -> NotificationToken? {
+    func makeNotificationToken(handler: @escaping @Sendable () -> Void) -> NotificationToken? {
         NotificationToken(handler: handler)
     }
 

@@ -75,6 +75,10 @@ enum EnergyChangeSensitivity: String, CaseIterable, Identifiable {
     }
 }
 
+struct BatteryMonitoringDemand: Equatable, Sendable {
+    var needsEnergyChangeAwareness = true
+}
+
 struct BatteryRefreshPolicy: Equatable {
     var cadence: RefreshCadencePreference = .dynamic
     var energyChangeSensitivity: EnergyChangeSensitivity = .balanced
@@ -88,6 +92,14 @@ struct BatteryRefreshPolicy: Equatable {
     }
 
     var usesEnergyChangeProbe: Bool {
+        usesEnergyChangeProbe(for: BatteryMonitoringDemand())
+    }
+
+    func usesEnergyChangeProbe(for demand: BatteryMonitoringDemand) -> Bool {
+        guard demand.needsEnergyChangeAwareness else {
+            return false
+        }
+
         guard let fixedInterval = cadence.fixedInterval else {
             return true
         }

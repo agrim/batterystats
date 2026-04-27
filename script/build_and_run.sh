@@ -4,6 +4,7 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="BatteryStats"
 BUNDLE_ID="io.github.agrim.batterystats"
+DESTINATION="${DESTINATION:-platform=macOS,arch=arm64}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/BatteryStats.xcodeproj"
@@ -12,7 +13,7 @@ APP_BUNDLE="$DERIVED_DATA_PATH/Build/Products/Debug/$APP_NAME.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 usage() {
-  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]"
+  echo "usage: $0 [run|test|--debug|--logs|--telemetry|--verify]"
 }
 
 build_app() {
@@ -20,9 +21,20 @@ build_app() {
     -project "$PROJECT_PATH" \
     -scheme "$APP_NAME" \
     -configuration Debug \
+    -destination "$DESTINATION" \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     CODE_SIGNING_ALLOWED=NO \
     build
+}
+
+test_app() {
+  xcodebuild \
+    test \
+    -project "$PROJECT_PATH" \
+    -scheme "$APP_NAME" \
+    -configuration Debug \
+    -destination "$DESTINATION" \
+    -derivedDataPath "$DERIVED_DATA_PATH"
 }
 
 open_app() {
@@ -32,6 +44,11 @@ open_app() {
 case "$MODE" in
   -h|--help|help)
     usage
+    exit 0
+    ;;
+  test)
+    pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+    test_app
     exit 0
     ;;
 esac

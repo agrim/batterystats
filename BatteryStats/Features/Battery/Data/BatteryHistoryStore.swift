@@ -80,6 +80,7 @@ final class BatteryHistoryStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var cloudStore: NSUbiquitousKeyValueStore?
     @ObservationIgnored private var policy = BatteryHistoryPolicy.disabled
+    @ObservationIgnored private var cloudSynchronizeTask: Task<Void, Never>?
 
     init(defaults: UserDefaults = .standard, cloudStore: NSUbiquitousKeyValueStore? = nil) {
         self.defaults = defaults
@@ -100,13 +101,16 @@ final class BatteryHistoryStore {
     }
 
     func updatePolicy(_ policy: BatteryHistoryPolicy) {
-        self.policy = policy
+        self.policy = BatteryHistoryPolicy(
+            isEnabled: policy.isEnabled,
+            syncsToICloud: policy.syncsToICloud && canUseCloudStore
+        )
 
-        guard policy.isEnabled else {
+        guard self.policy.isEnabled else {
             return
         }
 
-        if policy.syncsToICloud {
+        if self.policy.syncsToICloud {
             mergeCloudEntries()
         }
 
@@ -124,7 +128,7 @@ final class BatteryHistoryStore {
         }
 
         entries.append(entry)
-        entries = Array(entries.sorted { $0.timestamp < $1.timestamp }.suffix(288))
+        trimAndSortIfNeeded()
         persist()
     }
 
@@ -207,8 +211,48 @@ final class BatteryHistoryStore {
         if policy.syncsToICloud {
             let cloudStore = resolvedCloudStore
             cloudStore.set(encodedEntries, forKey: Key.cloudEntries)
-            cloudStore.synchronize()
+            scheduleCloudSynchronize()
         }
+    }
+
+    private func trimAndSortIfNeeded() {
+        if let previous = entries.dropLast().last,
+           let latest = entries.last,
+           latest.timestamp < previous.timestamp {
+            entries.sort { $0.timestamp < $1.timestamp }
+        }
+
+        if entries.count > 288 {
+            entries.removeFirst(entries.count - 288)
+        }
+    }
+
+    func flushPendingWrites() {
+        cloudSynchronizeTask?.cancel()
+        cloudSynchronizeTask = nil
+
+        guard policy.syncsToICloud else {
+            return
+        }
+
+        resolvedCloudStore.synchronize()
+    }
+
+    private func scheduleCloudSynchronize() {
+        cloudSynchronizeTask?.cancel()
+        cloudSynchronizeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(750))
+            guard Task.isCancelled == false else {
+                return
+            }
+
+            self?.resolvedCloudStore.synchronize()
+            self?.cloudSynchronizeTask = nil
+        }
+    }
+
+    private var canUseCloudStore: Bool {
+        cloudStore != nil || ICloudKeyValueStoreAvailability.isAvailable
     }
 
     private var resolvedCloudStore: NSUbiquitousKeyValueStore {

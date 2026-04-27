@@ -14,12 +14,11 @@ final class BatteryMonitor {
     var availabilityState: AvailabilityState = .loading
     var snapshot: BatterySnapshot?
     var lastUpdated: Date?
-    var rawSnapshotText = ""
-    var parsedSnapshotText = ""
     var isRefreshing = false
 
-    @ObservationIgnored private let service: BatteryReadingService
+    @ObservationIgnored private let reader: BatteryReadingClient
     @ObservationIgnored private var refreshPolicy = BatteryRefreshPolicy()
+    @ObservationIgnored private var monitoringDemand = BatteryMonitoringDemand()
     @ObservationIgnored private weak var historyStore: BatteryHistoryStore?
     @ObservationIgnored private var alertPolicy = BatteryAlertPolicy.disabled
     @ObservationIgnored private let alertCoordinator = BatteryAlertCoordinator()
@@ -31,10 +30,17 @@ final class BatteryMonitor {
     @ObservationIgnored private var powerSourceNotificationToken: PowerSourceReader.NotificationToken?
     @ObservationIgnored private var wakeObserver: NSObjectProtocol?
     @ObservationIgnored private var activeObserver: NSObjectProtocol?
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var energyProbeTask: Task<Void, Never>?
+    @ObservationIgnored private var diagnosticsTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingRefresh = false
+    @ObservationIgnored private var pendingRefreshNeedsDiagnostics = false
+    @ObservationIgnored private var latestRawSnapshotText = "No battery snapshot has been captured yet."
+    @ObservationIgnored private var latestParsedSnapshotText = "No parsed battery snapshot has been captured yet."
     @ObservationIgnored private var isStarted = false
 
-    init(service: BatteryReadingService = BatteryReadingService()) {
-        self.service = service
+    init(reader: BatteryReadingClient = .live()) {
+        self.reader = reader
     }
 
     func updateRefreshPolicy(_ policy: BatteryRefreshPolicy) {
@@ -43,6 +49,15 @@ final class BatteryMonitor {
         }
 
         refreshPolicy = policy
+        resetTimers()
+    }
+
+    func updateMonitoringDemand(_ demand: BatteryMonitoringDemand) {
+        guard monitoringDemand != demand else {
+            return
+        }
+
+        monitoringDemand = demand
         resetTimers()
     }
 
@@ -59,7 +74,7 @@ final class BatteryMonitor {
         isStarted = true
 
         if powerSourceNotificationToken == nil {
-            powerSourceNotificationToken = service.makeNotificationToken { [weak self] in
+            powerSourceNotificationToken = reader.makeNotificationToken { [weak self] in
                 Task { @MainActor in
                     self?.refresh()
                 }
@@ -95,15 +110,27 @@ final class BatteryMonitor {
     }
 
     func refresh() {
-        apply(service.read())
+        requestRefresh()
     }
 
     private func probeEnergyUse() {
-        guard isRefreshing == false else {
+        guard refreshTask == nil,
+              energyProbeTask == nil else {
             return
         }
 
-        let result = service.read()
+        energyProbeTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            let result = await reader.read(.now, .standard)
+            handleEnergyProbeResult(result)
+            energyProbeTask = nil
+        }
+    }
+
+    private func handleEnergyProbeResult(_ result: BatteryReadResult) {
         guard let probedSnapshot = result.snapshot else {
             if availabilityState != .unsupported {
                 apply(result)
@@ -121,14 +148,52 @@ final class BatteryMonitor {
         }
     }
 
-    private func apply(_ result: BatteryReadResult) {
+    private func requestRefresh(options: BatteryReadOptions = .standard) {
+        if refreshTask != nil {
+            pendingRefresh = true
+            pendingRefreshNeedsDiagnostics = pendingRefreshNeedsDiagnostics || options.includesDiagnostics
+            return
+        }
+
+        refreshTask = Task { @MainActor [weak self] in
+            await self?.runRefreshLoop(initialOptions: options)
+        }
+    }
+
+    private func runRefreshLoop(initialOptions: BatteryReadOptions) async {
         isRefreshing = true
         defer {
             isRefreshing = false
+            refreshTask = nil
+            pendingRefresh = false
+            pendingRefreshNeedsDiagnostics = false
         }
 
-        rawSnapshotText = result.rawSnapshotText
-        parsedSnapshotText = result.parsedSnapshotText
+        var options = initialOptions
+
+        while true {
+            let result = await reader.read(.now, options)
+            apply(result)
+
+            guard pendingRefresh else {
+                break
+            }
+
+            options = pendingRefreshNeedsDiagnostics ? .diagnostics : .standard
+            pendingRefresh = false
+            pendingRefreshNeedsDiagnostics = false
+        }
+    }
+
+    private func apply(_ result: BatteryReadResult) {
+        if let rawSnapshotText = result.rawSnapshotText {
+            latestRawSnapshotText = rawSnapshotText
+        }
+
+        if let parsedSnapshotText = result.parsedSnapshotText {
+            latestParsedSnapshotText = parsedSnapshotText
+        }
+
         lastUpdated = .now
 
         guard var snapshot = result.snapshot else {
@@ -168,11 +233,32 @@ final class BatteryMonitor {
     }
 
     func copyRawSnapshot() {
-        PasteboardCopying.copy(rawSnapshotText)
+        diagnosticsTask?.cancel()
+        diagnosticsTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            let result = await reader.read(.now, .diagnostics)
+            if let rawSnapshotText = result.rawSnapshotText {
+                latestRawSnapshotText = rawSnapshotText
+                PasteboardCopying.copy(rawSnapshotText)
+            } else {
+                PasteboardCopying.copy(latestRawSnapshotText)
+            }
+
+            diagnosticsTask = nil
+        }
     }
 
     func copyParsedSnapshot() {
-        PasteboardCopying.copy(parsedSnapshotText)
+        if let snapshot {
+            let parsedSnapshotText = snapshot.debugSummary
+            latestParsedSnapshotText = parsedSnapshotText
+            PasteboardCopying.copy(parsedSnapshotText)
+        } else {
+            PasteboardCopying.copy(latestParsedSnapshotText)
+        }
     }
 
     private func resetTimers() {
@@ -192,7 +278,7 @@ final class BatteryMonitor {
             currentRefreshInterval = desiredRefreshInterval
         }
 
-        if refreshPolicy.usesEnergyChangeProbe {
+        if refreshPolicy.usesEnergyChangeProbe(for: monitoringDemand) {
             if energyProbeTimer == nil {
                 energyProbeTimer = Timer.scheduledTimer(withTimeInterval: refreshPolicy.energyProbeInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor in
@@ -204,6 +290,12 @@ final class BatteryMonitor {
         } else {
             energyProbeTimer?.invalidate()
             energyProbeTimer = nil
+        }
+    }
+
+    func waitForIdleForTesting() async {
+        while refreshTask != nil || energyProbeTask != nil || diagnosticsTask != nil {
+            try? await Task.sleep(for: .milliseconds(10))
         }
     }
 }

@@ -98,10 +98,12 @@ final class PreferencesStore {
         didSet {
             defaults.set(isICloudSyncEnabled, forKey: Key.isICloudSyncEnabled)
             sync.setEnabled(isICloudSyncEnabled)
+            syncStatusMessage = sync.availabilityDescription
 
-            if isICloudSyncEnabled {
+            if sync.isEnabled {
                 pullRemoteValues()
                 pushLocalValues()
+                sync.flush()
             }
         }
     }
@@ -139,7 +141,7 @@ final class PreferencesStore {
             }
         }
 
-        if isICloudSyncEnabled {
+        if sync.isEnabled {
             pullRemoteValues()
             pushLocalValues()
         }
@@ -196,6 +198,15 @@ final class PreferencesStore {
         BatteryHistoryPolicy(
             isEnabled: isHistoryEnabled,
             syncsToICloud: isHistoryEnabled && isHistoryICloudSyncEnabled
+        )
+    }
+
+    var monitoringDemand: BatteryMonitoringDemand {
+        BatteryMonitoringDemand(
+            needsEnergyChangeAwareness: menuBarDisplayMode.needsEnergyChangeAwareness
+                || showAdvancedValues
+                || isHistoryEnabled
+                || isHighTemperatureAlertEnabled
         )
     }
 
@@ -259,10 +270,11 @@ final class PreferencesStore {
         sync.set(isHighTemperatureAlertEnabled, forKey: Key.isHighTemperatureAlertEnabled)
         sync.set(isHistoryEnabled, forKey: Key.isHistoryEnabled)
         sync.set(isHistoryICloudSyncEnabled, forKey: Key.isHistoryICloudSyncEnabled)
+        sync.flush()
     }
 
     private func applyRemoteChanges(for changedKeys: [String]) {
-        guard isICloudSyncEnabled else {
+        guard sync.isEnabled else {
             return
         }
 
@@ -349,5 +361,16 @@ final class PreferencesStore {
         }
 
         sync.set(value, forKey: key)
+    }
+}
+
+private extension MenuBarDisplayMode {
+    var needsEnergyChangeAwareness: Bool {
+        switch self {
+        case .iconAndTimeRemaining, .iconAndPower:
+            return true
+        case .iconOnly, .iconAndPercentage, .iconAndHealth, .iconAndFullCharge, .iconAndTemperature:
+            return false
+        }
     }
 }

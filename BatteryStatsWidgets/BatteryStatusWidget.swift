@@ -31,7 +31,7 @@ struct BatteryStatusProvider: TimelineProvider {
             return .placeholder
         }
 
-        return BatteryStatusEntry(date: date, snapshot: service.read(at: date).snapshot)
+        return BatteryStatusEntry(date: date, snapshot: service.read(at: date, options: .standard).snapshot)
     }
 }
 

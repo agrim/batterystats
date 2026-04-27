@@ -1,16 +1,22 @@
 import Foundation
 
+@MainActor
 final class ICloudPreferencesSync {
     private lazy var store = NSUbiquitousKeyValueStore.default
     private(set) var isEnabled = false
+    private var synchronizeTask: Task<Void, Never>?
 
     init() {}
 
     var isICloudAccountAvailable: Bool {
-        FileManager.default.ubiquityIdentityToken != nil
+        ICloudKeyValueStoreAvailability.hasAccount
     }
 
     var availabilityDescription: String {
+        guard ICloudKeyValueStoreAvailability.hasEntitlement else {
+            return "iCloud sync requires an iCloud Key-Value Storage entitlement in the signed app."
+        }
+
         if isICloudAccountAvailable {
             return "Uses your existing iCloud account when the app is signed with iCloud Key-Value Storage."
         }
@@ -19,8 +25,8 @@ final class ICloudPreferencesSync {
     }
 
     func setEnabled(_ enabled: Bool) {
-        isEnabled = enabled
-        guard enabled else {
+        isEnabled = enabled && ICloudKeyValueStoreAvailability.isAvailable
+        guard isEnabled else {
             return
         }
 
@@ -43,6 +49,10 @@ final class ICloudPreferencesSync {
     }
 
     func bool(forKey key: String) -> Bool? {
+        guard isEnabled else {
+            return nil
+        }
+
         guard store.object(forKey: key) != nil else {
             return nil
         }
@@ -51,7 +61,11 @@ final class ICloudPreferencesSync {
     }
 
     func string(forKey key: String) -> String? {
-        store.string(forKey: key)
+        guard isEnabled else {
+            return nil
+        }
+
+        return store.string(forKey: key)
     }
 
     func set(_ value: Bool, forKey key: String) {
@@ -60,7 +74,7 @@ final class ICloudPreferencesSync {
         }
 
         store.set(value, forKey: key)
-        store.synchronize()
+        scheduleSynchronize()
     }
 
     func set(_ value: String, forKey key: String) {
@@ -69,6 +83,29 @@ final class ICloudPreferencesSync {
         }
 
         store.set(value, forKey: key)
+        scheduleSynchronize()
+    }
+
+    func flush() {
+        synchronizeTask?.cancel()
+        synchronizeTask = nil
+        guard isEnabled else {
+            return
+        }
+
         store.synchronize()
+    }
+
+    private func scheduleSynchronize() {
+        synchronizeTask?.cancel()
+        synchronizeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(750))
+            guard Task.isCancelled == false else {
+                return
+            }
+
+            self?.store.synchronize()
+            self?.synchronizeTask = nil
+        }
     }
 }

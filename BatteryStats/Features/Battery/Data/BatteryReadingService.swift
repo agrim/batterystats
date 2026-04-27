@@ -1,12 +1,19 @@
 import Foundation
 
-struct BatteryReadResult {
-    let snapshot: BatterySnapshot?
-    let rawSnapshotText: String
-    let parsedSnapshotText: String
+struct BatteryReadOptions: Equatable, Sendable {
+    var includesDiagnostics = false
+
+    static let standard = BatteryReadOptions()
+    static let diagnostics = BatteryReadOptions(includesDiagnostics: true)
 }
 
-struct BatteryReadingService {
+struct BatteryReadResult: Sendable {
+    let snapshot: BatterySnapshot?
+    let rawSnapshotText: String?
+    let parsedSnapshotText: String?
+}
+
+struct BatteryReadingService: Sendable {
     let powerSourceReader: PowerSourceReader
     let smartBatteryReader: SmartBatteryReader
 
@@ -15,20 +22,28 @@ struct BatteryReadingService {
         self.smartBatteryReader = smartBatteryReader
     }
 
-    func makeNotificationToken(handler: @escaping () -> Void) -> PowerSourceReader.NotificationToken? {
+    func makeNotificationToken(handler: @escaping @Sendable () -> Void) -> PowerSourceReader.NotificationToken? {
         powerSourceReader.makeNotificationToken(handler: handler)
     }
 
-    func read(at now: Date = .now) -> BatteryReadResult {
+    func read(at now: Date = .now, options: BatteryReadOptions = .standard) -> BatteryReadResult {
         let publicSnapshot = powerSourceReader.read()
         let smartBattery = smartBatteryReader.read()
 
         guard let publicSnapshot = publicSnapshot ?? fallbackPublicSnapshot(from: smartBattery) else {
-            return BatteryReadResult(snapshot: nil, rawSnapshotText: "No internal battery detected.", parsedSnapshotText: "Unsupported")
+            return BatteryReadResult(
+                snapshot: nil,
+                rawSnapshotText: options.includesDiagnostics ? "No internal battery detected." : nil,
+                parsedSnapshotText: options.includesDiagnostics ? "Unsupported" : nil
+            )
         }
 
         guard publicSnapshot.isPresent, publicSnapshot.isInternalBattery else {
-            return BatteryReadResult(snapshot: nil, rawSnapshotText: prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery), parsedSnapshotText: "Unsupported")
+            return BatteryReadResult(
+                snapshot: nil,
+                rawSnapshotText: options.includesDiagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil,
+                parsedSnapshotText: options.includesDiagnostics ? "Unsupported" : nil
+            )
         }
 
         var notes: [String] = []
@@ -107,8 +122,8 @@ struct BatteryReadingService {
 
         return BatteryReadResult(
             snapshot: snapshot,
-            rawSnapshotText: prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery),
-            parsedSnapshotText: snapshot.debugSummary
+            rawSnapshotText: options.includesDiagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil,
+            parsedSnapshotText: options.includesDiagnostics ? snapshot.debugSummary : nil
         )
     }
 

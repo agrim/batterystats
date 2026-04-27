@@ -21,25 +21,10 @@ struct BatteryStatsApp: App {
             BatteryDashboardView(monitor: monitor, preferences: preferences)
                 .environment(monitor)
                 .environment(preferences)
-                .onAppear {
-                    configureMonitor()
-                    monitor.start()
-                }
-                .onChange(of: preferences.refreshPolicy) { _, policy in
-                    monitor.updateRefreshPolicy(policy)
-                }
-                .onChange(of: preferences.historyPolicy) { _, policy in
-                    monitor.updateHistory(store: historyStore, policy: policy)
-                }
-                .onChange(of: preferences.alertPolicy) { _, policy in
-                    monitor.updateAlerts(policy)
-                }
+                .monitorConfiguration(monitor: monitor, preferences: preferences, historyStore: historyStore, startsMonitor: true)
         }
         .windowResizability(.contentSize)
-        .defaultWindowPlacement { content, _ in
-            WindowPlacement(size: content.sizeThatFits(.unspecified))
-        }
-        .windowIdealSize(.fitToContent)
+        .defaultSize(width: 276, height: 280)
         .windowStyle(.hiddenTitleBar)
         .windowBackgroundDragBehavior(.disabled)
         .restorationBehavior(.disabled)
@@ -48,19 +33,7 @@ struct BatteryStatsApp: App {
             MenuBarBatteryView(monitor: monitor, preferences: preferences, historyStore: historyStore)
                 .environment(monitor)
                 .environment(preferences)
-                .onAppear {
-                    configureMonitor()
-                    monitor.start()
-                }
-                .onChange(of: preferences.refreshPolicy) { _, policy in
-                    monitor.updateRefreshPolicy(policy)
-                }
-                .onChange(of: preferences.historyPolicy) { _, policy in
-                    monitor.updateHistory(store: historyStore, policy: policy)
-                }
-                .onChange(of: preferences.alertPolicy) { _, policy in
-                    monitor.updateAlerts(policy)
-                }
+                .monitorConfiguration(monitor: monitor, preferences: preferences, historyStore: historyStore, startsMonitor: true)
         } label: {
             MenuBarBatteryLabelView(snapshot: monitor.snapshot, displayMode: preferences.menuBarDisplayMode)
         }
@@ -70,27 +43,64 @@ struct BatteryStatsApp: App {
             SettingsView(preferences: preferences, monitor: monitor, historyStore: historyStore)
                 .environment(preferences)
                 .environment(monitor)
-                .onAppear {
-                    configureMonitor()
-                }
-                .onChange(of: preferences.refreshPolicy) { _, policy in
-                    monitor.updateRefreshPolicy(policy)
-                }
-                .onChange(of: preferences.historyPolicy) { _, policy in
-                    monitor.updateHistory(store: historyStore, policy: policy)
-                }
-                .onChange(of: preferences.alertPolicy) { _, policy in
-                    monitor.updateAlerts(policy)
-                }
+                .monitorConfiguration(monitor: monitor, preferences: preferences, historyStore: historyStore, startsMonitor: false)
         }
         .commands {
             AppCommands()
         }
+    }
+}
+
+private struct MonitorConfigurationModifier: ViewModifier {
+    let monitor: BatteryMonitor
+    let preferences: PreferencesStore
+    let historyStore: BatteryHistoryStore
+    let startsMonitor: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                configureMonitor()
+                if startsMonitor {
+                    monitor.start()
+                }
+            }
+            .onChange(of: preferences.refreshPolicy) { _, policy in
+                monitor.updateRefreshPolicy(policy)
+            }
+            .onChange(of: preferences.historyPolicy) { _, policy in
+                monitor.updateHistory(store: historyStore, policy: policy)
+            }
+            .onChange(of: preferences.alertPolicy) { _, policy in
+                monitor.updateAlerts(policy)
+            }
+            .onChange(of: preferences.monitoringDemand) { _, demand in
+                monitor.updateMonitoringDemand(demand)
+            }
     }
 
     private func configureMonitor() {
         monitor.updateRefreshPolicy(preferences.refreshPolicy)
         monitor.updateHistory(store: historyStore, policy: preferences.historyPolicy)
         monitor.updateAlerts(preferences.alertPolicy)
+        monitor.updateMonitoringDemand(preferences.monitoringDemand)
+    }
+}
+
+private extension View {
+    func monitorConfiguration(
+        monitor: BatteryMonitor,
+        preferences: PreferencesStore,
+        historyStore: BatteryHistoryStore,
+        startsMonitor: Bool
+    ) -> some View {
+        modifier(
+            MonitorConfigurationModifier(
+                monitor: monitor,
+                preferences: preferences,
+                historyStore: historyStore,
+                startsMonitor: startsMonitor
+            )
+        )
     }
 }

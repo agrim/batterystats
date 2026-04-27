@@ -16,7 +16,7 @@ struct SmartBatteryDetails {
     let rawProperties: [String: Any]
 }
 
-final class SmartBatteryReader {
+final class SmartBatteryReader: @unchecked Sendable {
     private enum PropertyCandidate {
         case root(String)
         case nested(String, String)

@@ -70,7 +70,7 @@ struct MenuBarBatteryLabelView: View {
 
     var body: some View {
         let symbolName = snapshot?.batterySymbolName ?? "battery.0"
-        let symbolTint = snapshot.map { BatterySummaryGridView.tint(for: $0.chargeTone) } ?? .secondary
+        let symbolTint = BatteryPresentationStyle.chargeTint(for: snapshot)
 
         switch displayMode {
         case .iconOnly:
