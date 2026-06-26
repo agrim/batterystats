@@ -51,9 +51,31 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     func parse(properties rawProperties: [String: Any]) -> SmartBatteryDetails {
-        let currentChargeMilliampHours = integer(for: [.root("AppleRawCurrentCapacity"), .root("CurrentCapacity")], in: rawProperties)
-        let fullChargeCapacityMilliampHours = integer(for: [.root("AppleRawMaxCapacity"), .root("NominalChargeCapacity"), .root("MaxCapacity")], in: rawProperties)
-        let designCapacityMilliampHours = integer(for: [.root("DesignCapacity")], in: rawProperties)
+        let currentChargeMilliampHours = physicalCapacityInteger(
+            for: [
+                .root("AppleRawCurrentCapacity"),
+                .nested("BatteryData", "AppleRawCurrentCapacity"),
+                .nested("BatteryData", "RemainingCapacity")
+            ],
+            legacyFallbacks: [.root("CurrentCapacity")],
+            allowsZero: true,
+            in: rawProperties
+        )
+        let fullChargeCapacityMilliampHours = physicalCapacityInteger(
+            for: [
+                .root("AppleRawMaxCapacity"),
+                .nested("BatteryData", "AppleRawMaxCapacity"),
+                .nested("BatteryData", "FullChargeCapacity"),
+                .root("NominalChargeCapacity"),
+                .nested("BatteryData", "NominalChargeCapacity")
+            ],
+            legacyFallbacks: [.root("MaxCapacity")],
+            in: rawProperties
+        )
+        let designCapacityMilliampHours = physicalCapacityInteger(
+            for: [.root("DesignCapacity"), .nested("BatteryData", "DesignCapacity")],
+            in: rawProperties
+        )
         let cycleCount = integer(for: [.root("CycleCount"), .nested("LegacyBatteryInfo", "Cycle Count")], in: rawProperties)
         let voltageMillivolts = integer(for: [.root("Voltage"), .nested("BatteryData", "Voltage"), .nested("LegacyBatteryInfo", "Voltage")], in: rawProperties)
         let signedCurrentMilliamps = integer(for: [.root("InstantAmperage"), .nested("LegacyBatteryInfo", "Amperage"), .root("Amperage")], in: rawProperties)
@@ -85,6 +107,34 @@ final class SmartBatteryReader: @unchecked Sendable {
             if let parsed = SignedIntegerNormalizer.normalize(rawValue) {
                 return parsed
             }
+        }
+
+        return nil
+    }
+
+    private func physicalCapacityInteger(
+        for candidates: [PropertyCandidate],
+        legacyFallbacks: [PropertyCandidate] = [],
+        allowsZero: Bool = false,
+        in properties: [String: Any]
+    ) -> Int? {
+        let minimumValue = allowsZero ? 0 : 1
+        if let value = firstInteger(for: candidates, in: properties, minimumValue: minimumValue) {
+            return value
+        }
+
+        return firstInteger(for: legacyFallbacks, in: properties, minimumValue: 101)
+    }
+
+    private func firstInteger(for candidates: [PropertyCandidate], in properties: [String: Any], minimumValue: Int) -> Int? {
+        for candidate in candidates {
+            guard let rawValue = value(for: candidate, in: properties),
+                  let parsed = SignedIntegerNormalizer.normalize(rawValue),
+                  parsed >= minimumValue else {
+                continue
+            }
+
+            return parsed
         }
 
         return nil

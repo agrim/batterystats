@@ -53,6 +53,27 @@ final class SmartBatteryParsingTests: XCTestCase {
         XCTAssertNil(details.manufactureDate)
     }
 
+    func testReaderPrefersOS27PhysicalBatteryDataOverPercentageCapacities() {
+        let properties: [String: Any] = [
+            "CurrentCapacity": 80,
+            "MaxCapacity": 100,
+            "BatteryData": [
+                "RemainingCapacity": 3_506,
+                "FullChargeCapacity": 4_436,
+                "NominalChargeCapacity": 4_563,
+                "DesignCapacity": 4_563,
+                "CurrentCapacity": 80,
+                "MaxCapacity": 100
+            ]
+        ]
+
+        let details = SmartBatteryReader().parse(properties: properties)
+
+        XCTAssertEqual(details.currentChargeMilliampHours, 3_506)
+        XCTAssertEqual(details.fullChargeCapacityMilliampHours, 4_436)
+        XCTAssertEqual(details.designCapacityMilliampHours, 4_563)
+    }
+
     func testSignedIntegerNormalizerHandlesUnsignedEncodedNegativeCurrent() {
         XCTAssertEqual(SignedIntegerNormalizer.normalize("18446744073709549095"), -2_521)
         XCTAssertEqual(SignedIntegerNormalizer.normalize(UInt64.max), -1)
