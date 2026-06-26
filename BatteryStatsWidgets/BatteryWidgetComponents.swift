@@ -1,58 +1,9 @@
 import SwiftUI
-import WidgetKit
-
-struct BatteryWidgetLayout {
-    let circleDiameter: CGFloat
-    let horizontalSpacing: CGFloat
-    let verticalSpacing: CGFloat
-    let leadingInset: CGFloat
-    let topInset: CGFloat
-
-    init(size: CGSize) {
-        // Match Apple's widget by giving the rings more true center gap while
-        // keeping the overall grid tucked close to the widget edges.
-        circleDiameter = floor(min(size.width * 0.392, size.height * 0.399))
-        horizontalSpacing = max(20, round(min(size.width, size.height) * 0.073))
-        verticalSpacing = max(20, round(min(size.width, size.height) * 0.073))
-
-        let contentWidth = (circleDiameter * 2) + horizontalSpacing
-        let contentHeight = (circleDiameter * 2) + verticalSpacing
-
-        leadingInset = floor(max(0, (size.width - contentWidth) / 2))
-        topInset = floor(max(0, (size.height - contentHeight) / 2))
-    }
-
-    var trailingColumnInset: CGFloat {
-        leadingInset + circleDiameter + horizontalSpacing
-    }
-
-    var bottomRowInset: CGFloat {
-        topInset + circleDiameter + verticalSpacing
-    }
-}
 
 struct BatteryWidgetBackground: View {
     var body: some View {
-        ZStack {
-            ContainerRelativeShape()
-                .fill(.ultraThinMaterial)
-
-            ContainerRelativeShape()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.04),
-                            Color.black.opacity(0.14)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        }
-        .overlay {
-            ContainerRelativeShape()
-                .stroke(Color.white.opacity(0.10), lineWidth: 0.9)
-        }
+        ContainerRelativeShape()
+            .fill(.ultraThinMaterial)
     }
 }
 

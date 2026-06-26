@@ -90,15 +90,22 @@ struct BatterySummaryGridView: View {
             rateText = nil
         }
 
-        let components = [timeText, rateText].compactMap { value -> String? in
-            guard let value, value.isEmpty == false, value != "—" else {
-                return nil
-            }
+        let time = Self.visibleSummaryComponent(timeText)
+        let rate = Self.visibleSummaryComponent(rateText)
 
-            return value
+        if let time, let rate {
+            return "\(time) / \(rate)"
         }
 
-        return components.isEmpty ? "—" : components.joined(separator: " / ")
+        return time ?? rate ?? "—"
+    }
+
+    private static func visibleSummaryComponent(_ value: String?) -> String? {
+        guard let value, value.isEmpty == false, value != "—" else {
+            return nil
+        }
+
+        return value
     }
 
     @ViewBuilder

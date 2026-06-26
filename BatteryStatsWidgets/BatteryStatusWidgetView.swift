@@ -19,22 +19,21 @@ struct BatteryStatusWidgetView: View {
                 )
             default:
                 GeometryReader { geometry in
-                    let layout = BatteryWidgetLayout(size: geometry.size)
+                    let circleDiameter = floor(min(geometry.size.width * 0.392, geometry.size.height * 0.399))
+                    let spacing = max(20, round(min(geometry.size.width, geometry.size.height) * 0.073))
 
-                    ZStack(alignment: .topLeading) {
-                        BatteryWidgetMetricTile(metric: healthMetric, size: layout.circleDiameter)
-                            .offset(x: layout.leadingInset, y: layout.topInset)
+                    VStack(spacing: spacing) {
+                        HStack(spacing: spacing) {
+                            BatteryWidgetMetricTile(metric: healthMetric, size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: chargeMetric, size: circleDiameter)
+                        }
 
-                        BatteryWidgetMetricTile(metric: chargeMetric, size: layout.circleDiameter)
-                            .offset(x: layout.trailingColumnInset, y: layout.topInset)
-
-                        BatteryWidgetMetricTile(metric: timeMetric, size: layout.circleDiameter)
-                            .offset(x: layout.leadingInset, y: layout.bottomRowInset)
-
-                        BatteryWidgetMetricTile(metric: statusMetric, size: layout.circleDiameter)
-                            .offset(x: layout.trailingColumnInset, y: layout.bottomRowInset)
+                        HStack(spacing: spacing) {
+                            BatteryWidgetMetricTile(metric: timeMetric, size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: statusMetric, size: circleDiameter)
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
