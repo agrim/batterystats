@@ -129,13 +129,19 @@ enum BatteryCalculations {
     }
 
     static func smoothedDischargeRate(_ samples: [Int], fallback: Int?) -> Int? {
-        let recentSamples = Array(samples.suffix(8)).filter { $0 > 40 }
-        guard recentSamples.isEmpty == false else {
+        var total = 0
+        var count = 0
+
+        for sample in samples.suffix(8) where sample > 40 {
+            total += sample
+            count += 1
+        }
+
+        guard count > 0 else {
             return fallback
         }
 
-        let total = recentSamples.reduce(0, +)
-        return Int((Double(total) / Double(recentSamples.count)).rounded())
+        return Int((Double(total) / Double(count)).rounded())
     }
 
     static func batteryAgeComponents(from manufactureDate: Date?, now: Date, calendar: Calendar = .current) -> DateComponents? {

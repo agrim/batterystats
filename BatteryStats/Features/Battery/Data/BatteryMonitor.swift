@@ -209,7 +209,9 @@ final class BatteryMonitor {
 
         if let dischargeRate = snapshot.dischargeRateMilliamps {
             dischargeSamples.append(dischargeRate)
-            dischargeSamples = Array(dischargeSamples.suffix(8))
+            if dischargeSamples.count > 8 {
+                dischargeSamples.removeFirst(dischargeSamples.count - 8)
+            }
         } else {
             dischargeSamples.removeAll()
         }

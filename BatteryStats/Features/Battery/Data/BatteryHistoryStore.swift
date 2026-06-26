@@ -37,33 +37,50 @@ struct BatteryHistoryStats: Equatable, Sendable {
     let maximumTemperatureCelsius: Double?
 
     init?(entries: [BatteryHistoryEntry]) {
-        guard entries.isEmpty == false,
-              let firstTimestamp = entries.map(\.timestamp).min(),
-              let latestTimestamp = entries.map(\.timestamp).max() else {
+        guard let firstEntry = entries.first else {
             return nil
         }
-
-        let powerValues = entries.compactMap(\.activePowerWatts)
-        let chargeValues = entries.compactMap(\.stateOfChargePercent)
-        let temperatureValues = entries.compactMap(\.temperatureCelsius)
 
         self.sampleCount = entries.count
-        self.firstTimestamp = firstTimestamp
-        self.latestTimestamp = latestTimestamp
-        averagePowerWatts = Self.average(powerValues)
-        peakPowerWatts = powerValues.max()
-        minimumChargePercent = chargeValues.min()
-        maximumChargePercent = chargeValues.max()
-        minimumTemperatureCelsius = temperatureValues.min()
-        maximumTemperatureCelsius = temperatureValues.max()
-    }
+        var firstTimestamp = firstEntry.timestamp
+        var latestTimestamp = firstEntry.timestamp
+        var powerTotal = 0.0
+        var powerCount = 0
+        var peakPowerWatts: Double?
+        var minimumChargePercent: Double?
+        var maximumChargePercent: Double?
+        var minimumTemperatureCelsius: Double?
+        var maximumTemperatureCelsius: Double?
 
-    private static func average(_ values: [Double]) -> Double? {
-        guard values.isEmpty == false else {
-            return nil
+        for entry in entries {
+            firstTimestamp = min(firstTimestamp, entry.timestamp)
+            latestTimestamp = max(latestTimestamp, entry.timestamp)
+
+            if let activePowerWatts = entry.activePowerWatts {
+                powerTotal += activePowerWatts
+                powerCount += 1
+                peakPowerWatts = max(peakPowerWatts ?? activePowerWatts, activePowerWatts)
+            }
+
+            if let chargePercent = entry.stateOfChargePercent {
+                minimumChargePercent = min(minimumChargePercent ?? chargePercent, chargePercent)
+                maximumChargePercent = max(maximumChargePercent ?? chargePercent, chargePercent)
+            }
+
+            if let temperatureCelsius = entry.temperatureCelsius {
+                minimumTemperatureCelsius = min(minimumTemperatureCelsius ?? temperatureCelsius, temperatureCelsius)
+                maximumTemperatureCelsius = max(maximumTemperatureCelsius ?? temperatureCelsius, temperatureCelsius)
+            }
         }
 
-        return values.reduce(0, +) / Double(values.count)
+        self.firstTimestamp = firstTimestamp
+        self.latestTimestamp = latestTimestamp
+        self.averagePowerWatts = powerCount == 0 ? nil : powerTotal / Double(powerCount)
+        self.peakPowerWatts = peakPowerWatts
+        self.minimumChargePercent = minimumChargePercent
+        self.maximumChargePercent = maximumChargePercent
+        self.minimumTemperatureCelsius = minimumTemperatureCelsius
+        self.maximumTemperatureCelsius = maximumTemperatureCelsius
     }
 }
 
@@ -138,9 +155,10 @@ final class BatteryHistoryStore {
 
     private var csvString: String {
         let header = "timestamp,power_state,health_percent,charge_percent,time_minutes,active_power_watts,temperature_celsius,cycle_count"
+        let formatter = Self.makeISOFormatter()
         let rows = entries.map { entry in
             [
-                Self.isoString(from: entry.timestamp),
+                Self.isoString(from: entry.timestamp, formatter: formatter),
                 entry.powerState,
                 Self.csvValue(entry.healthPercent),
                 Self.csvValue(entry.stateOfChargePercent),
@@ -287,9 +305,13 @@ final class BatteryHistoryStore {
         value.map { $0.formatted(.number.precision(.fractionLength(2))) } ?? ""
     }
 
-    private static func isoString(from date: Date) -> String {
+    private static func makeISOFormatter() -> ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }
+
+    private static func isoString(from date: Date, formatter: ISO8601DateFormatter) -> String {
         return formatter.string(from: date)
     }
 }

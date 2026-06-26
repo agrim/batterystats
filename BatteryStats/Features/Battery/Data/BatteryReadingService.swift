@@ -62,6 +62,8 @@ struct BatteryReadingService: Sendable {
         let voltageMillivolts = smartBattery?.voltageMillivolts
         let signedCurrentMilliamps = smartBattery?.signedCurrentMilliamps
         let reportedTimeToFullMinutes = sanitized(publicSnapshot.timeToFullMinutes)
+        let dischargeRateMilliamps = BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps)
+        let chargeRateMilliamps = BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps)
 
         let powerState = BatteryCalculations.derivePowerState(
             isCharging: publicSnapshot.isCharging,
@@ -98,18 +100,18 @@ struct BatteryReadingService: Sendable {
             ),
             voltageMillivolts: voltageMillivolts,
             currentMilliampsSigned: signedCurrentMilliamps,
-            dischargeRateMilliamps: BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps),
+            dischargeRateMilliamps: dischargeRateMilliamps,
             chargeRateWatts: BatteryCalculations.chargeRateWatts(voltageMillivolts: voltageMillivolts, signedCurrentMilliamps: signedCurrentMilliamps),
             dischargeRateWatts: BatteryCalculations.dischargeRateWatts(voltageMillivolts: voltageMillivolts, signedCurrentMilliamps: signedCurrentMilliamps),
             rateBasedTimeRemainingMinutes: BatteryCalculations.timeRemainingMinutes(
                 currentChargeMilliampHours: currentChargeMilliampHours,
-                dischargeRateMilliamps: BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps)
+                dischargeRateMilliamps: dischargeRateMilliamps
             ),
             systemTimeRemainingMinutes: sanitized(publicSnapshot.systemTimeRemainingMinutes),
             timeToFullMinutes: BatteryCalculations.estimatedTimeToFullMinutes(
                 currentChargeMilliampHours: currentChargeMilliampHours,
                 fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-                chargeCurrentMilliamps: BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps),
+                chargeCurrentMilliamps: chargeRateMilliamps,
                 reportedTimeToFullMinutes: reportedTimeToFullMinutes
             ),
             cycleCount: smartBattery?.cycleCount,

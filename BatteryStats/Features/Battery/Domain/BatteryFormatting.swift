@@ -43,11 +43,7 @@ enum BatteryFormatting {
     }
 
     static func signedMilliamps(_ value: Int?) -> String {
-        guard let value else {
-            return "Unavailable"
-        }
-
-        return "\(value.formatted(.number.grouping(.automatic))) mA"
+        milliamps(value)
     }
 
     static func milliamps(_ value: Int?) -> String {
