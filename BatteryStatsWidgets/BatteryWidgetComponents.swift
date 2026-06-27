@@ -67,7 +67,7 @@ struct BatteryMediumWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: snapshot?.batterySymbolName ?? "battery.0")
+                Image(systemName: snapshot?.batterySymbolName ?? "questionmark")
                     .font(.system(size: 22, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(chargeTint)

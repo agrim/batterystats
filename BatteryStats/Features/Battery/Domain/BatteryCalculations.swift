@@ -6,10 +6,22 @@ enum BatteryCalculations {
         fullChargeCapacityMilliampHours: Int?,
         publicPercentage: Double?
     ) -> Double? {
+        let publicPercentage = publicPercentage.flatMap(normalizedPercent)
+
         if let currentChargeMilliampHours,
            let fullChargeCapacityMilliampHours,
            fullChargeCapacityMilliampHours > 0 {
-            return (Double(currentChargeMilliampHours) / Double(fullChargeCapacityMilliampHours)) * 100
+            let calculatedPercentage = (Double(currentChargeMilliampHours) / Double(fullChargeCapacityMilliampHours)) * 100
+            guard let normalizedCalculatedPercentage = normalizedPercent(calculatedPercentage) else {
+                return publicPercentage
+            }
+
+            if let publicPercentage,
+               abs(normalizedCalculatedPercentage - publicPercentage) > 15 {
+                return publicPercentage
+            }
+
+            return normalizedCalculatedPercentage
         }
 
         return publicPercentage
@@ -222,5 +234,21 @@ enum BatteryCalculations {
         default:
             return 1.75
         }
+    }
+
+    private static func normalizedPercent(_ value: Double) -> Double? {
+        guard value.isFinite else {
+            return nil
+        }
+
+        if value < 0 {
+            return nil
+        }
+
+        if value > 105 {
+            return nil
+        }
+
+        return max(0, min(100, value))
     }
 }

@@ -69,6 +69,7 @@ targets:
       - path: BatteryStats/Shared/Logging/Logger+BatteryStats.swift
       - path: BatteryStats/Shared/Utilities/DateComponentsFormatter+BatteryStats.swift
       - path: BatteryStats/Shared/Utilities/NSNumber+SignedConversions.swift
+      - path: BatteryStats/Shared/Widget/BatteryWidgetTimeline.swift
     settings:
       base:
         PRODUCT_NAME: BatteryStatsWidgetsExtension

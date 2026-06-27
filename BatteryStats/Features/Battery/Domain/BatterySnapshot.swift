@@ -161,7 +161,7 @@ struct BatterySnapshot: Equatable, Sendable {
 
     var batterySymbolName: String {
         guard let stateOfChargePercent else {
-            return "battery.0"
+            return "questionmark"
         }
 
         switch stateOfChargePercent {

@@ -11,6 +11,36 @@ final class BatteryCalculationsTests: XCTestCase {
         XCTAssertEqual(percent, 81.38435737155054, accuracy: 0.0001)
     }
 
+    func testStateOfChargeUsesSmartCapacityWhenConsistentWithPublicPercent() throws {
+        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
+            currentChargeMilliampHours: 4_912,
+            fullChargeCapacityMilliampHours: 5_338,
+            publicPercentage: 92
+        ))
+
+        XCTAssertEqual(percent, 92, accuracy: 0.1)
+    }
+
+    func testStateOfChargeFallsBackToPublicPercentWhenSmartCapacityIsTransientlyWrong() throws {
+        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
+            currentChargeMilliampHours: 0,
+            fullChargeCapacityMilliampHours: 5_338,
+            publicPercentage: 92
+        ))
+
+        XCTAssertEqual(percent, 92, accuracy: 0.001)
+    }
+
+    func testStateOfChargeRejectsImpossibleCalculatedPercent() throws {
+        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
+            currentChargeMilliampHours: 6_500,
+            fullChargeCapacityMilliampHours: 5_338,
+            publicPercentage: 99
+        ))
+
+        XCTAssertEqual(percent, 99, accuracy: 0.001)
+    }
+
     func testTimeRemainingCalculation() {
         let minutes = BatteryCalculations.timeRemainingMinutes(
             currentChargeMilliampHours: 3_000,

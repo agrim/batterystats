@@ -8,7 +8,7 @@ final class BatteryMonitorTests: XCTestCase {
             delayNanoseconds: 30_000_000,
             snapshots: [.previewDischarging, .previewCharging]
         )
-        let monitor = BatteryMonitor(reader: makeClient(reader))
+        let monitor = makeMonitor(reader)
 
         monitor.refresh()
         monitor.refresh()
@@ -24,7 +24,7 @@ final class BatteryMonitorTests: XCTestCase {
             delayNanoseconds: 30_000_000,
             snapshots: [.previewDischarging, .previewCharging, .previewDischarging]
         )
-        let monitor = BatteryMonitor(reader: makeClient(reader))
+        let monitor = makeMonitor(reader)
 
         monitor.refresh()
         try? await Task.sleep(nanoseconds: 5_000_000)
@@ -38,7 +38,7 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testStandardRefreshDoesNotRequestDiagnostics() async {
         let reader = StubBatteryReader(snapshots: [.previewDischarging])
-        let monitor = BatteryMonitor(reader: makeClient(reader))
+        let monitor = makeMonitor(reader)
 
         monitor.refresh()
         await monitor.waitForIdleForTesting()
@@ -49,7 +49,7 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testRawSnapshotCopyRequestsDiagnosticsOnDemand() async {
         let reader = StubBatteryReader(snapshots: [.previewDischarging])
-        let monitor = BatteryMonitor(reader: makeClient(reader))
+        let monitor = makeMonitor(reader)
 
         monitor.copyRawSnapshot()
         await monitor.waitForIdleForTesting()
@@ -63,6 +63,45 @@ final class BatteryMonitorTests: XCTestCase {
 
         XCTAssertTrue(policy.usesEnergyChangeProbe(for: BatteryMonitoringDemand(needsEnergyChangeAwareness: true)))
         XCTAssertFalse(policy.usesEnergyChangeProbe(for: BatteryMonitoringDemand(needsEnergyChangeAwareness: false)))
+    }
+
+    func testRefreshRequestsWidgetTimelineReloadWhenSnapshotPublishes() async {
+        let reader = StubBatteryReader(snapshots: [.previewDischarging])
+        var reloadCount = 0
+        let monitor = BatteryMonitor(
+            reader: makeClient(reader),
+            widgetTimelineReloader: {
+                reloadCount += 1
+            }
+        )
+
+        monitor.refresh()
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertEqual(reloadCount, 1)
+    }
+
+    func testRefreshSkipsDuplicateWidgetTimelineReloadInsideThrottleWindow() async {
+        let reader = StubBatteryReader(snapshots: [.previewDischarging, .previewDischarging])
+        var reloadCount = 0
+        let monitor = BatteryMonitor(
+            reader: makeClient(reader),
+            widgetTimelineReloader: {
+                reloadCount += 1
+            },
+            widgetTimelineReloadMinimumInterval: 60
+        )
+
+        monitor.refresh()
+        await monitor.waitForIdleForTesting()
+        monitor.refresh()
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertEqual(reloadCount, 1)
+    }
+
+    private func makeMonitor(_ reader: StubBatteryReader) -> BatteryMonitor {
+        BatteryMonitor(reader: makeClient(reader), widgetTimelineReloader: {})
     }
 
     private func makeClient(_ reader: StubBatteryReader) -> BatteryReadingClient {

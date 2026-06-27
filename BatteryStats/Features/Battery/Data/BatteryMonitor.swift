@@ -1,6 +1,7 @@
 @preconcurrency import AppKit
 @preconcurrency import Foundation
 import Observation
+import WidgetKit
 
 @MainActor
 @Observable
@@ -38,9 +39,21 @@ final class BatteryMonitor {
     @ObservationIgnored private var latestRawSnapshotText = "No battery snapshot has been captured yet."
     @ObservationIgnored private var latestParsedSnapshotText = "No parsed battery snapshot has been captured yet."
     @ObservationIgnored private var isStarted = false
+    @ObservationIgnored private let widgetTimelineReloader: @MainActor () -> Void
+    @ObservationIgnored private let widgetTimelineReloadMinimumInterval: TimeInterval
+    @ObservationIgnored private var lastWidgetTimelineReloadDate: Date?
+    @ObservationIgnored private var lastWidgetTimelineReloadSignature: WidgetTimelineReloadSignature?
 
-    init(reader: BatteryReadingClient = .live()) {
+    init(
+        reader: BatteryReadingClient = .live(),
+        widgetTimelineReloader: @escaping @MainActor () -> Void = {
+            WidgetCenter.shared.reloadTimelines(ofKind: BatteryWidgetTimeline.kind)
+        },
+        widgetTimelineReloadMinimumInterval: TimeInterval = 60
+    ) {
         self.reader = reader
+        self.widgetTimelineReloader = widgetTimelineReloader
+        self.widgetTimelineReloadMinimumInterval = widgetTimelineReloadMinimumInterval
     }
 
     func updateRefreshPolicy(_ policy: BatteryRefreshPolicy) {
@@ -194,13 +207,15 @@ final class BatteryMonitor {
             latestParsedSnapshotText = parsedSnapshotText
         }
 
-        lastUpdated = .now
+        let publicationDate = Date()
+        lastUpdated = publicationDate
 
         guard var snapshot = result.snapshot else {
             availabilityState = .unsupported
             self.snapshot = nil
             lastPublishedEnergyUse = nil
             dischargeSamples.removeAll()
+            requestWidgetTimelineReload(for: nil, at: publicationDate)
             resetTimers()
             return
         }
@@ -231,7 +246,20 @@ final class BatteryMonitor {
         lastPublishedEnergyUse = snapshot.energyUseComparisonValue
         historyStore?.record(snapshot)
         alertCoordinator.evaluate(snapshot: snapshot, policy: alertPolicy)
+        requestWidgetTimelineReload(for: snapshot, at: publicationDate)
         resetTimers()
+    }
+
+    private func requestWidgetTimelineReload(for snapshot: BatterySnapshot?, at date: Date) {
+        let signature = WidgetTimelineReloadSignature(snapshot: snapshot)
+        let elapsed = lastWidgetTimelineReloadDate.map { date.timeIntervalSince($0) } ?? .infinity
+        guard signature != lastWidgetTimelineReloadSignature || elapsed >= widgetTimelineReloadMinimumInterval else {
+            return
+        }
+
+        lastWidgetTimelineReloadDate = date
+        lastWidgetTimelineReloadSignature = signature
+        widgetTimelineReloader()
     }
 
     func copyRawSnapshot() {
@@ -299,5 +327,21 @@ final class BatteryMonitor {
         while refreshTask != nil || energyProbeTask != nil || diagnosticsTask != nil {
             try? await Task.sleep(for: .milliseconds(10))
         }
+    }
+}
+
+private struct WidgetTimelineReloadSignature: Equatable {
+    let powerState: BatteryPowerState?
+    let chargePercent: Int?
+    let healthPercent: Int?
+    let displayedTimeMinutes: Int?
+    let activePowerDeciwatts: Int?
+
+    init(snapshot: BatterySnapshot?) {
+        powerState = snapshot?.powerState
+        chargePercent = snapshot?.stateOfChargePercent.map { Int($0.rounded()) }
+        healthPercent = snapshot?.healthPercent.map { Int($0.rounded()) }
+        displayedTimeMinutes = snapshot?.displayedTimeMinutes
+        activePowerDeciwatts = snapshot?.activePowerWatts.map { Int(($0 * 10).rounded()) }
     }
 }

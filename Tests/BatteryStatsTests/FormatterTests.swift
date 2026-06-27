@@ -53,6 +53,40 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(halfChargedSnapshot.batterySymbolName, "battery.50")
     }
 
+    func testSnapshotUsesUnknownIconWhenChargePercentIsUnavailable() {
+        var snapshot = makeSnapshot(stateOfChargePercent: 55, powerState: .charging)
+        snapshot = BatterySnapshot(
+            timestamp: snapshot.timestamp,
+            powerState: snapshot.powerState,
+            isCharging: snapshot.isCharging,
+            isExternalPowerConnected: snapshot.isExternalPowerConnected,
+            currentChargeMilliampHours: snapshot.currentChargeMilliampHours,
+            currentChargeWattHours: snapshot.currentChargeWattHours,
+            fullChargeCapacityMilliampHours: snapshot.fullChargeCapacityMilliampHours,
+            fullChargeCapacityWattHours: snapshot.fullChargeCapacityWattHours,
+            designCapacityMilliampHours: snapshot.designCapacityMilliampHours,
+            designCapacityWattHours: snapshot.designCapacityWattHours,
+            healthPercent: snapshot.healthPercent,
+            stateOfChargePercent: nil,
+            voltageMillivolts: snapshot.voltageMillivolts,
+            currentMilliampsSigned: snapshot.currentMilliampsSigned,
+            dischargeRateMilliamps: snapshot.dischargeRateMilliamps,
+            chargeRateWatts: snapshot.chargeRateWatts,
+            dischargeRateWatts: snapshot.dischargeRateWatts,
+            rateBasedTimeRemainingMinutes: snapshot.rateBasedTimeRemainingMinutes,
+            systemTimeRemainingMinutes: snapshot.systemTimeRemainingMinutes,
+            timeToFullMinutes: snapshot.timeToFullMinutes,
+            cycleCount: snapshot.cycleCount,
+            manufactureDate: snapshot.manufactureDate,
+            batteryAgeComponents: snapshot.batteryAgeComponents,
+            temperatureCelsius: snapshot.temperatureCelsius,
+            adapterMaxWatts: snapshot.adapterMaxWatts,
+            notes: snapshot.notes
+        )
+
+        XCTAssertEqual(snapshot.batterySymbolName, "questionmark")
+    }
+
     func testSnapshotUsesRequestedHealthAndChargeThresholdBands() {
         let redSnapshot = makeSnapshot(stateOfChargePercent: 8, healthPercent: 79.5, powerState: .onBattery)
         XCTAssertEqual(redSnapshot.healthTone, .red)

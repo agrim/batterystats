@@ -36,10 +36,8 @@ struct BatteryStatusProvider: TimelineProvider {
 }
 
 struct BatteryStatusWidget: Widget {
-    private let kind = "BatteryStatusWidget"
-
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: BatteryStatusProvider()) { entry in
+        StaticConfiguration(kind: BatteryWidgetTimeline.kind, provider: BatteryStatusProvider()) { entry in
             BatteryStatusWidgetView(entry: entry)
         }
         .configurationDisplayName("Battery Circles")
