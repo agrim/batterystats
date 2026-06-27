@@ -100,6 +100,18 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reloadCount, 1)
     }
 
+    func testRefreshKeepsOnlyRecentSnapshotsForTrends() async {
+        let reader = StubBatteryReader(snapshots: Array(repeating: .previewDischarging, count: 14))
+        let monitor = makeMonitor(reader)
+
+        for _ in 0..<14 {
+            monitor.refresh()
+            await monitor.waitForIdleForTesting()
+        }
+
+        XCTAssertEqual(monitor.recentSnapshots.count, 12)
+    }
+
     private func makeMonitor(_ reader: StubBatteryReader) -> BatteryMonitor {
         BatteryMonitor(reader: makeClient(reader), widgetTimelineReloader: {})
     }

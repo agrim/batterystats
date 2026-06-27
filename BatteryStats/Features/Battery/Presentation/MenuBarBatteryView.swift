@@ -20,8 +20,16 @@ struct MenuBarBatteryView: View {
                 Button {
                     monitor.refresh()
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    if monitor.isRefreshing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.62)
+                            .frame(width: 12, height: 12)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
                 }
+                .disabled(monitor.isRefreshing)
                 .help("Refresh")
 
                 Button {

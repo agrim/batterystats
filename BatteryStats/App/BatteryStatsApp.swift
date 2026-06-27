@@ -28,6 +28,7 @@ struct BatteryStatsApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowBackgroundDragBehavior(.disabled)
         .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.presented)
 
         MenuBarExtra {
             MenuBarBatteryView(monitor: monitor, preferences: preferences, historyStore: historyStore)

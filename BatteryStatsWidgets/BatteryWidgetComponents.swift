@@ -59,6 +59,7 @@ private struct BatteryWidgetMetricContent: View {
 
 struct BatteryMediumWidgetView: View {
     let snapshot: BatterySnapshot?
+    let updatedAt: Date
     let healthTint: Color
     let chargeTint: Color
     let timeTint: Color
@@ -79,10 +80,18 @@ struct BatteryMediumWidgetView: View {
 
                 Spacer(minLength: 8)
 
-                Text(BatteryFormatting.percent(snapshot?.stateOfChargePercent))
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .lineLimit(1)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(BatteryFormatting.percent(snapshot?.stateOfChargePercent))
+                        .font(.title3.weight(.semibold))
+                        .monospacedDigit()
+                        .lineLimit(1)
+
+                    Text("Updated \(updatedText)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
             }
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 8) {
@@ -137,6 +146,10 @@ struct BatteryMediumWidgetView: View {
         }
 
         return BatteryFormatting.watts(activePowerWatts)
+    }
+
+    private var updatedText: String {
+        updatedAt.formatted(date: .omitted, time: .shortened)
     }
 }
 

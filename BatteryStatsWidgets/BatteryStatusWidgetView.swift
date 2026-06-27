@@ -12,6 +12,7 @@ struct BatteryStatusWidgetView: View {
             case .systemMedium:
                 BatteryMediumWidgetView(
                     snapshot: entry.snapshot,
+                    updatedAt: entry.date,
                     healthTint: BatteryPresentationStyle.healthTint(for: entry.snapshot),
                     chargeTint: BatteryPresentationStyle.chargeTint(for: entry.snapshot),
                     timeTint: BatteryPresentationStyle.timeTint(for: entry.snapshot),

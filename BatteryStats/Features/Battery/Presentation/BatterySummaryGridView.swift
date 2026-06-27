@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BatterySummaryGridView: View {
     let snapshot: BatterySnapshot
+    let recentSnapshots: [BatterySnapshot]
     let temperatureUnitPreference: TemperatureUnitPreference
     let showsAdvancedValues: Bool
 
@@ -15,6 +16,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatteryFormatting.percent(snapshot.healthPercent, decimals: 0),
                 progress: snapshot.healthPercent,
+                trendValues: recentSnapshots.compactMap(\.healthPercent),
                 tint: BatteryPresentationStyle.tint(for: snapshot.healthTone)
             )
 
@@ -26,6 +28,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatteryFormatting.percent(snapshot.stateOfChargePercent, decimals: 0),
                 progress: snapshot.stateOfChargePercent,
+                trendValues: recentSnapshots.compactMap(\.stateOfChargePercent),
                 tint: BatteryPresentationStyle.tint(for: snapshot.chargeTone)
             )
 
@@ -161,6 +164,8 @@ struct BatterySummaryGridView: View {
 }
 
 private struct BatteryCapacityBarSectionView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private static let valueSpacing: CGFloat = 8
     private static let barSpacing: CGFloat = 10
     private static let barMinimumWidth: CGFloat = 148
@@ -169,6 +174,7 @@ private struct BatteryCapacityBarSectionView: View {
     let capacityValue: String
     let percentValue: String
     let progress: Double?
+    let trendValues: [Double]
     let tint: Color
 
     var body: some View {
@@ -190,6 +196,7 @@ private struct BatteryCapacityBarSectionView: View {
                     .controlSize(.small)
                     .tint(tint)
                     .frame(minWidth: Self.barMinimumWidth, maxWidth: .infinity)
+                    .animation(valueAnimation, value: clampedProgress)
 
                 Text(percentValue)
                     .font(.callout)
@@ -198,6 +205,14 @@ private struct BatteryCapacityBarSectionView: View {
                     .lineLimit(1)
                     .fixedSize()
                     .contentTransition(.numericText())
+                    .animation(valueAnimation, value: percentValue)
+            }
+
+            if trendValues.count >= 2 {
+                BatteryTrendSparkline(values: trendValues, tint: tint)
+                    .frame(height: 14)
+                    .transition(.opacity)
+                    .animation(valueAnimation, value: trendValues)
             }
         }
     }
@@ -205,9 +220,15 @@ private struct BatteryCapacityBarSectionView: View {
     private var clampedProgress: Double {
         max(0, min(100, progress ?? 0)) / 100
     }
+
+    private var valueAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.35)
+    }
 }
 
 private struct BatteryDetailRowView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let title: String
     let value: String
 
@@ -226,13 +247,68 @@ private struct BatteryDetailRowView: View {
                 .layoutPriority(1)
                 .gridColumnAlignment(.trailing)
                 .contentTransition(.numericText())
+                .animation(valueAnimation, value: value)
         }
         .font(.subheadline)
         .padding(.vertical, 4)
     }
+
+    private var valueAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.25)
+    }
+}
+
+private struct BatteryTrendSparkline: View {
+    let values: [Double]
+    let tint: Color
+
+    var body: some View {
+        TrendSparklineShape(values: normalizedValues)
+            .stroke(
+                tint.opacity(0.72),
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+            )
+            .accessibilityHidden(true)
+    }
+
+    private var normalizedValues: [Double] {
+        values.suffix(12).map { max(0, min(100, $0)) / 100 }
+    }
+}
+
+private struct TrendSparklineShape: Shape {
+    let values: [Double]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard values.count >= 2 else {
+            return path
+        }
+
+        let horizontalStep = rect.width / CGFloat(values.count - 1)
+        for (index, value) in values.enumerated() {
+            let point = CGPoint(
+                x: rect.minX + (CGFloat(index) * horizontalStep),
+                y: rect.maxY - (CGFloat(value) * rect.height)
+            )
+
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+
+        return path
+    }
 }
 
 #Preview {
-    BatterySummaryGridView(snapshot: .previewDischarging, temperatureUnitPreference: .celsius, showsAdvancedValues: true)
+    BatterySummaryGridView(
+        snapshot: .previewDischarging,
+        recentSnapshots: [.previewCharging, .previewDischarging],
+        temperatureUnitPreference: .celsius,
+        showsAdvancedValues: true
+    )
         .padding()
 }

@@ -43,11 +43,19 @@ struct BatterySurfaceView: View {
                     )
             case .available:
                 if let snapshot = monitor.snapshot {
-                    BatterySummaryGridView(
-                        snapshot: snapshot,
-                        temperatureUnitPreference: preferences.temperatureUnitPreference,
-                        showsAdvancedValues: preferences.showAdvancedValues
-                    )
+                    VStack(alignment: .leading, spacing: 8) {
+                        BatteryFreshnessView(
+                            lastUpdated: monitor.lastUpdated,
+                            isRefreshing: monitor.isRefreshing
+                        )
+
+                        BatterySummaryGridView(
+                            snapshot: snapshot,
+                            recentSnapshots: monitor.recentSnapshots,
+                            temperatureUnitPreference: preferences.temperatureUnitPreference,
+                            showsAdvancedValues: preferences.showAdvancedValues
+                        )
+                    }
                 } else {
                     UnsupportedBatteryView()
                         .frame(

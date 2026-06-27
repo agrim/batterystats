@@ -14,6 +14,7 @@ final class BatteryMonitor {
 
     var availabilityState: AvailabilityState = .loading
     var snapshot: BatterySnapshot?
+    var recentSnapshots: [BatterySnapshot] = []
     var lastUpdated: Date?
     var isRefreshing = false
 
@@ -43,6 +44,7 @@ final class BatteryMonitor {
     @ObservationIgnored private let widgetTimelineReloadMinimumInterval: TimeInterval
     @ObservationIgnored private var lastWidgetTimelineReloadDate: Date?
     @ObservationIgnored private var lastWidgetTimelineReloadSignature: WidgetTimelineReloadSignature?
+    @ObservationIgnored private let recentSnapshotLimit = 12
 
     init(
         reader: BatteryReadingClient = .live(),
@@ -213,6 +215,7 @@ final class BatteryMonitor {
         guard var snapshot = result.snapshot else {
             availabilityState = .unsupported
             self.snapshot = nil
+            recentSnapshots.removeAll()
             lastPublishedEnergyUse = nil
             dischargeSamples.removeAll()
             requestWidgetTimelineReload(for: nil, at: publicationDate)
@@ -243,11 +246,19 @@ final class BatteryMonitor {
         )
 
         self.snapshot = snapshot
+        appendRecentSnapshot(snapshot)
         lastPublishedEnergyUse = snapshot.energyUseComparisonValue
         historyStore?.record(snapshot)
         alertCoordinator.evaluate(snapshot: snapshot, policy: alertPolicy)
         requestWidgetTimelineReload(for: snapshot, at: publicationDate)
         resetTimers()
+    }
+
+    private func appendRecentSnapshot(_ snapshot: BatterySnapshot) {
+        recentSnapshots.append(snapshot)
+        if recentSnapshots.count > recentSnapshotLimit {
+            recentSnapshots.removeFirst(recentSnapshots.count - recentSnapshotLimit)
+        }
     }
 
     private func requestWidgetTimelineReload(for snapshot: BatterySnapshot?, at date: Date) {
