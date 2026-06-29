@@ -2,8 +2,8 @@ import SwiftUI
 
 struct BatterySummaryGridView: View {
     let snapshot: BatterySnapshot
-    let recentSnapshots: [BatterySnapshot]
     let temperatureUnitPreference: TemperatureUnitPreference
+    let temperatureUnitResolutionToken: Int
     let showsAdvancedValues: Bool
 
     var body: some View {
@@ -12,12 +12,12 @@ struct BatterySummaryGridView: View {
                 title: "Health",
                 capacityValue: BatteryFormatting.compactCapacityPair(
                     current: snapshot.fullChargeCapacityMilliampHours,
-                    maximum: snapshot.designCapacityMilliampHours
+                    maximum: snapshot.designCapacityMilliampHours,
+                    currentAllowsZero: false
                 ),
-                percentValue: BatteryFormatting.percent(snapshot.healthPercent, decimals: 0),
-                progress: snapshot.healthPercent,
-                trendValues: recentSnapshots.compactMap(\.healthPercent),
-                tint: BatteryPresentationStyle.tint(for: snapshot.healthTone)
+                percentValue: BatterySummaryDetailFormatting.compactPercent(snapshot.presentationHealthPercent),
+                progress: snapshot.presentationHealthPercent,
+                tint: BatteryPresentationStyle.healthTint(for: snapshot)
             )
 
             BatteryCapacityBarSectionView(
@@ -26,10 +26,9 @@ struct BatterySummaryGridView: View {
                     current: snapshot.currentChargeMilliampHours,
                     maximum: snapshot.fullChargeCapacityMilliampHours
                 ),
-                percentValue: BatteryFormatting.percent(snapshot.stateOfChargePercent, decimals: 0),
-                progress: snapshot.stateOfChargePercent,
-                trendValues: recentSnapshots.compactMap(\.stateOfChargePercent),
-                tint: BatteryPresentationStyle.tint(for: snapshot.chargeTone)
+                percentValue: BatterySummaryDetailFormatting.compactPercent(snapshot.presentationStateOfChargePercent),
+                progress: snapshot.presentationStateOfChargePercent,
+                tint: BatteryPresentationStyle.chargeTint(for: snapshot)
             )
 
             GroupBox {
@@ -41,21 +40,25 @@ struct BatterySummaryGridView: View {
 
                     BatteryDetailRowView(title: "Status", value: snapshot.statusDisplayTitle)
 
-                    if let cycleCount = snapshot.cycleCount {
+                    if let cycleCount = BatterySummaryDetailFormatting.cycleCount(snapshot.cycleCount) {
                         Divider()
                             .gridCellColumns(2)
 
-                        BatteryDetailRowView(title: "Charge Cycles", value: String(cycleCount))
+                        BatteryDetailRowView(title: "Charge Cycles", value: cycleCount)
                     }
 
-                    if snapshot.temperatureCelsius != nil {
+                    if let temperature = BatterySummaryDetailFormatting.temperature(
+                        snapshot.presentationTemperatureCelsius,
+                        unitPreference: temperatureUnitPreference
+                    ) {
                         Divider()
                             .gridCellColumns(2)
 
                         BatteryDetailRowView(
                             title: "Temperature",
-                            value: BatteryFormatting.temperature(snapshot.temperatureCelsius, unitPreference: temperatureUnitPreference)
+                            value: temperature
                         )
+                        .id(temperatureUnitResolutionToken)
                     }
 
                     if showsAdvancedValues {
@@ -69,97 +72,230 @@ struct BatterySummaryGridView: View {
     }
 
     private var timeTitle: String {
-        snapshot.powerState == .charging ? "Time to Full" : "Time Left"
+        BatterySummaryDetailFormatting.timeTitle(for: snapshot)
     }
 
     private var timeSummary: String {
+        BatterySummaryDetailFormatting.timeSummary(for: snapshot)
+    }
+
+    @ViewBuilder
+    private var advancedRows: some View {
+        if let power = BatterySummaryDetailFormatting.power(snapshot.activePowerWatts) {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: BatterySummaryDetailFormatting.powerTitle(for: snapshot), value: power)
+        }
+
+        if let voltage = BatterySummaryDetailFormatting.voltage(snapshot.voltageMillivolts) {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Voltage", value: voltage)
+        }
+
+        if let energy = BatterySummaryDetailFormatting.energy(
+            current: snapshot.currentChargeWattHours,
+            maximum: snapshot.fullChargeCapacityWattHours
+        ) {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(
+                title: "Energy",
+                value: energy
+            )
+        }
+
+        if let manufactureDate = BatterySummaryDetailFormatting.manufactureDate(snapshot.validatedManufactureDate) {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Made", value: manufactureDate)
+        }
+
+        if let age = BatterySummaryDetailFormatting.age(for: snapshot) {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Age", value: age)
+        }
+    }
+}
+
+enum BatterySummaryDetailFormatting {
+    static func compactPercent(_ value: Double?) -> String {
+        guard let value,
+              value.isFinite,
+              value >= 0,
+              value <= 100 else {
+            return "—"
+        }
+
+        return BatteryFormatting.percent(value, decimals: 0)
+    }
+
+    static func timeTitle(for snapshot: BatterySnapshot) -> String {
+        switch snapshot.powerState {
+        case .charging:
+            return "Time to Full"
+        case .onBattery, .connectedDischarging:
+            return "Time Left"
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return "Time"
+        }
+    }
+
+    static func timeSummary(for snapshot: BatterySnapshot) -> String {
         let timeText: String?
         switch snapshot.powerState {
-        case .onBattery:
-            timeText = BatteryFormatting.compactDuration(minutes: snapshot.rateBasedTimeRemainingMinutes ?? snapshot.systemTimeRemainingMinutes)
-        case .charging:
-            timeText = BatteryFormatting.compactDuration(minutes: snapshot.timeToFullMinutes)
+        case .onBattery, .connectedDischarging, .charging:
+            if let displayedTimeMinutes = BatteryCalculations.plausibleDurationMinutes(snapshot.displayedTimeMinutes) {
+                timeText = BatteryFormatting.compactDuration(minutes: displayedTimeMinutes)
+            } else {
+                timeText = nil
+            }
         case .connectedNotCharging, .fullOnAC, .unknown:
             timeText = nil
         }
 
         let rateText: String?
         switch snapshot.powerState {
-        case .onBattery:
-            rateText = snapshot.dischargeRateMilliamps.map(BatteryFormatting.milliamps)
         case .charging:
-            rateText = BatteryCalculations.chargeRateMilliamps(from: snapshot.currentMilliampsSigned).map(BatteryFormatting.milliamps)
+            if let activePowerWatts = BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) {
+                rateText = BatteryFormatting.watts(activePowerWatts)
+            } else if let activeCurrentMilliamps = BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps) {
+                rateText = BatteryFormatting.milliamps(activeCurrentMilliamps)
+            } else {
+                rateText = nil
+            }
+        case .onBattery, .connectedDischarging:
+            if let activeCurrentMilliamps = BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps) {
+                rateText = BatteryFormatting.milliamps(activeCurrentMilliamps)
+            } else {
+                rateText = nil
+            }
         case .connectedNotCharging, .fullOnAC, .unknown:
             rateText = nil
         }
 
-        let time = Self.visibleSummaryComponent(timeText)
-        let rate = Self.visibleSummaryComponent(rateText)
-
-        if let time, let rate {
-            return "\(time) / \(rate)"
+        if let timeText, let rateText {
+            return "\(timeText) / \(rateText)"
         }
 
-        return time ?? rate ?? "—"
+        if let timeText {
+            return timeText
+        }
+
+        if let rateText {
+            return "Estimating / \(rateText)"
+        }
+
+        return "—"
     }
 
-    private static func visibleSummaryComponent(_ value: String?) -> String? {
-        guard let value, value.isEmpty == false, value != "—" else {
+    static func cycleCount(_ value: Int?) -> String? {
+        guard let value = BatteryCalculations.plausibleCycleCount(value) else {
+            return nil
+        }
+
+        return String(value)
+    }
+
+    static func temperature(_ value: Double?, unitPreference: TemperatureUnitPreference) -> String? {
+        guard let value = BatteryCalculations.plausibleTemperatureCelsius(value) else {
+            return nil
+        }
+
+        return BatteryFormatting.temperature(value, unitPreference: unitPreference)
+    }
+
+    static func power(_ value: Double?) -> String? {
+        guard let value = BatteryCalculations.plausibleWatts(value) else {
+            return nil
+        }
+
+        return BatteryFormatting.watts(value)
+    }
+
+    static func powerTitle(for snapshot: BatterySnapshot) -> String {
+        switch snapshot.powerState {
+        case .charging:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "Input Power"
+            }
+
+            if BatteryCalculations.plausibleWatts(snapshot.chargeRateWatts) != nil {
+                return "Charge Rate"
+            }
+
+            return "Charge Rate"
+        case .connectedDischarging:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "Input Power"
+            }
+
+            return "Battery Drain"
+        case .onBattery:
+            return "Power"
+        case .connectedNotCharging, .fullOnAC:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "Input Power"
+            }
+
+            return "Power"
+        case .unknown:
+            return "Power"
+        }
+    }
+
+    static func voltage(_ value: Int?) -> String? {
+        guard let value = BatteryCalculations.plausibleVoltageMillivolts(value) else {
+            return nil
+        }
+
+        return BatteryFormatting.millivolts(value)
+    }
+
+    static func energy(current: Double?, maximum: Double?) -> String? {
+        let current = BatteryCalculations.plausibleWattHours(current)
+        let maximum = positiveWattHours(maximum)
+
+        guard current != nil || maximum != nil else {
+            return nil
+        }
+
+        return BatteryFormatting.compactWattHourPair(current: current, maximum: maximum)
+    }
+
+    static func manufactureDate(_ value: Date?) -> String? {
+        guard let value else {
+            return nil
+        }
+
+        return BatteryFormatting.date(value)
+    }
+
+    static func age(_ value: DateComponents?) -> String? {
+        guard BatteryCalculations.displayableBatteryAgeComponents(value) != nil else {
+            return nil
+        }
+
+        return BatteryFormatting.age(value)
+    }
+
+    static func age(for snapshot: BatterySnapshot) -> String? {
+        age(snapshot.validatedBatteryAgeComponents)
+    }
+
+    private static func positiveWattHours(_ value: Double?) -> Double? {
+        guard let value = BatteryCalculations.plausibleWattHours(value),
+              value > 0 else {
             return nil
         }
 
         return value
-    }
-
-    @ViewBuilder
-    private var advancedRows: some View {
-        if let activePowerWatts = snapshot.activePowerWatts {
-            Divider()
-                .gridCellColumns(2)
-
-            BatteryDetailRowView(title: "Power", value: BatteryFormatting.watts(activePowerWatts))
-        }
-
-        if snapshot.voltageMillivolts != nil {
-            Divider()
-                .gridCellColumns(2)
-
-            BatteryDetailRowView(title: "Voltage", value: BatteryFormatting.millivolts(snapshot.voltageMillivolts))
-        }
-
-        if snapshot.currentChargeWattHours != nil || snapshot.fullChargeCapacityWattHours != nil {
-            Divider()
-                .gridCellColumns(2)
-
-            BatteryDetailRowView(
-                title: "Energy",
-                value: BatteryFormatting.compactWattHourPair(
-                    current: snapshot.currentChargeWattHours,
-                    maximum: snapshot.fullChargeCapacityWattHours
-                )
-            )
-        }
-
-        if let adapterMaxWatts = snapshot.adapterMaxWatts {
-            Divider()
-                .gridCellColumns(2)
-
-            BatteryDetailRowView(title: "Adapter", value: "\(adapterMaxWatts) W")
-        }
-
-        if snapshot.manufactureDate != nil {
-            Divider()
-                .gridCellColumns(2)
-
-            BatteryDetailRowView(title: "Made", value: BatteryFormatting.date(snapshot.manufactureDate))
-        }
-
-        if snapshot.batteryAgeComponents != nil {
-            Divider()
-                .gridCellColumns(2)
-
-            BatteryDetailRowView(title: "Age", value: BatteryFormatting.age(snapshot.batteryAgeComponents))
-        }
     }
 }
 
@@ -174,7 +310,6 @@ private struct BatteryCapacityBarSectionView: View {
     let capacityValue: String
     let percentValue: String
     let progress: Double?
-    let trendValues: [Double]
     let tint: Color
 
     var body: some View {
@@ -191,12 +326,10 @@ private struct BatteryCapacityBarSectionView: View {
             }
             .font(.subheadline)
 
-            HStack(alignment: .firstTextBaseline, spacing: Self.barSpacing) {
-                ProgressView(value: clampedProgress)
-                    .controlSize(.small)
-                    .tint(tint)
+            HStack(alignment: .center, spacing: Self.barSpacing) {
+                BatteryCapacityProgressBar(presentation: progressPresentation, tint: tint)
                     .frame(minWidth: Self.barMinimumWidth, maxWidth: .infinity)
-                    .animation(valueAnimation, value: clampedProgress)
+                    .animation(valueAnimation, value: progressPresentation)
 
                 Text(percentValue)
                     .font(.callout)
@@ -207,22 +340,64 @@ private struct BatteryCapacityBarSectionView: View {
                     .contentTransition(.numericText())
                     .animation(valueAnimation, value: percentValue)
             }
-
-            if trendValues.count >= 2 {
-                BatteryTrendSparkline(values: trendValues, tint: tint)
-                    .frame(height: 14)
-                    .transition(.opacity)
-                    .animation(valueAnimation, value: trendValues)
-            }
         }
     }
 
-    private var clampedProgress: Double {
-        max(0, min(100, progress ?? 0)) / 100
+    private var progressPresentation: BatteryCapacityProgressPresentation {
+        BatteryCapacityProgressPresentation(progress: progress)
     }
 
     private var valueAnimation: Animation? {
         reduceMotion ? nil : .smooth(duration: 0.35)
+    }
+}
+
+struct BatteryCapacityProgressPresentation: Equatable {
+    let fillFraction: Double?
+
+    var isUnavailable: Bool {
+        fillFraction == nil
+    }
+
+    init(progress: Double?) {
+        guard let progress, progress.isFinite, progress >= 0 else {
+            fillFraction = nil
+            return
+        }
+
+        fillFraction = max(0, min(100, progress)) / 100
+    }
+}
+
+private struct BatteryCapacityProgressBar: View {
+    let presentation: BatteryCapacityProgressPresentation
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = max(0, geometry.size.width)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(tint.opacity(presentation.isUnavailable ? 0.12 : 0.18))
+
+                if let fillFraction = presentation.fillFraction {
+                    let fillWidth = width * fillFraction
+                    if fillWidth > 0 {
+                        Capsule()
+                            .fill(tint)
+                            .frame(width: fillWidth)
+                    }
+                } else if width > 0 {
+                    Capsule()
+                        .fill(tint.opacity(0.46))
+                        .frame(width: min(width, max(36, width * 0.28)))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
     }
 }
 
@@ -258,56 +433,11 @@ private struct BatteryDetailRowView: View {
     }
 }
 
-private struct BatteryTrendSparkline: View {
-    let values: [Double]
-    let tint: Color
-
-    var body: some View {
-        TrendSparklineShape(values: normalizedValues)
-            .stroke(
-                tint.opacity(0.72),
-                style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
-            )
-            .accessibilityHidden(true)
-    }
-
-    private var normalizedValues: [Double] {
-        values.suffix(12).map { max(0, min(100, $0)) / 100 }
-    }
-}
-
-private struct TrendSparklineShape: Shape {
-    let values: [Double]
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        guard values.count >= 2 else {
-            return path
-        }
-
-        let horizontalStep = rect.width / CGFloat(values.count - 1)
-        for (index, value) in values.enumerated() {
-            let point = CGPoint(
-                x: rect.minX + (CGFloat(index) * horizontalStep),
-                y: rect.maxY - (CGFloat(value) * rect.height)
-            )
-
-            if index == 0 {
-                path.move(to: point)
-            } else {
-                path.addLine(to: point)
-            }
-        }
-
-        return path
-    }
-}
-
 #Preview {
     BatterySummaryGridView(
         snapshot: .previewDischarging,
-        recentSnapshots: [.previewCharging, .previewDischarging],
         temperatureUnitPreference: .celsius,
+        temperatureUnitResolutionToken: 0,
         showsAdvancedValues: true
     )
         .padding()

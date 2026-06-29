@@ -29,8 +29,12 @@ struct BatteryReadingService: Sendable {
     func read(at now: Date = .now, options: BatteryReadOptions = .standard) -> BatteryReadResult {
         let publicSnapshot = powerSourceReader.read()
         let smartBattery = smartBatteryReader.read()
+        let resolvedPublicSnapshot = Self.resolvedPublicSnapshot(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery
+        )
 
-        guard let publicSnapshot = publicSnapshot ?? fallbackPublicSnapshot(from: smartBattery) else {
+        guard let publicSnapshot = resolvedPublicSnapshot else {
             return BatteryReadResult(
                 snapshot: nil,
                 rawSnapshotText: options.includesDiagnostics ? "No internal battery detected." : nil,
@@ -51,26 +55,88 @@ struct BatteryReadingService: Sendable {
             notes.append("Detailed AppleSmartBattery properties were unavailable, so the app is showing public power-source data only.")
         }
 
-        let currentChargeMilliampHours = smartBattery?.currentChargeMilliampHours
-            ?? BatteryCalculations.deriveCurrentChargeMilliampHours(
-                publicPercentage: publicSnapshot.stateOfChargePercent,
-                fullChargeCapacityMilliampHours: smartBattery?.fullChargeCapacityMilliampHours
-            )
-
         let fullChargeCapacityMilliampHours = smartBattery?.fullChargeCapacityMilliampHours
+        let signedCurrentMilliamps = Self.reconciledSignedCurrentMilliamps(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            signedCurrentMilliamps: smartBattery?.signedCurrentMilliamps
+        )
+        let isCharged = Self.reconciledChargedState(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            signedCurrentMilliamps: signedCurrentMilliamps,
+            currentChargeMilliampHours: smartBattery?.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        )
+        let publicStateOfChargePercent = Self.trustedPublicStateOfChargePercent(
+            publicSnapshot: publicSnapshot,
+            isCharged: isCharged
+        )
+        let currentChargeMilliampHours = BatteryCalculations.reconciledCurrentChargeMilliampHours(
+            smartCurrentChargeMilliampHours: smartBattery?.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            publicPercentage: publicStateOfChargePercent
+        )
         let designCapacityMilliampHours = smartBattery?.designCapacityMilliampHours
         let voltageMillivolts = smartBattery?.voltageMillivolts
-        let signedCurrentMilliamps = smartBattery?.signedCurrentMilliamps
-        let reportedTimeToFullMinutes = sanitized(publicSnapshot.timeToFullMinutes)
         let dischargeRateMilliamps = BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps)
         let chargeRateMilliamps = BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps)
+        let reportedTimeToFullMinutes = Self.reportedTimeToFullMinutes(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery
+        )
+        let computedTimeToFullMinutes = BatteryCalculations.estimatedTimeToFullMinutes(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            chargeCurrentMilliamps: chargeRateMilliamps,
+            reportedTimeToFullMinutes: nil
+        )
 
-        let powerState = BatteryCalculations.derivePowerState(
-            isCharging: publicSnapshot.isCharging,
-            isExternalPowerConnected: publicSnapshot.isExternalPowerConnected,
+        let powerState = Self.reconciledPowerState(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            isCharged: isCharged,
             signedCurrentMilliamps: signedCurrentMilliamps,
             currentChargeMilliampHours: currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        )
+        let powerFlags = BatteryCalculations.normalizedPowerFlags(for: powerState)
+        let adapterMaxWatts = Self.displayableAdapterMaxWatts(
+            smartBattery?.adapterMaxWatts,
+            powerState: powerState
+        )
+        let inputPowerWatts = Self.displayableInputPowerWatts(
+            smartBattery?.inputPowerWatts,
+            evidence: smartBattery?.inputPowerEvidence,
+            adapterMaxWatts: adapterMaxWatts,
+            powerState: powerState
+        )
+        let powerRates = Self.displayablePowerRates(
+            powerState: powerState,
+            chargeRateWatts: Self.dynamicChargeRateWatts(
+                smartBattery: smartBattery,
+                voltageMillivolts: voltageMillivolts,
+                signedCurrentMilliamps: signedCurrentMilliamps
+            ),
+            dischargeRateWatts: BatteryCalculations.dischargeRateWatts(
+                voltageMillivolts: voltageMillivolts,
+                signedCurrentMilliamps: signedCurrentMilliamps
+            )
+        )
+        let timing = Self.displayableTiming(
+            powerState: powerState,
+            rateBasedTimeRemainingMinutes: BatteryCalculations.timeRemainingMinutes(
+                currentChargeMilliampHours: currentChargeMilliampHours,
+                dischargeRateMilliamps: dischargeRateMilliamps
+            ),
+            systemTimeRemainingMinutes: Self.reportedSystemTimeRemainingMinutes(
+                publicSnapshot: publicSnapshot,
+                smartBattery: smartBattery
+            ),
+            timeToFullMinutes: Self.preferredTimeToFullMinutes(
+                computedTimeToFullMinutes: computedTimeToFullMinutes,
+                reportedTimeToFullMinutes: reportedTimeToFullMinutes
+            )
         )
 
         if smartBattery?.temperatureCelsius == nil,
@@ -78,11 +144,14 @@ struct BatteryReadingService: Sendable {
             notes.append("Battery temperature was present but could not be converted confidently.")
         }
 
+        let manufactureDate = BatteryCalculations.plausibleManufactureDate(smartBattery?.manufactureDate, now: now)
+        let batteryAgeComponents = BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: now)
+
         let snapshot = BatterySnapshot(
             timestamp: now,
             powerState: powerState,
-            isCharging: publicSnapshot.isCharging,
-            isExternalPowerConnected: publicSnapshot.isExternalPowerConnected,
+            isCharging: powerFlags.isCharging,
+            isExternalPowerConnected: powerFlags.isExternalPowerConnected,
             currentChargeMilliampHours: currentChargeMilliampHours,
             currentChargeWattHours: BatteryCalculations.wattHours(milliampHours: currentChargeMilliampHours, voltageMillivolts: voltageMillivolts),
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
@@ -96,29 +165,23 @@ struct BatteryReadingService: Sendable {
             stateOfChargePercent: BatteryCalculations.stateOfChargePercent(
                 currentChargeMilliampHours: currentChargeMilliampHours,
                 fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-                publicPercentage: publicSnapshot.stateOfChargePercent
+                publicPercentage: publicStateOfChargePercent
             ),
             voltageMillivolts: voltageMillivolts,
             currentMilliampsSigned: signedCurrentMilliamps,
             dischargeRateMilliamps: dischargeRateMilliamps,
-            chargeRateWatts: BatteryCalculations.chargeRateWatts(voltageMillivolts: voltageMillivolts, signedCurrentMilliamps: signedCurrentMilliamps),
-            dischargeRateWatts: BatteryCalculations.dischargeRateWatts(voltageMillivolts: voltageMillivolts, signedCurrentMilliamps: signedCurrentMilliamps),
-            rateBasedTimeRemainingMinutes: BatteryCalculations.timeRemainingMinutes(
-                currentChargeMilliampHours: currentChargeMilliampHours,
-                dischargeRateMilliamps: dischargeRateMilliamps
-            ),
-            systemTimeRemainingMinutes: sanitized(publicSnapshot.systemTimeRemainingMinutes),
-            timeToFullMinutes: BatteryCalculations.estimatedTimeToFullMinutes(
-                currentChargeMilliampHours: currentChargeMilliampHours,
-                fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-                chargeCurrentMilliamps: chargeRateMilliamps,
-                reportedTimeToFullMinutes: reportedTimeToFullMinutes
-            ),
+            chargeRateWatts: powerRates.chargeRateWatts,
+            inputPowerWatts: inputPowerWatts,
+            inputPowerEvidence: inputPowerWatts == nil ? nil : smartBattery?.inputPowerEvidence,
+            dischargeRateWatts: powerRates.dischargeRateWatts,
+            rateBasedTimeRemainingMinutes: timing.rateBasedTimeRemainingMinutes,
+            systemTimeRemainingMinutes: timing.systemTimeRemainingMinutes,
+            timeToFullMinutes: timing.timeToFullMinutes,
             cycleCount: smartBattery?.cycleCount,
-            manufactureDate: smartBattery?.manufactureDate,
-            batteryAgeComponents: BatteryCalculations.batteryAgeComponents(from: smartBattery?.manufactureDate, now: now),
+            manufactureDate: manufactureDate,
+            batteryAgeComponents: batteryAgeComponents,
             temperatureCelsius: smartBattery?.temperatureCelsius,
-            adapterMaxWatts: smartBattery?.adapterMaxWatts,
+            adapterMaxWatts: adapterMaxWatts,
             notes: notes
         )
 
@@ -129,46 +192,604 @@ struct BatteryReadingService: Sendable {
         )
     }
 
-    private func fallbackPublicSnapshot(from smartBattery: SmartBatteryDetails?) -> PublicPowerSourceSnapshot? {
-        guard smartBattery != nil else {
+    static func resolvedPublicSnapshot(
+        publicSnapshot: PublicPowerSourceSnapshot?,
+        smartBattery: SmartBatteryDetails?
+    ) -> PublicPowerSourceSnapshot? {
+        if let publicSnapshot,
+           publicSnapshot.isPresent,
+           publicSnapshot.isInternalBattery {
+            return publicSnapshot
+        }
+
+        return fallbackPublicSnapshot(from: smartBattery)
+    }
+
+    static func fallbackPublicSnapshot(from smartBattery: SmartBatteryDetails?) -> PublicPowerSourceSnapshot? {
+        guard let smartBattery else {
             return nil
         }
 
+        let currentImpliesCharging = BatteryCalculations.chargeRateMilliamps(from: smartBattery.signedCurrentMilliamps) != nil
+        let isDischarging = BatteryCalculations.dischargeRateMilliamps(from: smartBattery.signedCurrentMilliamps) != nil
+        let isCharging = isDischarging ? false : currentImpliesCharging || smartBattery.isCharging == true
+        let isCharged = Self.reconciledChargedState(
+            publicIsCharged: false,
+            smartIsFullyCharged: smartBattery.isFullyCharged,
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours,
+            publicStateOfChargePercent: nil
+        )
+        let isExternalPowerConnected = Self.smartExternalPowerConnected(
+            reportedExternalPowerConnected: smartBattery.isExternalPowerConnected,
+            isCharging: isCharging,
+            isCharged: isCharged,
+            isDischarging: isDischarging,
+            inputPowerWatts: smartBattery.inputPowerWatts,
+            inputPowerEvidence: smartBattery.inputPowerEvidence,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
+        )
+        let trustedStateOfChargePercent = isCharged && isDischarging == false ? 100.0 : nil
+        let stateOfChargePercent = BatteryCalculations.stateOfChargePercent(
+            currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours,
+            publicPercentage: trustedStateOfChargePercent
+        )
+        let powerState = BatteryCalculations.derivePowerState(
+            isCharging: isCharging,
+            isCharged: isCharged,
+            isExternalPowerConnected: isExternalPowerConnected,
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours
+        )
+        let powerSourceState = isExternalPowerConnected ? "AC Power" : "Battery Power"
+
         return PublicPowerSourceSnapshot(
             isPresent: true,
-            isCharging: false,
-            isCharged: false,
-            isExternalPowerConnected: false,
+            isCharging: isCharging,
+            isCharged: powerState == .fullOnAC,
+            isExternalPowerConnected: isExternalPowerConnected,
             isInternalBattery: true,
-            stateOfChargePercent: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            powerSourceState: nil,
+            stateOfChargePercent: stateOfChargePercent,
+            systemTimeRemainingMinutes: smartBattery.reportedTimeToEmptyMinutes,
+            timeToFullMinutes: smartBattery.reportedTimeToFullMinutes,
+            powerSourceState: powerSourceState,
             rawDescription: [:]
         )
     }
 
-    private func sanitized(_ minutes: Int?) -> Int? {
-        guard let minutes, minutes >= 0 else {
+    static func reportedSystemTimeRemainingMinutes(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?
+    ) -> Int? {
+        firstDisplayableReportedMinutes(
+            publicMinutes: publicSnapshot.systemTimeRemainingMinutes,
+            smartMinutes: smartBattery?.reportedTimeToEmptyMinutes,
+            zeroIsDisplayable: isEffectivelyEmptyForZeroTimeToEmpty(
+                publicSnapshot: publicSnapshot,
+                smartBattery: smartBattery
+            )
+        )
+    }
+
+    static func reportedTimeToFullMinutes(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?
+    ) -> Int? {
+        firstDisplayableReportedMinutes(
+            publicMinutes: publicSnapshot.timeToFullMinutes,
+            smartMinutes: smartBattery?.reportedTimeToFullMinutes,
+            zeroIsDisplayable: isEffectivelyFullForZeroTimeToFull(
+                publicSnapshot: publicSnapshot,
+                smartBattery: smartBattery
+            )
+        )
+    }
+
+    static func trustedPublicStateOfChargePercent(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        isCharged: Bool
+    ) -> Double? {
+        if isCharged {
+            return 100
+        }
+
+        return publicSnapshot.stateOfChargePercent
+    }
+
+    static func reconciledChargedState(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?,
+        signedCurrentMilliamps: Int?,
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?
+    ) -> Bool {
+        reconciledChargedState(
+            publicIsCharged: publicSnapshot.isCharged && shouldSuppressSmartExternalPowerEvidence(
+                publicSnapshot: publicSnapshot,
+                smartBattery: smartBattery
+            ) == false,
+            smartIsFullyCharged: shouldSuppressSmartExternalPowerEvidence(
+                publicSnapshot: publicSnapshot,
+                smartBattery: smartBattery
+            ) ? nil : smartBattery?.isFullyCharged,
+            signedCurrentMilliamps: signedCurrentMilliamps,
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            publicStateOfChargePercent: publicSnapshot.stateOfChargePercent
+        )
+    }
+
+    static func reconciledPowerState(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?,
+        isCharged: Bool,
+        signedCurrentMilliamps: Int?,
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?
+    ) -> BatteryPowerState {
+        let signedCurrentMilliamps = Self.reconciledSignedCurrentMilliamps(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            signedCurrentMilliamps: signedCurrentMilliamps
+        )
+        let suppressSmartExternalPowerEvidence = shouldSuppressSmartExternalPowerEvidence(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery
+        )
+        let isPublicCharging = publicSnapshot.isCharging && suppressSmartExternalPowerEvidence == false
+        let isSmartCharging = smartBattery?.isCharging == true && suppressSmartExternalPowerEvidence == false
+        let isCharging = isPublicCharging || isSmartCharging
+        let isExternalPowerConnected = Self.reconciledExternalPowerConnected(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            isCharging: isCharging,
+            isCharged: isCharged,
+            signedCurrentMilliamps: signedCurrentMilliamps
+        )
+
+        return BatteryCalculations.derivePowerState(
+            isCharging: isCharging,
+            isCharged: isCharged,
+            isExternalPowerConnected: isExternalPowerConnected,
+            signedCurrentMilliamps: signedCurrentMilliamps,
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        )
+    }
+
+    static func reconciledSignedCurrentMilliamps(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?,
+        signedCurrentMilliamps: Int?
+    ) -> Int? {
+        guard publicSnapshot.explicitlyReportsBatteryPower,
+              BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps) != nil else {
+            return signedCurrentMilliamps
+        }
+
+        if trustedInputPowerWatts(smartBattery: smartBattery) != nil {
+            return signedCurrentMilliamps
+        }
+
+        return nil
+    }
+
+    static func reconciledPowerState(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?,
+        signedCurrentMilliamps: Int?,
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?
+    ) -> BatteryPowerState {
+        reconciledPowerState(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            isCharged: reconciledChargedState(
+                publicSnapshot: publicSnapshot,
+                smartBattery: smartBattery,
+                signedCurrentMilliamps: signedCurrentMilliamps,
+                currentChargeMilliampHours: currentChargeMilliampHours,
+                fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+            ),
+            signedCurrentMilliamps: signedCurrentMilliamps,
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        )
+    }
+
+    static func displayableAdapterMaxWatts(_ adapterMaxWatts: Int?, powerState: BatteryPowerState) -> Int? {
+        guard let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
             return nil
         }
 
-        return minutes
+        switch powerState {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            return adapterMaxWatts
+        case .onBattery, .unknown:
+            return nil
+        }
+    }
+
+    static func displayableInputPowerWatts(
+        _ inputPowerWatts: Double?,
+        evidence: BatteryInputPowerEvidence? = nil,
+        adapterMaxWatts: Int? = nil,
+        powerState: BatteryPowerState
+    ) -> Double? {
+        guard let inputPowerWatts = displayableInputPowerWatts(
+            inputPowerWatts,
+            evidence: evidence,
+            adapterMaxWatts: adapterMaxWatts
+        ) else {
+            return nil
+        }
+
+        switch powerState {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            return inputPowerWatts
+        case .onBattery, .unknown:
+            return nil
+        }
+    }
+
+    static func displayablePowerRates(
+        powerState: BatteryPowerState,
+        chargeRateWatts: Double?,
+        dischargeRateWatts: Double?
+    ) -> (chargeRateWatts: Double?, dischargeRateWatts: Double?) {
+        switch powerState {
+        case .charging:
+            return (BatteryCalculations.plausibleWatts(chargeRateWatts), nil)
+        case .onBattery, .connectedDischarging:
+            return (nil, BatteryCalculations.plausibleWatts(dischargeRateWatts))
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return (nil, nil)
+        }
+    }
+
+    static func dynamicChargeRateWatts(
+        smartBattery: SmartBatteryDetails?,
+        voltageMillivolts: Int?,
+        signedCurrentMilliamps: Int?
+    ) -> Double? {
+        chargeRateWattsWithinAdapterContract(
+            voltageMillivolts: voltageMillivolts,
+            signedCurrentMilliamps: signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery?.adapterMaxWatts
+        )
+    }
+
+    static func displayableTiming(
+        powerState: BatteryPowerState,
+        rateBasedTimeRemainingMinutes: Int?,
+        systemTimeRemainingMinutes: Int?,
+        timeToFullMinutes: Int?
+    ) -> (rateBasedTimeRemainingMinutes: Int?, systemTimeRemainingMinutes: Int?, timeToFullMinutes: Int?) {
+        switch powerState {
+        case .onBattery, .connectedDischarging:
+            return (
+                BatteryCalculations.plausibleDurationMinutes(rateBasedTimeRemainingMinutes),
+                BatteryCalculations.plausibleDurationMinutes(systemTimeRemainingMinutes),
+                nil
+            )
+        case .charging:
+            return (
+                nil,
+                nil,
+                BatteryCalculations.plausibleDurationMinutes(timeToFullMinutes)
+            )
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return (nil, nil, nil)
+        }
+    }
+
+    static func preferredTimeToFullMinutes(
+        computedTimeToFullMinutes: Int?,
+        reportedTimeToFullMinutes: Int?
+    ) -> Int? {
+        let computedTimeToFullMinutes = BatteryCalculations.plausibleDurationMinutes(computedTimeToFullMinutes)
+        let reportedTimeToFullMinutes = BatteryCalculations.plausibleDurationMinutes(reportedTimeToFullMinutes)
+
+        if computedTimeToFullMinutes == 0 {
+            return 0
+        }
+
+        return reportedTimeToFullMinutes ?? computedTimeToFullMinutes
+    }
+
+    private static func reconciledExternalPowerConnected(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?,
+        isCharging: Bool,
+        isCharged: Bool,
+        signedCurrentMilliamps: Int?
+    ) -> Bool {
+        if isCharging {
+            return true
+        }
+
+        if isCharged {
+            return true
+        }
+
+        if trustedCounterBackedInputPowerWatts(smartBattery: smartBattery) != nil {
+            return true
+        }
+
+        if publicSnapshot.explicitlyReportsBatteryPower,
+           BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) != nil {
+            return false
+        }
+
+        if trustedInputPowerWatts(smartBattery: smartBattery) != nil {
+            return true
+        }
+
+        if publicSnapshot.reportedExternalPowerConnected {
+            return true
+        }
+
+        if publicSnapshot.explicitlyReportsBatteryPower {
+            return false
+        }
+
+        if let smartExternalPowerConnected = smartBattery?.isExternalPowerConnected {
+            return smartExternalPowerConnected
+        }
+
+        return publicSnapshot.reportedExternalPowerConnected || isCharged
+    }
+
+    private static func smartExternalPowerConnected(
+        reportedExternalPowerConnected: Bool?,
+        isCharging: Bool,
+        isCharged: Bool,
+        isDischarging: Bool,
+        inputPowerWatts: Double?,
+        inputPowerEvidence: BatteryInputPowerEvidence?,
+        adapterMaxWatts: Int?
+    ) -> Bool {
+        if isCharging {
+            return true
+        }
+
+        if isCharged {
+            return true
+        }
+
+        if displayableInputPowerWatts(
+            inputPowerWatts,
+            evidence: inputPowerEvidence,
+            adapterMaxWatts: adapterMaxWatts
+        ) != nil {
+            return true
+        }
+
+        if let reportedExternalPowerConnected {
+            return reportedExternalPowerConnected
+        }
+
+        if isDischarging {
+            return false
+        }
+
+        return false
+    }
+
+    private static func shouldSuppressSmartExternalPowerEvidence(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?
+    ) -> Bool {
+        publicSnapshot.explicitlyReportsBatteryPower
+            && trustedInputPowerWatts(smartBattery: smartBattery) == nil
+    }
+
+    private static func trustedInputPowerWatts(smartBattery: SmartBatteryDetails?) -> Double? {
+        displayableInputPowerWatts(
+            smartBattery?.inputPowerWatts,
+            evidence: smartBattery?.inputPowerEvidence,
+            adapterMaxWatts: smartBattery?.adapterMaxWatts
+        )
+    }
+
+    private static func trustedCounterBackedInputPowerWatts(smartBattery: SmartBatteryDetails?) -> Double? {
+        guard smartBattery?.inputPowerEvidence == .counterBacked else {
+            return nil
+        }
+
+        return trustedInputPowerWatts(smartBattery: smartBattery)
+    }
+
+    static func chargeRateWattsWithinAdapterContract(
+        voltageMillivolts: Int?,
+        signedCurrentMilliamps: Int?,
+        adapterMaxWatts: Int?
+    ) -> Double? {
+        displayableCurrentDerivedChargeRateWatts(
+            BatteryCalculations.chargeRateWatts(
+                voltageMillivolts: voltageMillivolts,
+                signedCurrentMilliamps: signedCurrentMilliamps
+            ),
+            adapterMaxWatts: adapterMaxWatts
+        )
+    }
+
+    static func displayableCurrentDerivedChargeRateWatts(_ watts: Double?, adapterMaxWatts: Int?) -> Double? {
+        guard let watts = BatteryCalculations.plausibleInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts) else {
+            return nil
+        }
+
+        guard BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) != nil || watts < 90 else {
+            return nil
+        }
+
+        guard isDistinctFromExactAdapterCapabilityEcho(watts, adapterMaxWatts: adapterMaxWatts) else {
+            return nil
+        }
+
+        return watts
+    }
+
+    private static func isDistinctFromExactAdapterCapabilityEcho(_ watts: Double, adapterMaxWatts: Int?) -> Bool {
+        guard let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
+            return true
+        }
+
+        return abs(watts - Double(adapterMaxWatts)) > 0.1
+    }
+
+    private static func displayableInputPowerWatts(
+        _ inputPowerWatts: Double?,
+        evidence: BatteryInputPowerEvidence? = nil,
+        adapterMaxWatts: Int?
+    ) -> Double? {
+        switch evidence {
+        case .counterBacked:
+            return BatteryCalculations.displayableCounterBackedInputPowerWatts(
+                inputPowerWatts,
+                adapterMaxWatts: adapterMaxWatts
+            )
+        case nil:
+            return BatteryCalculations.displayableInputPowerWatts(
+                inputPowerWatts,
+                adapterMaxWatts: adapterMaxWatts
+            )
+        }
+    }
+
+    private static func isEffectivelyFullForZeroTimeToFull(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?
+    ) -> Bool {
+        if reconciledChargedState(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            signedCurrentMilliamps: smartBattery?.signedCurrentMilliamps,
+            currentChargeMilliampHours: smartBattery?.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: smartBattery?.fullChargeCapacityMilliampHours
+        ) {
+            return true
+        }
+
+        guard let stateOfChargePercent = publicSnapshot.stateOfChargePercent,
+              stateOfChargePercent.isFinite else {
+            return false
+        }
+
+        return stateOfChargePercent >= 99 && stateOfChargePercent <= 105
+    }
+
+    private static func isEffectivelyEmptyForZeroTimeToEmpty(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?
+    ) -> Bool {
+        if let stateOfChargePercent = publicSnapshot.stateOfChargePercent,
+           stateOfChargePercent.isFinite {
+            return stateOfChargePercent >= 0 && stateOfChargePercent <= 1
+        }
+
+        guard let currentChargeMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
+            smartBattery?.currentChargeMilliampHours
+        ) else {
+            return false
+        }
+
+        return currentChargeMilliampHours == 0
+    }
+
+    private static func reconciledChargedState(
+        publicIsCharged: Bool,
+        smartIsFullyCharged: Bool?,
+        signedCurrentMilliamps: Int?,
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        publicStateOfChargePercent: Double?
+    ) -> Bool {
+        guard BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) == nil,
+              publicIsCharged || smartIsFullyCharged == true else {
+            return false
+        }
+
+        if let capacityEvidence = chargedCapacityEvidence(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        ) {
+            return capacityEvidence
+        }
+
+        if let publicStateOfChargePercent,
+           publicStateOfChargePercent.isFinite {
+            return publicStateOfChargePercent >= 95 && publicStateOfChargePercent <= 105
+        }
+
+        return true
+    }
+
+    private static func chargedCapacityEvidence(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?
+    ) -> Bool? {
+        guard let currentChargeMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(currentChargeMilliampHours) else {
+            return nil
+        }
+
+        if currentChargeMilliampHours == 0 {
+            return nil
+        }
+
+        guard let fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
+            fullChargeCapacityMilliampHours,
+            allowsZero: false
+        ) else {
+            return nil
+        }
+
+        let threshold = max(8, Int(Double(fullChargeCapacityMilliampHours) * 0.01))
+        return currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold
+    }
+
+    private static func firstDisplayableReportedMinutes(
+        publicMinutes: Int?,
+        smartMinutes: Int?,
+        zeroIsDisplayable: Bool
+    ) -> Int? {
+        for reportedMinutes in [sanitized(publicMinutes), sanitized(smartMinutes)] {
+            guard let reportedMinutes else {
+                continue
+            }
+
+            guard reportedMinutes == 0 else {
+                return reportedMinutes
+            }
+
+            if zeroIsDisplayable {
+                return 0
+            }
+        }
+
+        return nil
+    }
+
+    private static func sanitized(_ minutes: Int?) -> Int? {
+        BatteryCalculations.plausibleDurationMinutes(minutes)
     }
 
     private func prettyRawSnapshot(publicSnapshot: PublicPowerSourceSnapshot?, smartBattery: SmartBatteryDetails?) -> String {
         var sections: [String] = []
 
         sections.append("Public power source")
-        sections.append(render(value: publicSnapshot?.rawDescription ?? [:]))
+        sections.append(Self.renderDiagnosticValue(publicSnapshot?.rawDescription ?? [:]))
         sections.append("")
         sections.append("AppleSmartBattery")
-        sections.append(render(value: smartBattery?.rawProperties ?? [:]))
+        sections.append(Self.renderDiagnosticValue(smartBattery?.rawProperties ?? [:]))
 
         return sections.joined(separator: "\n")
     }
 
-    private func render(value: Any, indentLevel: Int = 0) -> String {
+    static func renderDiagnosticValue(_ value: Any, indentLevel: Int = 0) -> String {
         let indent = String(repeating: "  ", count: indentLevel)
 
         switch value {
@@ -178,7 +799,7 @@ struct BatteryReadingService: Sendable {
             }
 
             return dictionary.keys.sorted().map { key in
-                let renderedValue = render(value: dictionary[key] ?? "nil", indentLevel: indentLevel + 1)
+                let renderedValue = renderDiagnosticValue(dictionary[key] ?? "nil", indentLevel: indentLevel + 1)
                 if renderedValue.contains("\n") {
                     return "\(indent)\(key):\n\(renderedValue)"
                 }
@@ -192,24 +813,38 @@ struct BatteryReadingService: Sendable {
                     swiftDictionary[key] = value
                 }
             }
-            return render(value: swiftDictionary, indentLevel: indentLevel)
+            return renderDiagnosticValue(swiftDictionary, indentLevel: indentLevel)
         case let array as [Any]:
             if array.isEmpty {
                 return "\(indent)[]"
             }
 
             return array.map { item in
-                let rendered = render(value: item, indentLevel: indentLevel + 1)
+                let rendered = renderDiagnosticValue(item, indentLevel: indentLevel + 1)
                 return "\(indent)- \(rendered.trimmingCharacters(in: .whitespacesAndNewlines))"
             }.joined(separator: "\n")
         case let number as NSNumber:
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                return "\(indent)\(number.boolValue)"
+            }
+
             return "\(indent)\(number)"
         case let string as String:
             return "\(indent)\(string)"
-        case let boolean as Bool:
-            return "\(indent)\(boolean)"
         default:
             return "\(indent)\(String(describing: value))"
         }
+    }
+}
+
+private extension PublicPowerSourceSnapshot {
+    var explicitlyReportsBatteryPower: Bool {
+        powerSourceState?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare("Battery Power") == .orderedSame
+    }
+
+    var reportedExternalPowerConnected: Bool {
+        explicitlyReportsBatteryPower ? false : isExternalPowerConnected
     }
 }

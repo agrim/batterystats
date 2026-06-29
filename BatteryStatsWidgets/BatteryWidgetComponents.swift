@@ -12,13 +12,27 @@ struct BatteryWidgetMetricTile: View {
     let size: CGFloat
 
     var body: some View {
-        Gauge(value: metric.progress) {
-            EmptyView()
-        } currentValueLabel: {
-            BatteryWidgetMetricContent(metric: metric, size: size)
+        Group {
+            if let progress = metric.progress {
+                Gauge(value: progress) {
+                    EmptyView()
+                } currentValueLabel: {
+                    BatteryWidgetMetricContent(metric: metric, size: size)
+                }
+                .gaugeStyle(.accessoryCircularCapacity)
+                .tint(metric.ringTint)
+            } else {
+                ZStack {
+                    Circle()
+                        .stroke(
+                            metric.ringTint.opacity(0.24),
+                            style: StrokeStyle(lineWidth: max(4, size * 0.065), lineCap: .round)
+                        )
+
+                    BatteryWidgetMetricContent(metric: metric, size: size)
+                }
+            }
         }
-        .gaugeStyle(.accessoryCircularCapacity)
-        .tint(metric.ringTint)
         .frame(width: size, height: size)
     }
 }
@@ -30,7 +44,7 @@ struct BatteryWidgetMetric {
     }
 
     let content: Content
-    let progress: Double
+    let progress: Double?
     let ringTint: Color
     let contentTint: Color
 }
@@ -59,7 +73,8 @@ private struct BatteryWidgetMetricContent: View {
 
 struct BatteryMediumWidgetView: View {
     let snapshot: BatterySnapshot?
-    let updatedAt: Date
+    let updatedAt: Date?
+    let now: Date
     let healthTint: Color
     let chargeTint: Color
     let timeTint: Color
@@ -68,7 +83,7 @@ struct BatteryMediumWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: snapshot?.batterySymbolName ?? "questionmark")
+                Image(systemName: BatteryPresentationStyle.batterySymbolName(for: snapshot))
                     .font(.system(size: 22, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(chargeTint)
@@ -81,12 +96,12 @@ struct BatteryMediumWidgetView: View {
                 Spacer(minLength: 8)
 
                 VStack(alignment: .trailing, spacing: 1) {
-                    Text(BatteryFormatting.percent(snapshot?.stateOfChargePercent))
+                    Text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent))
                         .font(.title3.weight(.semibold))
                         .monospacedDigit()
                         .lineLimit(1)
 
-                    Text("Updated \(updatedText)")
+                    Text(BatteryWidgetUpdateFormatting.statusText(updatedAt: updatedAt, now: now))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -98,14 +113,14 @@ struct BatteryMediumWidgetView: View {
                 GridRow {
                     BatteryMediumMetricView(
                         title: "Health",
-                        value: BatteryFormatting.percent(snapshot?.healthPercent, decimals: 0),
+                        value: BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent),
                         symbolName: "heart.fill",
                         tint: healthTint
                     )
 
                     BatteryMediumMetricView(
                         title: "Charge",
-                        value: BatteryFormatting.percent(snapshot?.stateOfChargePercent, decimals: 0),
+                        value: BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent),
                         symbolName: "bolt.fill",
                         tint: chargeTint
                     )
@@ -114,13 +129,13 @@ struct BatteryMediumWidgetView: View {
                 GridRow {
                     BatteryMediumMetricView(
                         title: timeTitle,
-                        value: BatteryFormatting.compactDuration(minutes: snapshot?.displayedTimeMinutes),
+                        value: BatteryMediumWidgetFormatting.timeValue(for: snapshot),
                         symbolName: "clock",
                         tint: timeTint
                     )
 
                     BatteryMediumMetricView(
-                        title: "Power",
+                        title: powerTitle,
                         value: powerValue,
                         symbolName: statusDescriptor.symbolName,
                         tint: statusDescriptor.ringTint
@@ -133,23 +148,19 @@ struct BatteryMediumWidgetView: View {
     }
 
     private var statusTitle: String {
-        snapshot?.statusDisplayTitle ?? "Unavailable"
+        BatteryMediumWidgetFormatting.statusTitle(for: snapshot)
     }
 
     private var timeTitle: String {
-        snapshot?.powerState == .charging ? "To Full" : "Time Left"
+        BatteryWidgetMetricFormatting.timeTitle(for: snapshot)
+    }
+
+    private var powerTitle: String {
+        BatteryMediumWidgetFormatting.powerTitle(for: snapshot)
     }
 
     private var powerValue: String {
-        guard let activePowerWatts = snapshot?.activePowerWatts else {
-            return snapshot?.statusDisplayTitle ?? "-"
-        }
-
-        return BatteryFormatting.watts(activePowerWatts)
-    }
-
-    private var updatedText: String {
-        updatedAt.formatted(date: .omitted, time: .shortened)
+        BatteryWidgetMetricFormatting.powerText(for: snapshot)
     }
 }
 

@@ -76,7 +76,13 @@ enum EnergyChangeSensitivity: String, CaseIterable, Identifiable {
 }
 
 struct BatteryMonitoringDemand: Equatable, Sendable {
-    var needsEnergyChangeAwareness = true
+    var needsEnergyChangeAwareness = false
+
+    func combined(with other: BatteryMonitoringDemand) -> BatteryMonitoringDemand {
+        BatteryMonitoringDemand(
+            needsEnergyChangeAwareness: needsEnergyChangeAwareness || other.needsEnergyChangeAwareness
+        )
+    }
 }
 
 struct BatteryRefreshPolicy: Equatable {
@@ -92,7 +98,7 @@ struct BatteryRefreshPolicy: Equatable {
     }
 
     var usesEnergyChangeProbe: Bool {
-        usesEnergyChangeProbe(for: BatteryMonitoringDemand())
+        usesEnergyChangeProbe(for: BatteryMonitoringDemand(needsEnergyChangeAwareness: true))
     }
 
     func usesEnergyChangeProbe(for demand: BatteryMonitoringDemand) -> Bool {
@@ -116,14 +122,14 @@ struct BatteryRefreshPolicy: Equatable {
             return 60
         }
 
-        if let stateOfChargePercent = snapshot.stateOfChargePercent,
-           snapshot.powerState == .onBattery,
+        if let stateOfChargePercent = snapshot.presentationStateOfChargePercent,
+           (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging),
            stateOfChargePercent <= 20 {
             return 30
         }
 
         switch snapshot.powerState {
-        case .onBattery, .charging:
+        case .onBattery, .connectedDischarging, .charging:
             return 60
         case .connectedNotCharging, .fullOnAC:
             return 300
@@ -133,14 +139,26 @@ struct BatteryRefreshPolicy: Equatable {
     }
 
     static func isSignificantEnergyChange(previous: Double?, current: Double?, thresholdPercent: Double) -> Bool {
-        guard let previous,
-              let current,
-              previous > 0,
-              current > 0 else {
+        let previous = normalizedEnergyUse(previous)
+        let current = normalizedEnergyUse(current)
+
+        switch (previous, current) {
+        case (nil, nil):
             return false
+        case (nil, .some), (.some, nil):
+            return true
+        case let (.some(previous), .some(current)):
+            let thresholdPercent = max(0, thresholdPercent)
+            let percentChange = abs(current - previous) / previous * 100
+            return percentChange >= thresholdPercent
+        }
+    }
+
+    private static func normalizedEnergyUse(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, value > 0 else {
+            return nil
         }
 
-        let percentChange = abs(current - previous) / previous * 100
-        return percentChange >= thresholdPercent
+        return value
     }
 }

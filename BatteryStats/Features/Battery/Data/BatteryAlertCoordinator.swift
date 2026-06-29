@@ -1,99 +1,270 @@
 import Foundation
 import UserNotifications
 
+enum BatteryAlertType: Hashable, Sendable {
+    case lowBattery
+    case chargeComplete
+    case highTemperature
+}
+
+enum BatteryAlertEvaluator {
+    static func activeAlertTypes(snapshot: BatterySnapshot, policy: BatteryAlertPolicy) -> Set<BatteryAlertType> {
+        var activeTypes: Set<BatteryAlertType> = []
+
+        if policy.isLowBatteryAlertEnabled,
+           (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging),
+           let stateOfChargePercent = snapshot.presentationStateOfChargePercent,
+           stateOfChargePercent <= policy.lowBatteryThresholdPercent {
+            activeTypes.insert(.lowBattery)
+        }
+
+        if policy.isChargeCompleteAlertEnabled,
+           isChargeCompleteCandidate(snapshot) {
+            activeTypes.insert(.chargeComplete)
+        }
+
+        if policy.isHighTemperatureAlertEnabled,
+           let temperatureCelsius = snapshot.presentationTemperatureCelsius,
+           temperatureCelsius >= policy.highTemperatureThresholdCelsius {
+            activeTypes.insert(.highTemperature)
+        }
+
+        return activeTypes
+    }
+
+    private static func isChargeCompleteCandidate(_ snapshot: BatterySnapshot) -> Bool {
+        switch snapshot.powerState {
+        case .charging, .connectedNotCharging:
+            return (snapshot.presentationStateOfChargePercent ?? 0) >= 99
+        case .fullOnAC:
+            return true
+        case .connectedDischarging, .onBattery, .unknown:
+            return false
+        }
+    }
+}
+
+struct BatteryAlertNotification: Equatable, Sendable {
+    let identifier: String
+    let title: String
+    let body: String
+}
+
+@MainActor
+protocol BatteryAlertNotificationDelivering: AnyObject {
+    func deliver(_ notification: BatteryAlertNotification) async -> Bool
+}
+
+@MainActor
+protocol BatteryAlertNotificationCentering: AnyObject {
+    func authorizationStatus() async -> UNAuthorizationStatus
+    func add(_ request: UNNotificationRequest) async throws
+}
+
 @MainActor
 final class BatteryAlertCoordinator {
-    private enum AlertKind: Hashable, Sendable {
-        case lowBattery
-        case chargeComplete
-        case highTemperature
+    private var activeAlerts: Set<BatteryAlertType> = []
+    private var pendingDeliveries: [BatteryAlertType: Int] = [:]
+    private var pendingDeliveryTasks: [BatteryAlertType: Task<Void, Never>] = [:]
+    private var deliveryGeneration = 0
+    private let notificationDeliverer: any BatteryAlertNotificationDelivering
+
+    init(notificationDeliverer: any BatteryAlertNotificationDelivering = UserNotificationBatteryAlertDeliverer()) {
+        self.notificationDeliverer = notificationDeliverer
     }
 
-    private struct AlertEvent: Sendable {
-        let identifier: String
-        let title: String
-        let body: String
+    func updatePolicy(_ policy: BatteryAlertPolicy, currentSnapshot: BatterySnapshot?) {
+        clearDisabledAlerts(for: policy)
+
+        guard let currentSnapshot else {
+            return
+        }
+
+        evaluate(snapshot: currentSnapshot, policy: policy)
     }
 
-    private var activeAlerts: Set<AlertKind> = []
+    func clearActiveAlerts() {
+        activeAlerts.removeAll()
+        pendingDeliveries.removeAll()
+        cancelPendingDeliveryTasks()
+    }
 
     func evaluate(snapshot: BatterySnapshot, policy: BatteryAlertPolicy) {
+        let activeAlertTypes = BatteryAlertEvaluator.activeAlertTypes(snapshot: snapshot, policy: policy)
+
         evaluate(
             kind: .lowBattery,
-            isActive: policy.isLowBatteryAlertEnabled
-                && snapshot.powerState == .onBattery
-                && (snapshot.stateOfChargePercent ?? 100) <= policy.lowBatteryThresholdPercent,
-            event: AlertEvent(
+            isActive: activeAlertTypes.contains(.lowBattery),
+            notification: BatteryAlertNotification(
                 identifier: "BatteryStats.LowBattery",
                 title: "Battery Low",
-                body: "Battery charge is \(BatteryFormatting.percent(snapshot.stateOfChargePercent))."
+                body: chargeBody(for: snapshot, fallback: "Battery charge is low.")
             )
         )
 
         evaluate(
             kind: .chargeComplete,
-            isActive: policy.isChargeCompleteAlertEnabled
-                && (snapshot.powerState == .fullOnAC || (snapshot.stateOfChargePercent ?? 0) >= 99),
-            event: AlertEvent(
+            isActive: activeAlertTypes.contains(.chargeComplete),
+            notification: BatteryAlertNotification(
                 identifier: "BatteryStats.ChargeComplete",
                 title: "Battery Charged",
-                body: "Battery charge is \(BatteryFormatting.percent(snapshot.stateOfChargePercent))."
+                body: chargeBody(for: snapshot, fallback: "Battery is fully charged.")
             )
         )
 
         evaluate(
             kind: .highTemperature,
-            isActive: policy.isHighTemperatureAlertEnabled
-                && (snapshot.temperatureCelsius ?? 0) >= policy.highTemperatureThresholdCelsius,
-            event: AlertEvent(
+            isActive: activeAlertTypes.contains(.highTemperature),
+            notification: BatteryAlertNotification(
                 identifier: "BatteryStats.HighTemperature",
                 title: "Battery Temperature High",
-                body: "Battery temperature is \(BatteryFormatting.temperature(snapshot.temperatureCelsius, unitPreference: .celsius))."
+                body: "Battery temperature is \(BatteryFormatting.temperature(snapshot.presentationTemperatureCelsius, unitPreference: policy.temperatureUnitPreference))."
             )
         )
     }
 
-    private func evaluate(kind: AlertKind, isActive: Bool, event: AlertEvent) {
-        if isActive {
-            guard activeAlerts.contains(kind) == false else {
-                return
-            }
+    private func clearDisabledAlerts(for policy: BatteryAlertPolicy) {
+        if policy.isLowBatteryAlertEnabled == false {
+            clearAlertState(for: .lowBattery)
+        }
 
-            activeAlerts.insert(kind)
-            deliver(event)
-        } else {
-            activeAlerts.remove(kind)
+        if policy.isChargeCompleteAlertEnabled == false {
+            clearAlertState(for: .chargeComplete)
+        }
+
+        if policy.isHighTemperatureAlertEnabled == false {
+            clearAlertState(for: .highTemperature)
         }
     }
 
-    private func deliver(_ event: AlertEvent) {
-        Task {
-            let center = UNUserNotificationCenter.current()
-            let settings = await center.notificationSettings()
-            let isAuthorized: Bool
+    private func chargeBody(for snapshot: BatterySnapshot, fallback: String) -> String {
+        guard let stateOfChargePercent = snapshot.presentationStateOfChargePercent else {
+            return fallback
+        }
 
-            switch settings.authorizationStatus {
-            case .authorized, .provisional, .ephemeral:
-                isAuthorized = true
-            case .notDetermined:
-                isAuthorized = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
-            case .denied:
-                isAuthorized = false
-            @unknown default:
-                isAuthorized = false
-            }
+        return "Battery charge is \(BatteryFormatting.percent(stateOfChargePercent))."
+    }
 
-            guard isAuthorized else {
+    private func evaluate(kind: BatteryAlertType, isActive: Bool, notification: BatteryAlertNotification) {
+        if isActive {
+            guard activeAlerts.contains(kind) == false,
+                  pendingDeliveries[kind] == nil else {
                 return
             }
 
-            let content = UNMutableNotificationContent()
-            content.title = event.title
-            content.body = event.body
-            content.sound = .default
+            deliveryGeneration &+= 1
+            let generation = deliveryGeneration
+            pendingDeliveries[kind] = generation
 
-            let request = UNNotificationRequest(identifier: event.identifier, content: content, trigger: nil)
-            try? await center.add(request)
+            let deliveryTask = Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+
+                guard pendingDeliveries[kind] == generation,
+                      Task.isCancelled == false else {
+                    return
+                }
+
+                let didDeliver = await notificationDeliverer.deliver(notification)
+                guard pendingDeliveries[kind] == generation,
+                      Task.isCancelled == false else {
+                    return
+                }
+
+                pendingDeliveries.removeValue(forKey: kind)
+                pendingDeliveryTasks.removeValue(forKey: kind)
+                if didDeliver {
+                    activeAlerts.insert(kind)
+                }
+            }
+            pendingDeliveryTasks[kind] = deliveryTask
+        } else {
+            clearAlertState(for: kind)
         }
+    }
+
+    func waitForIdleForTesting() async {
+        while pendingDeliveries.isEmpty == false {
+            await Task.yield()
+        }
+    }
+
+    private func clearAlertState(for kind: BatteryAlertType) {
+        activeAlerts.remove(kind)
+        pendingDeliveries.removeValue(forKey: kind)
+        pendingDeliveryTasks.removeValue(forKey: kind)?.cancel()
+    }
+
+    private func cancelPendingDeliveryTasks() {
+        for task in pendingDeliveryTasks.values {
+            task.cancel()
+        }
+
+        pendingDeliveryTasks.removeAll()
+    }
+}
+
+@MainActor
+final class UserNotificationBatteryAlertDeliverer: BatteryAlertNotificationDelivering {
+    private let notificationCenter: any BatteryAlertNotificationCentering
+
+    init(notificationCenter: any BatteryAlertNotificationCentering = UserNotificationCenterAdapter()) {
+        self.notificationCenter = notificationCenter
+    }
+
+    func deliver(_ notification: BatteryAlertNotification) async -> Bool {
+        guard Task.isCancelled == false else {
+            return false
+        }
+
+        let authorizationStatus = await notificationCenter.authorizationStatus()
+        guard Task.isCancelled == false else {
+            return false
+        }
+
+        switch authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            break
+        case .notDetermined, .denied:
+            return false
+        @unknown default:
+            return false
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = notification.title
+        content.body = notification.body
+        content.sound = .default
+
+        let request = UNNotificationRequest(identifier: notification.identifier, content: content, trigger: nil)
+        do {
+            guard Task.isCancelled == false else {
+                return false
+            }
+
+            try await notificationCenter.add(request)
+            return true
+        } catch {
+            return false
+        }
+    }
+}
+
+@MainActor
+private final class UserNotificationCenterAdapter: BatteryAlertNotificationCentering {
+    private let center: UNUserNotificationCenter
+
+    init(center: UNUserNotificationCenter = .current()) {
+        self.center = center
+    }
+
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        let settings = await center.notificationSettings()
+        return settings.authorizationStatus
+    }
+
+    func add(_ request: UNNotificationRequest) async throws {
+        try await center.add(request)
     }
 }

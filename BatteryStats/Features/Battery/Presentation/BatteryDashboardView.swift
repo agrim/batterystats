@@ -1,8 +1,10 @@
+import AppKit
 import Observation
 import SwiftUI
 
 enum BatterySurfaceLayout {
     static let minimumWidth: CGFloat = 248
+    static let menuBarPanelMinimumHeight: CGFloat = 260
     static let horizontalPadding: CGFloat = 14
     static let topPadding: CGFloat = 14
     static let bottomPadding: CGFloat = 14
@@ -18,6 +20,92 @@ struct BatteryDashboardView: View {
             .frame(minWidth: BatterySurfaceLayout.minimumWidth, alignment: .topLeading)
             .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
             .containerBackground(.thinMaterial, for: .window)
+            .background(CurrentWindowSpaceConfigurator())
+    }
+}
+
+private struct CurrentWindowSpaceConfigurator: NSViewRepresentable {
+    private static let windowConfigurationRetryDelays: [TimeInterval] = [0, 0.02, 0.12, 0.32]
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        context.coordinator.scheduleConfiguration(for: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.scheduleConfiguration(for: nsView)
+    }
+
+    @MainActor
+    final class Coordinator {
+        private var configurationTask: Task<Void, Never>?
+
+        deinit {
+            configurationTask?.cancel()
+        }
+
+        func scheduleConfiguration(for view: NSView) {
+            if Self.configureWindowIfAvailable(for: view) {
+                configurationTask?.cancel()
+                configurationTask = nil
+                return
+            }
+
+            guard configurationTask == nil else {
+                return
+            }
+
+            configurationTask = Task { @MainActor [weak self, weak view] in
+                guard let self else {
+                    return
+                }
+
+                for delay in CurrentWindowSpaceConfigurator.windowConfigurationRetryDelays {
+                    if delay == 0 {
+                        await Task.yield()
+                    } else {
+                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    }
+
+                    guard Task.isCancelled == false else {
+                        return
+                    }
+
+                    guard let view else {
+                        configurationTask = nil
+                        return
+                    }
+
+                    if Self.configureWindowIfAvailable(for: view) {
+                        configurationTask = nil
+                        return
+                    }
+                }
+
+                self.configurationTask = nil
+            }
+        }
+
+        private static func configureWindowIfAvailable(for view: NSView) -> Bool {
+            guard let window = view.window else {
+                return false
+            }
+
+            var behavior = window.collectionBehavior
+            behavior.remove(.canJoinAllSpaces)
+            behavior.formUnion([
+                .canJoinAllApplications,
+                .fullScreenAuxiliary,
+                .moveToActiveSpace
+            ])
+            window.collectionBehavior = behavior
+            return true
+        }
     }
 }
 
@@ -51,8 +139,8 @@ struct BatterySurfaceView: View {
 
                         BatterySummaryGridView(
                             snapshot: snapshot,
-                            recentSnapshots: monitor.recentSnapshots,
                             temperatureUnitPreference: preferences.temperatureUnitPreference,
+                            temperatureUnitResolutionToken: preferences.temperatureUnitResolutionToken,
                             showsAdvancedValues: preferences.showAdvancedValues
                         )
                     }

@@ -1,0 +1,811 @@
+import Foundation
+
+protocol BatteryWidgetSnapshotStoring {
+    func save(_ snapshot: BatterySnapshot)
+    func snapshot(now: Date, maximumAge: TimeInterval) -> BatterySnapshot?
+    func clear()
+}
+
+struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
+    static let appGroupIdentifier = "group.io.github.agrim.batterystats"
+    static let defaultMaximumAge: TimeInterval = 600
+    static let defaultRetentionAge: TimeInterval = 6 * 60 * 60
+
+    private static let snapshotKey = "latestBatteryWidgetSnapshot"
+    private static let allowableFutureSkew: TimeInterval = 60
+
+    let defaults: UserDefaults?
+
+    static var shared: BatteryWidgetSnapshotStore {
+        BatteryWidgetSnapshotStore(defaults: UserDefaults(suiteName: appGroupIdentifier))
+    }
+
+    init(defaults: UserDefaults?) {
+        self.defaults = defaults
+    }
+
+    func save(_ snapshot: BatterySnapshot) {
+        let sanitizedSnapshot = Self.sanitized(snapshot)
+        saveSanitized(
+            sanitizedSnapshot,
+            preservingInvalidPowerRateMarkersFrom: snapshot,
+            encodedPowerRateFields: nil
+        )
+    }
+
+    private func saveSanitized(
+        _ sanitizedSnapshot: BatterySnapshot,
+        preservingInvalidPowerRateMarkersFrom sourceSnapshot: BatterySnapshot,
+        encodedPowerRateFields: EncodedPowerRateFields?
+    ) {
+        guard let defaults else {
+            return
+        }
+
+        guard let data = try? Self.encodedSnapshotData(
+            sanitizedSnapshot,
+            preservingInvalidPowerRateMarkersFrom: sourceSnapshot,
+            encodedPowerRateFields: encodedPowerRateFields
+        ) else {
+            clear()
+            return
+        }
+
+        defaults.set(data, forKey: Self.snapshotKey)
+        defaults.synchronize()
+    }
+
+    func snapshot(now: Date = .now, maximumAge: TimeInterval = defaultRetentionAge) -> BatterySnapshot? {
+        guard maximumAge > 0 else {
+            return nil
+        }
+
+        guard let defaults else {
+            return nil
+        }
+
+        guard let data = defaults.data(forKey: Self.snapshotKey) else {
+            return nil
+        }
+
+        guard let snapshot = try? JSONDecoder().decode(BatterySnapshot.self, from: data) else {
+            clear()
+            return nil
+        }
+
+        let encodedPowerRateFields = Self.encodedPowerRateFields(in: data)
+        let age = now.timeIntervalSince(snapshot.timestamp)
+        guard age >= -Self.allowableFutureSkew,
+              age <= Self.defaultRetentionAge else {
+            clear()
+            return nil
+        }
+
+        let sanitizedSnapshot = Self.sanitized(
+            snapshot,
+            now: now,
+            encodedPowerRateFields: encodedPowerRateFields
+        )
+        if sanitizedSnapshot != snapshot {
+            saveSanitized(
+                sanitizedSnapshot,
+                preservingInvalidPowerRateMarkersFrom: snapshot,
+                encodedPowerRateFields: encodedPowerRateFields
+            )
+        }
+
+        guard age <= maximumAge else {
+            return nil
+        }
+
+        return sanitizedSnapshot
+    }
+
+    func clear() {
+        guard let defaults else {
+            return
+        }
+
+        guard defaults.object(forKey: Self.snapshotKey) != nil else {
+            return
+        }
+
+        defaults.removeObject(forKey: Self.snapshotKey)
+        defaults.synchronize()
+    }
+
+    private static func sanitized(
+        _ snapshot: BatterySnapshot,
+        now: Date? = nil,
+        encodedPowerRateFields: EncodedPowerRateFields? = nil
+    ) -> BatterySnapshot {
+        let timestamp = clampedTimestamp(snapshot.timestamp, now: now)
+        let ageReferenceDate = now ?? timestamp
+        let manufactureDate = BatteryCalculations.plausibleManufactureDate(snapshot.manufactureDate, now: ageReferenceDate)
+        let batteryAgeComponents = BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: ageReferenceDate)
+        let fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.fullChargeCapacityMilliampHours, allowsZero: false)
+        let designCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.designCapacityMilliampHours, allowsZero: false)
+        let storedHealthPercent = percent(snapshot.healthPercent, maximumAllowed: 120)
+        let derivedHealthPercent = BatteryCalculations.healthPercent(
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            designCapacityMilliampHours: designCapacityMilliampHours
+        )
+        let healthPercent = derivedHealthPercent ?? storedHealthPercent
+        let storedStateOfChargePercent = percent(snapshot.stateOfChargePercent, maximumAllowed: 105)
+        let currentMilliampsSigned = signedCurrentMilliampsForStoredPowerState(
+            snapshot.currentMilliampsSigned,
+            powerState: snapshot.powerState
+        )
+        let isStoredCharged = reconciledStoredChargedState(
+            snapshot: snapshot,
+            signedCurrentMilliamps: currentMilliampsSigned,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            storedStateOfChargePercent: storedStateOfChargePercent
+        )
+        let trustedStateOfChargePercent = isStoredCharged ? 100.0 : storedStateOfChargePercent
+        let voltageMillivolts = BatteryCalculations.plausibleVoltageMillivolts(snapshot.voltageMillivolts)
+        let currentChargeMilliampHours = BatteryCalculations.reconciledCurrentChargeMilliampHours(
+            smartCurrentChargeMilliampHours: snapshot.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            publicPercentage: trustedStateOfChargePercent
+        )
+        let stateOfChargePercent = BatteryCalculations.stateOfChargePercent(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            publicPercentage: trustedStateOfChargePercent
+        )
+        let storedExternalPowerConnected: Bool
+        switch snapshot.powerState {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            storedExternalPowerConnected = true
+        case .onBattery:
+            storedExternalPowerConnected = false
+        case .unknown:
+            storedExternalPowerConnected = snapshot.isExternalPowerConnected
+        }
+        let derivedPowerState = BatteryCalculations.derivePowerState(
+            isCharging: snapshot.isCharging || snapshot.powerState == .charging,
+            isCharged: isStoredCharged,
+            isExternalPowerConnected: storedExternalPowerConnected,
+            signedCurrentMilliamps: currentMilliampsSigned,
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        )
+        let powerState = reconciledStoredPowerState(
+            originalPowerState: snapshot.powerState,
+            derivedPowerState: derivedPowerState,
+            isCharging: snapshot.isCharging,
+            isStoredCharged: isStoredCharged,
+            isExternalPowerConnected: storedExternalPowerConnected,
+            signedCurrentMilliamps: currentMilliampsSigned
+        )
+        let flags = BatteryCalculations.normalizedPowerFlags(for: powerState)
+        let storedDischargeRateMilliamps = BatteryCalculations.plausibleDischargeRateMilliamps(snapshot.dischargeRateMilliamps)
+        let dischargeRateMilliamps = (powerState == .onBattery || powerState == .connectedDischarging)
+            ? storedDischargeRateMilliamps
+            : nil
+        let chargeRateMilliamps = BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned)
+        let adapterMaxWatts = BatteryReadingService.displayableAdapterMaxWatts(
+            snapshot.adapterMaxWatts,
+            powerState: powerState
+        )
+        let computedChargeRateWatts = BatteryReadingService.chargeRateWattsWithinAdapterContract(
+            voltageMillivolts: voltageMillivolts,
+            signedCurrentMilliamps: currentMilliampsSigned,
+            adapterMaxWatts: adapterMaxWatts
+        )
+        let computedDischargeRateWatts = BatteryCalculations.dischargeRateWatts(
+            voltageMillivolts: voltageMillivolts,
+            signedCurrentMilliamps: currentMilliampsSigned
+        )
+        let powerRates = BatteryReadingService.displayablePowerRates(
+            powerState: powerState,
+            chargeRateWatts: correctedStoredPowerRate(
+                stored: snapshot.chargeRateWatts,
+                computed: computedChargeRateWatts,
+                encodedFieldWasPresent: encodedPowerRateFields?.chargeRateWatts,
+                hasCurrentEvidence: BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned) != nil,
+                validatesInputPower: true,
+                adapterMaxWatts: adapterMaxWatts
+            ),
+            dischargeRateWatts: correctedStoredPowerRate(
+                stored: snapshot.dischargeRateWatts,
+                computed: computedDischargeRateWatts,
+                encodedFieldWasPresent: encodedPowerRateFields?.dischargeRateWatts,
+                hasCurrentEvidence: BatteryCalculations.dischargeRateMilliamps(from: currentMilliampsSigned) != nil
+            )
+        )
+        let inputPowerWatts = BatteryReadingService.displayableInputPowerWatts(
+            snapshot.inputPowerWatts,
+            evidence: snapshot.inputPowerEvidence,
+            adapterMaxWatts: adapterMaxWatts,
+            powerState: powerState
+        )
+        let timing = BatteryReadingService.displayableTiming(
+            powerState: powerState,
+            rateBasedTimeRemainingMinutes: rateBasedTimeRemainingMinutes(
+                snapshot.rateBasedTimeRemainingMinutes,
+                currentChargeMilliampHours: currentChargeMilliampHours,
+                dischargeRateMilliamps: dischargeRateMilliamps,
+                stateOfChargePercent: stateOfChargePercent
+            ),
+            systemTimeRemainingMinutes: timeToEmptyMinutes(
+                snapshot.systemTimeRemainingMinutes,
+                currentChargeMilliampHours: currentChargeMilliampHours,
+                stateOfChargePercent: stateOfChargePercent
+            ),
+            timeToFullMinutes: timeToFullMinutes(
+                snapshot.timeToFullMinutes,
+                currentChargeMilliampHours: currentChargeMilliampHours,
+                fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+                stateOfChargePercent: stateOfChargePercent,
+                chargeRateMilliamps: chargeRateMilliamps
+            )
+        )
+
+        return BatterySnapshot(
+            timestamp: timestamp,
+            powerState: powerState,
+            isCharging: flags.isCharging,
+            isExternalPowerConnected: flags.isExternalPowerConnected,
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            currentChargeWattHours: derivedWattHours(
+                milliampHours: currentChargeMilliampHours,
+                voltageMillivolts: voltageMillivolts,
+                allowsZero: true
+            ),
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            fullChargeCapacityWattHours: derivedWattHours(
+                milliampHours: fullChargeCapacityMilliampHours,
+                voltageMillivolts: voltageMillivolts,
+                allowsZero: false
+            ),
+            designCapacityMilliampHours: designCapacityMilliampHours,
+            designCapacityWattHours: derivedWattHours(
+                milliampHours: designCapacityMilliampHours,
+                voltageMillivolts: voltageMillivolts,
+                allowsZero: false
+            ),
+            healthPercent: healthPercent,
+            stateOfChargePercent: stateOfChargePercent,
+            voltageMillivolts: voltageMillivolts,
+            currentMilliampsSigned: currentMilliampsSigned,
+            dischargeRateMilliamps: dischargeRateMilliamps,
+            chargeRateWatts: powerRates.chargeRateWatts,
+            inputPowerWatts: inputPowerWatts,
+            inputPowerEvidence: inputPowerWatts == nil ? nil : snapshot.inputPowerEvidence,
+            dischargeRateWatts: powerRates.dischargeRateWatts,
+            rateBasedTimeRemainingMinutes: timing.rateBasedTimeRemainingMinutes,
+            systemTimeRemainingMinutes: timing.systemTimeRemainingMinutes,
+            timeToFullMinutes: timing.timeToFullMinutes,
+            cycleCount: BatteryCalculations.plausibleCycleCount(snapshot.cycleCount),
+            manufactureDate: manufactureDate,
+            batteryAgeComponents: batteryAgeComponents,
+            temperatureCelsius: BatteryCalculations.plausibleTemperatureCelsius(snapshot.temperatureCelsius),
+            adapterMaxWatts: adapterMaxWatts,
+            notes: snapshot.notes
+        )
+    }
+
+    private static func clampedTimestamp(_ timestamp: Date, now: Date?) -> Date {
+        guard let now, timestamp > now else {
+            return timestamp
+        }
+
+        return now
+    }
+
+    private static func correctedStoredPowerRate(
+        stored: Double?,
+        computed: Double?,
+        encodedFieldWasPresent: Bool?,
+        hasCurrentEvidence: Bool,
+        validatesInputPower: Bool = false,
+        adapterMaxWatts: Int? = nil
+    ) -> Double? {
+        guard let stored else {
+            return encodedFieldWasPresent == true ? nil : computed
+        }
+
+        if let computed {
+            return computed
+        }
+
+        guard hasCurrentEvidence else {
+            return nil
+        }
+
+        guard let storedPowerRate = BatteryCalculations.plausibleWatts(stored) else {
+            return nil
+        }
+
+        guard validatesInputPower else {
+            return storedPowerRate
+        }
+
+        return BatteryReadingService.displayableCurrentDerivedChargeRateWatts(
+            storedPowerRate,
+            adapterMaxWatts: adapterMaxWatts
+        )
+    }
+
+    private static func encodedSnapshotData(
+        _ snapshot: BatterySnapshot,
+        preservingInvalidPowerRateMarkersFrom sourceSnapshot: BatterySnapshot,
+        encodedPowerRateFields: EncodedPowerRateFields?
+    ) throws -> Data {
+        let encodedData = try JSONEncoder().encode(snapshot)
+        let shouldPreserveChargeMarker = snapshot.chargeRateWatts == nil
+            && (sourceSnapshot.chargeRateWatts != nil || encodedPowerRateFields?.chargeRateWatts == true)
+        let shouldPreserveDischargeMarker = snapshot.dischargeRateWatts == nil
+            && (sourceSnapshot.dischargeRateWatts != nil || encodedPowerRateFields?.dischargeRateWatts == true)
+        guard shouldPreserveChargeMarker || shouldPreserveDischargeMarker else {
+            return encodedData
+        }
+
+        guard var dictionary = try JSONSerialization.jsonObject(with: encodedData) as? [String: Any] else {
+            return encodedData
+        }
+
+        if shouldPreserveChargeMarker {
+            dictionary["chargeRateWatts"] = NSNull()
+        }
+
+        if shouldPreserveDischargeMarker {
+            dictionary["dischargeRateWatts"] = NSNull()
+        }
+
+        return try JSONSerialization.data(withJSONObject: dictionary)
+    }
+
+    private static func encodedPowerRateFields(in data: Data) -> EncodedPowerRateFields? {
+        guard let dictionary = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        return EncodedPowerRateFields(
+            chargeRateWatts: dictionary.keys.contains("chargeRateWatts"),
+            dischargeRateWatts: dictionary.keys.contains("dischargeRateWatts")
+        )
+    }
+
+    private struct EncodedPowerRateFields {
+        let chargeRateWatts: Bool
+        let dischargeRateWatts: Bool
+    }
+
+    private static func finite(_ value: Double?) -> Double? {
+        guard let value, value.isFinite else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func derivedWattHours(
+        milliampHours: Int?,
+        voltageMillivolts: Int?,
+        allowsZero: Bool
+    ) -> Double? {
+        guard let value = BatteryCalculations.wattHours(
+            milliampHours: milliampHours,
+            voltageMillivolts: voltageMillivolts
+        ),
+              allowsZero || value > 0 else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func percent(_ value: Double?, maximumAllowed: Double) -> Double? {
+        guard let value = finite(value),
+              value >= 0,
+              value <= maximumAllowed else {
+            return nil
+        }
+
+        return min(100, value)
+    }
+
+    private static func rateBasedTimeRemainingMinutes(
+        _ minutes: Int?,
+        currentChargeMilliampHours: Int?,
+        dischargeRateMilliamps: Int?,
+        stateOfChargePercent: Double?
+    ) -> Int? {
+        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
+            return nil
+        }
+
+        guard minutes == 0 else {
+            return minutes
+        }
+
+        if isEffectivelyEmpty(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            stateOfChargePercent: stateOfChargePercent
+        ) {
+            return 0
+        }
+
+        return BatteryCalculations.timeRemainingMinutes(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            dischargeRateMilliamps: dischargeRateMilliamps
+        )
+    }
+
+    private static func timeToEmptyMinutes(
+        _ minutes: Int?,
+        currentChargeMilliampHours: Int?,
+        stateOfChargePercent: Double?
+    ) -> Int? {
+        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
+            return nil
+        }
+
+        guard minutes == 0 else {
+            return minutes
+        }
+
+        return isEffectivelyEmpty(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            stateOfChargePercent: stateOfChargePercent
+        ) ? 0 : nil
+    }
+
+    private static func timeToFullMinutes(
+        _ minutes: Int?,
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        stateOfChargePercent: Double?,
+        chargeRateMilliamps: Int?
+    ) -> Int? {
+        let reportedMinutes = BatteryCalculations.plausibleDurationMinutes(minutes)
+        let computedMinutes = BatteryCalculations.estimatedTimeToFullMinutes(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            chargeCurrentMilliamps: chargeRateMilliamps,
+            reportedTimeToFullMinutes: nil
+        )
+        let isFull = isEffectivelyFull(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            stateOfChargePercent: stateOfChargePercent
+        )
+
+        if reportedMinutes == 0, isFull {
+            return 0
+        }
+
+        return BatteryReadingService.preferredTimeToFullMinutes(
+            computedTimeToFullMinutes: computedMinutes,
+            reportedTimeToFullMinutes: reportedMinutes == 0 ? nil : reportedMinutes
+        )
+    }
+
+    private static func isEffectivelyEmpty(
+        currentChargeMilliampHours: Int?,
+        stateOfChargePercent: Double?
+    ) -> Bool {
+        if let stateOfChargePercent,
+           stateOfChargePercent.isFinite {
+            return stateOfChargePercent >= 0 && stateOfChargePercent <= 1
+        }
+
+        return currentChargeMilliampHours == 0
+    }
+
+    private static func isEffectivelyFull(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        stateOfChargePercent: Double?
+    ) -> Bool {
+        if let stateOfChargePercent,
+           stateOfChargePercent.isFinite {
+            return stateOfChargePercent >= 99 && stateOfChargePercent <= 105
+        }
+
+        return chargedCapacityEvidence(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        ) == true
+    }
+
+    private static func reconciledStoredChargedState(
+        snapshot: BatterySnapshot,
+        signedCurrentMilliamps: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        storedStateOfChargePercent: Double?
+    ) -> Bool {
+        guard snapshot.powerState == .fullOnAC,
+              BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) == nil else {
+            return false
+        }
+
+        if let capacityEvidence = chargedCapacityEvidence(
+            currentChargeMilliampHours: snapshot.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        ) {
+            return capacityEvidence
+        }
+
+        if let storedStateOfChargePercent {
+            return storedStateOfChargePercent >= 95
+        }
+
+        return true
+    }
+
+    private static func reconciledStoredPowerState(
+        originalPowerState: BatteryPowerState,
+        derivedPowerState: BatteryPowerState,
+        isCharging: Bool,
+        isStoredCharged: Bool,
+        isExternalPowerConnected: Bool,
+        signedCurrentMilliamps: Int?
+    ) -> BatteryPowerState {
+        guard originalPowerState == .unknown,
+              isCharging == false,
+              isStoredCharged == false,
+              isExternalPowerConnected == false,
+              BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps) == nil,
+              BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) == nil else {
+            return derivedPowerState
+        }
+
+        return .unknown
+    }
+
+    private static func signedCurrentMilliampsForStoredPowerState(
+        _ value: Int?,
+        powerState: BatteryPowerState
+    ) -> Int? {
+        let value = BatteryCalculations.plausibleSignedCurrentMilliamps(value)
+
+        switch powerState {
+        case .connectedNotCharging, .fullOnAC:
+            return nil
+        case .onBattery, .connectedDischarging:
+            return BatteryCalculations.chargeRateMilliamps(from: value) == nil ? value : nil
+        case .charging, .unknown:
+            return value
+        }
+    }
+
+    private static func chargedCapacityEvidence(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?
+    ) -> Bool? {
+        guard let currentChargeMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(currentChargeMilliampHours) else {
+            return nil
+        }
+
+        if currentChargeMilliampHours == 0 {
+            return nil
+        }
+
+        guard let fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
+            fullChargeCapacityMilliampHours,
+            allowsZero: false
+        ) else {
+            return nil
+        }
+
+        let threshold = max(8, Int(Double(fullChargeCapacityMilliampHours) * 0.01))
+        return currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold
+    }
+
+}
+
+enum BatteryWidgetMetricFormatting {
+    static func percentText(_ value: Double?) -> String {
+        guard let progress = clampedProgress(value) else {
+            return "—"
+        }
+
+        let percent = progress * 100
+        return "\(percent.formatted(.number.precision(.fractionLength(0))))%"
+    }
+
+    static func timeTitle(for snapshot: BatterySnapshot?) -> String {
+        switch snapshot?.powerState {
+        case .charging:
+            return "To Full"
+        case .onBattery, .connectedDischarging:
+            return "Time Left"
+        case .connectedNotCharging, .fullOnAC, .unknown, nil:
+            return "Time"
+        }
+    }
+
+    static func timeText(for snapshot: BatterySnapshot?) -> String {
+        guard let snapshot,
+              let displayedMinutes = snapshot.displayedTimeMinutes else {
+            return "—"
+        }
+
+        return BatteryFormatting.compactWidgetDuration(minutes: displayedMinutes)
+    }
+
+    static func timeProgress(for snapshot: BatterySnapshot?) -> Double? {
+        guard let snapshot,
+              let displayedMinutes = snapshot.displayedTimeMinutes else {
+            return nil
+        }
+
+        guard displayedMinutes > 0 else {
+            return 0
+        }
+
+        let normalizedHours = Double(displayedMinutes) / (24 * 60)
+        return max(0.15, min(1, normalizedHours))
+    }
+
+    static func powerText(for snapshot: BatterySnapshot?) -> String {
+        guard let snapshot else {
+            return "—"
+        }
+
+        guard let activePowerWatts = snapshot.activePowerWatts else {
+            return "—"
+        }
+
+        return BatteryFormatting.watts(activePowerWatts)
+    }
+
+    static func statusProgress(for snapshot: BatterySnapshot?) -> Double? {
+        let descriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
+        return descriptor.ringTintStyle == .secondary ? nil : 1
+    }
+
+    static func clampedProgress(_ value: Double?) -> Double? {
+        guard let value,
+              value.isFinite,
+              value >= 0 else {
+            return nil
+        }
+
+        return max(0, min(100, value)) / 100
+    }
+}
+
+enum BatteryMediumWidgetFormatting {
+    static func statusTitle(for snapshot: BatterySnapshot?) -> String {
+        snapshot?.statusDisplayTitle ?? "Unavailable"
+    }
+
+    static func timeValue(for snapshot: BatterySnapshot?) -> String {
+        BatteryWidgetMetricFormatting.timeText(for: snapshot)
+    }
+
+    static func powerTitle(for snapshot: BatterySnapshot?) -> String {
+        switch snapshot?.powerState {
+        case .charging:
+            if snapshot?.visibleInputPowerWatts != nil {
+                return "Input Power"
+            }
+
+            if BatteryCalculations.plausibleWatts(snapshot?.chargeRateWatts) != nil {
+                return "Charge Rate"
+            }
+
+            return "Charge Rate"
+        case .connectedDischarging:
+            if snapshot?.visibleInputPowerWatts != nil {
+                return "Input Power"
+            }
+
+            return "Battery Drain"
+        case .connectedNotCharging, .fullOnAC:
+            if snapshot?.visibleInputPowerWatts != nil {
+                return "Input Power"
+            }
+
+            return "Power"
+        case .onBattery, .unknown, nil:
+            return "Power"
+        }
+    }
+}
+
+enum BatteryWidgetCompactDisplayPolicy {
+    private static let allowableFutureSkew: TimeInterval = 60
+    private static let maximumLiveAge: TimeInterval = BatteryWidgetSnapshotStore.defaultMaximumAge
+
+    static func snapshotForMetrics(
+        _ snapshot: BatterySnapshot?,
+        updatedAt: Date?,
+        now: Date = .now
+    ) -> BatterySnapshot? {
+        guard let snapshot,
+              let updatedAt else {
+            return nil
+        }
+
+        guard updatedAt.timeIntervalSince(now) <= allowableFutureSkew else {
+            return nil
+        }
+
+        guard now.timeIntervalSince(updatedAt) <= maximumLiveAge else {
+            return nil
+        }
+
+        return snapshot
+    }
+}
+
+enum BatteryWidgetUpdateFormatting {
+    private static let allowableFutureSkew: TimeInterval = 60
+    private static let maximumLiveAge: TimeInterval = BatteryWidgetSnapshotStore.defaultMaximumAge
+    private static let maximumRetentionAge: TimeInterval = BatteryWidgetSnapshotStore.defaultRetentionAge
+
+    static func statusText(updatedAt: Date?, now: Date = .now) -> String {
+        guard let updatedAt else {
+            return "No update"
+        }
+
+        guard updatedAt.timeIntervalSince(now) <= allowableFutureSkew else {
+            return "Waiting for update"
+        }
+
+        let relativeText = relativeUpdateText(updatedAt: updatedAt, now: now)
+        guard now.timeIntervalSince(updatedAt) <= maximumLiveAge else {
+            return "Stale \(relativeText)"
+        }
+
+        return "Updated \(relativeText)"
+    }
+
+    static func nextStatusChangeDate(updatedAt: Date?, now: Date) -> Date {
+        guard let updatedAt else {
+            return now.addingTimeInterval(300)
+        }
+
+        let futureOffset = updatedAt.timeIntervalSince(now)
+        if futureOffset > allowableFutureSkew {
+            return updatedAt.addingTimeInterval(-allowableFutureSkew)
+        }
+
+        let elapsedSeconds = max(0, now.timeIntervalSince(updatedAt))
+        let nextRelativeDate: Date
+        if elapsedSeconds < 60 {
+            nextRelativeDate = updatedAt.addingTimeInterval(60)
+        } else if elapsedSeconds < 60 * 60 {
+            let elapsedMinute = floor(elapsedSeconds / 60)
+            nextRelativeDate = updatedAt.addingTimeInterval((elapsedMinute + 1) * 60)
+        } else if elapsedSeconds < 24 * 60 * 60 {
+            let elapsedHour = floor(elapsedSeconds / (60 * 60))
+            nextRelativeDate = updatedAt.addingTimeInterval((elapsedHour + 1) * 60 * 60)
+        } else {
+            let elapsedDay = floor(elapsedSeconds / (24 * 60 * 60))
+            nextRelativeDate = updatedAt.addingTimeInterval((elapsedDay + 1) * 24 * 60 * 60)
+        }
+
+        let staleDate = updatedAt.addingTimeInterval(maximumLiveAge + 1)
+        let retentionDate = updatedAt.addingTimeInterval(maximumRetentionAge + 1)
+        return [nextRelativeDate, staleDate, retentionDate]
+            .filter { $0 > now }
+            .min() ?? now.addingTimeInterval(300)
+    }
+
+    private static func relativeUpdateText(updatedAt: Date, now: Date) -> String {
+        let elapsedSeconds = max(0, Int(now.timeIntervalSince(updatedAt).rounded(.down)))
+        if elapsedSeconds < 60 {
+            return "just now"
+        }
+
+        let elapsedMinutes = elapsedSeconds / 60
+        if elapsedMinutes < 60 {
+            return "\(elapsedMinutes)m ago"
+        }
+
+        let elapsedHours = elapsedMinutes / 60
+        if elapsedHours < 24 {
+            return "\(elapsedHours)h ago"
+        }
+
+        let elapsedDays = elapsedHours / 24
+        return "\(elapsedDays)d ago"
+    }
+}

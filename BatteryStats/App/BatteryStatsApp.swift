@@ -1,27 +1,37 @@
 import AppKit
+import Observation
 import SwiftUI
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        BatteryStatsAppRuntime.shared.startMonitoring()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        BatteryStatsAppRuntime.shared.refreshExternalConfiguration()
     }
 }
 
 @main
+@MainActor
 struct BatteryStatsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    @State private var monitor = BatteryMonitor()
-    @State private var preferences = PreferencesStore()
-    @State private var historyStore = BatteryHistoryStore()
+    @State private var runtime = BatteryStatsAppRuntime.shared
 
     var body: some Scene {
         WindowGroup("BatteryStats", id: "main") {
-            BatteryDashboardView(monitor: monitor, preferences: preferences)
-                .environment(monitor)
-                .environment(preferences)
-                .monitorConfiguration(monitor: monitor, preferences: preferences, historyStore: historyStore, startsMonitor: true)
+            BatteryDashboardView(monitor: runtime.monitor, preferences: runtime.preferences)
+                .environment(runtime.monitor)
+                .environment(runtime.preferences)
+                .monitorConfiguration(
+                    monitor: runtime.monitor,
+                    preferences: runtime.preferences,
+                    historyStore: runtime.historyStore,
+                    startsMonitor: true
+                )
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 276, height: 280)
@@ -30,25 +40,224 @@ struct BatteryStatsApp: App {
         .restorationBehavior(.disabled)
         .defaultLaunchBehavior(.presented)
 
-        MenuBarExtra {
-            MenuBarBatteryView(monitor: monitor, preferences: preferences, historyStore: historyStore)
-                .environment(monitor)
-                .environment(preferences)
-                .monitorConfiguration(monitor: monitor, preferences: preferences, historyStore: historyStore, startsMonitor: true)
-        } label: {
-            MenuBarBatteryLabelView(snapshot: monitor.snapshot, displayMode: preferences.menuBarDisplayMode)
-        }
-        .menuBarExtraStyle(.window)
-
         Settings {
-            SettingsView(preferences: preferences, monitor: monitor, historyStore: historyStore)
-                .environment(preferences)
-                .environment(monitor)
-                .monitorConfiguration(monitor: monitor, preferences: preferences, historyStore: historyStore, startsMonitor: false)
+            SettingsView(preferences: runtime.preferences, monitor: runtime.monitor, historyStore: runtime.historyStore)
+                .environment(runtime.preferences)
+                .environment(runtime.monitor)
+                .monitorConfiguration(monitor: runtime.monitor, preferences: runtime.preferences, historyStore: runtime.historyStore, startsMonitor: false)
         }
         .commands {
             AppCommands()
         }
+    }
+}
+
+@MainActor
+@Observable
+private final class BatteryStatsAppRuntime {
+    static let shared = BatteryStatsAppRuntime()
+
+    @ObservationIgnored
+    let monitor: BatteryMonitor
+    @ObservationIgnored
+    let preferences: PreferencesStore
+    @ObservationIgnored
+    let historyStore: BatteryHistoryStore
+    @ObservationIgnored
+    let menuBarLabelModel: MenuBarBatteryLabelModel
+
+    @ObservationIgnored
+    private let monitorConfigurationObserver: BatteryMonitorConfigurationObserver
+    @ObservationIgnored
+    private let alertAuthorizationObserver: BatteryAlertAuthorizationObserver
+    @ObservationIgnored
+    private var menuBarStatusItemController: MenuBarStatusItemController?
+    @ObservationIgnored
+    private let settingsWindowController = SettingsWindowController()
+    @ObservationIgnored
+    private var showSettingsObserver: NSObjectProtocol?
+
+    private init() {
+        monitor = BatteryMonitor()
+        preferences = PreferencesStore()
+        historyStore = BatteryHistoryStore()
+        menuBarLabelModel = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
+        monitorConfigurationObserver = BatteryMonitorConfigurationObserver(
+            monitor: monitor,
+            preferences: preferences,
+            historyStore: historyStore
+        )
+        alertAuthorizationObserver = BatteryAlertAuthorizationObserver(preferences: preferences)
+
+        showSettingsObserver = NotificationCenter.default.addObserver(
+            forName: .showBatteryStatsSettingsWindow,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.showSettingsWindow()
+            }
+        }
+    }
+
+    func startMonitoring() {
+        preferences.refreshICloudSyncAvailability()
+        alertAuthorizationObserver.start()
+        monitorConfigurationObserver.start()
+        installMenuBarStatusItem()
+        monitor.start()
+    }
+
+    func refreshExternalConfiguration() {
+        preferences.refreshICloudSyncAvailability()
+        alertAuthorizationObserver.refreshAuthorizationStatus()
+    }
+
+    func showSettingsWindow() {
+        startMonitoring()
+        settingsWindowController.show(
+            preferences: preferences,
+            monitor: monitor,
+            historyStore: historyStore
+        )
+    }
+
+    private func installMenuBarStatusItem() {
+        guard menuBarStatusItemController == nil else {
+            return
+        }
+
+        let controller = MenuBarStatusItemController(
+            monitor: monitor,
+            preferences: preferences,
+            historyStore: historyStore,
+            labelModel: menuBarLabelModel
+        )
+        menuBarStatusItemController = controller
+        controller.start()
+    }
+}
+
+@MainActor
+private final class SettingsWindowController {
+    private var window: NSWindow?
+
+    func show(
+        preferences: PreferencesStore,
+        monitor: BatteryMonitor,
+        historyStore: BatteryHistoryStore
+    ) {
+        NSApp.setActivationPolicy(.regular)
+        let window = window ?? makeWindow(
+            preferences: preferences,
+            monitor: monitor,
+            historyStore: historyStore
+        )
+        self.window = window
+        configureWindowForCurrentSpace(window)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func configureWindowForCurrentSpace(_ window: NSWindow) {
+        var behavior = window.collectionBehavior
+        behavior.remove(.canJoinAllSpaces)
+        behavior.formUnion([
+            .canJoinAllApplications,
+            .fullScreenAuxiliary,
+            .moveToActiveSpace
+        ])
+        window.collectionBehavior = behavior
+    }
+
+    private func makeWindow(
+        preferences: PreferencesStore,
+        monitor: BatteryMonitor,
+        historyStore: BatteryHistoryStore
+    ) -> NSWindow {
+        let contentView = NSHostingView(rootView:
+            SettingsView(preferences: preferences, monitor: monitor, historyStore: historyStore)
+                .environment(preferences)
+                .environment(monitor)
+                .monitorConfiguration(
+                    monitor: monitor,
+                    preferences: preferences,
+                    historyStore: historyStore,
+                    startsMonitor: false
+                )
+        )
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: SettingsLayout.minimumWindowWidth, height: 640),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Settings"
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: SettingsLayout.minimumWindowWidth, height: 480)
+        window.contentView = contentView
+        window.center()
+        return window
+    }
+}
+
+@MainActor
+final class BatteryMonitorConfigurationObserver {
+    private let monitor: BatteryMonitor
+    private let preferences: PreferencesStore
+    private let historyStore: BatteryHistoryStore
+    private var observationGeneration = 0
+    private var isStarted = false
+
+    init(
+        monitor: BatteryMonitor,
+        preferences: PreferencesStore,
+        historyStore: BatteryHistoryStore
+    ) {
+        self.monitor = monitor
+        self.preferences = preferences
+        self.historyStore = historyStore
+    }
+
+    func start() {
+        guard isStarted == false else {
+            return
+        }
+
+        isStarted = true
+        applyConfiguration()
+        observePreferences()
+    }
+
+    private func observePreferences() {
+        observationGeneration += 1
+        let generation = observationGeneration
+
+        withObservationTracking {
+            _ = preferences.refreshPolicy
+            _ = preferences.historyPolicy
+            _ = preferences.alertPolicy
+            _ = preferences.monitoringDemand
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      isStarted,
+                      observationGeneration == generation else {
+                    return
+                }
+
+                applyConfiguration()
+                observePreferences()
+            }
+        }
+    }
+
+    private func applyConfiguration() {
+        monitor.updateRefreshPolicy(preferences.refreshPolicy)
+        monitor.updateHistory(store: historyStore, policy: preferences.historyPolicy)
+        monitor.updateAlerts(preferences.alertPolicy)
+        monitor.updateMonitoringDemand(preferences.monitoringDemand)
     }
 }
 
@@ -57,26 +266,29 @@ private struct MonitorConfigurationModifier: ViewModifier {
     let preferences: PreferencesStore
     let historyStore: BatteryHistoryStore
     let startsMonitor: Bool
+    @State private var isVisibleSurfaceMonitoringActive = false
 
     func body(content: Content) -> some View {
         content
             .onAppear {
                 configureMonitor()
                 if startsMonitor {
-                    monitor.start()
+                    if isVisibleSurfaceMonitoringActive == false {
+                        isVisibleSurfaceMonitoringActive = true
+                        monitor.beginVisibleSurfaceMonitoring()
+                    }
+
+                    if monitor.start() == false {
+                        monitor.refreshForVisibleSurface()
+                    }
                 }
             }
-            .onChange(of: preferences.refreshPolicy) { _, policy in
-                monitor.updateRefreshPolicy(policy)
-            }
-            .onChange(of: preferences.historyPolicy) { _, policy in
-                monitor.updateHistory(store: historyStore, policy: policy)
-            }
-            .onChange(of: preferences.alertPolicy) { _, policy in
-                monitor.updateAlerts(policy)
-            }
-            .onChange(of: preferences.monitoringDemand) { _, demand in
-                monitor.updateMonitoringDemand(demand)
+            .onDisappear {
+                if startsMonitor,
+                   isVisibleSurfaceMonitoringActive {
+                    isVisibleSurfaceMonitoringActive = false
+                    monitor.endVisibleSurfaceMonitoring()
+                }
             }
     }
 
@@ -88,7 +300,7 @@ private struct MonitorConfigurationModifier: ViewModifier {
     }
 }
 
-private extension View {
+extension View {
     func monitorConfiguration(
         monitor: BatteryMonitor,
         preferences: PreferencesStore,

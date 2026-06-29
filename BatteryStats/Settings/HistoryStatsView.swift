@@ -3,15 +3,16 @@ import SwiftUI
 struct HistoryStatsView: View {
     let stats: BatteryHistoryStats?
     let unitPreference: TemperatureUnitPreference
+    let unitResolutionToken: Int
     let emptyText: String
 
     var body: some View {
         Group {
             if let stats {
                 VStack(alignment: .leading, spacing: 5) {
-                    HistoryStatRow(title: "History", value: "\(stats.sampleCount) samples")
-                    HistoryStatRow(title: "Latest", value: dateText(stats.latestTimestamp))
-                    HistoryStatRow(title: "Captured", value: capturedText(for: stats))
+                    HistoryStatRow(title: "History", value: BatteryHistoryTextFormatting.sampleCountText(stats.sampleCount))
+                    HistoryStatRow(title: "Latest", value: HistoryStatsFormatting.dateText(stats.latestTimestamp))
+                    HistoryStatRow(title: "Captured", value: HistoryStatsFormatting.capturedText(for: stats))
                     HistoryStatRow(title: "Power", value: powerText(for: stats))
                     HistoryStatRow(
                         title: "Charge",
@@ -27,6 +28,7 @@ struct HistoryStatsView: View {
                             maximum: stats.maximumTemperatureCelsius
                         )
                     )
+                    .id(unitResolutionToken)
                 }
                 .font(.footnote)
             } else {
@@ -37,15 +39,31 @@ struct HistoryStatsView: View {
         }
         .padding(.vertical, 2)
     }
+}
 
-    private func capturedText(for stats: BatteryHistoryStats) -> String {
-        if Calendar.current.isDate(stats.firstTimestamp, inSameDayAs: stats.latestTimestamp) {
+enum HistoryStatsFormatting {
+    static func capturedText(for stats: BatteryHistoryStats, calendar: Calendar = .current) -> String {
+        if stats.firstTimestamp == stats.latestTimestamp {
+            return dateText(stats.firstTimestamp)
+        }
+
+        if calendar.isDate(stats.firstTimestamp, inSameDayAs: stats.latestTimestamp) {
             return "\(dateText(stats.firstTimestamp)) - \(timeText(stats.latestTimestamp))"
         }
 
         return "\(dateText(stats.firstTimestamp)) - \(dateText(stats.latestTimestamp))"
     }
 
+    static func dateText(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+    }
+
+    static func timeText(_ date: Date) -> String {
+        date.formatted(.dateTime.hour().minute())
+    }
+}
+
+private extension HistoryStatsView {
     private func powerText(for stats: BatteryHistoryStats) -> String {
         switch (stats.averagePowerWatts, stats.peakPowerWatts) {
         case let (.some(average), .some(peak)):
@@ -85,14 +103,6 @@ struct HistoryStatsView: View {
         }
 
         return "\(minimumText) - \(maximumText)"
-    }
-
-    private func dateText(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
-    }
-
-    private func timeText(_ date: Date) -> String {
-        date.formatted(.dateTime.hour().minute())
     }
 }
 

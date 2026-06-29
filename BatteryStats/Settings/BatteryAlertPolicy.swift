@@ -4,6 +4,7 @@ struct BatteryAlertPolicy: Equatable {
     var isLowBatteryAlertEnabled = false
     var isChargeCompleteAlertEnabled = false
     var isHighTemperatureAlertEnabled = false
+    var temperatureUnitPreference: TemperatureUnitPreference = .system
 
     var lowBatteryThresholdPercent: Double = 20
     var highTemperatureThresholdCelsius: Double = 40

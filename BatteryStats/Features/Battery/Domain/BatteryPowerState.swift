@@ -1,8 +1,9 @@
 import Foundation
 
-enum BatteryPowerState: String, Equatable, Sendable {
+enum BatteryPowerState: String, Codable, Equatable, Sendable {
     case onBattery
     case charging
+    case connectedDischarging
     case connectedNotCharging
     case fullOnAC
     case unknown
@@ -13,6 +14,8 @@ enum BatteryPowerState: String, Equatable, Sendable {
             return "On Battery"
         case .charging:
             return "Charging"
+        case .connectedDischarging:
+            return "Connected, Discharging"
         case .connectedNotCharging:
             return "Connected, Not Charging"
         case .fullOnAC:
@@ -28,6 +31,8 @@ enum BatteryPowerState: String, Equatable, Sendable {
             return "battery.25"
         case .charging:
             return "battery.100.bolt"
+        case .connectedDischarging:
+            return "powerplug"
         case .connectedNotCharging:
             return "powerplug"
         case .fullOnAC:

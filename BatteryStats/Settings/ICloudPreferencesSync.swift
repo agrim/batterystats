@@ -1,19 +1,88 @@
 import Foundation
 
 @MainActor
-final class ICloudPreferencesSync {
-    private lazy var store = NSUbiquitousKeyValueStore.default
-    private(set) var isEnabled = false
-    private var synchronizeTask: Task<Void, Never>?
+protocol PreferencesSyncing: AnyObject {
+    var isEnabled: Bool { get }
+    var isAvailable: Bool { get }
+    var isICloudAccountAvailable: Bool { get }
+    var availabilityDescription: String { get }
 
-    init() {}
+    func setEnabled(_ enabled: Bool)
+    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol
+    func removeObserver(_ token: NSObjectProtocol)
+    func hasValue(forKey key: String) -> Bool
+    func bool(forKey key: String) -> Bool?
+    func string(forKey key: String) -> String?
+    func set(_ value: Bool, forKey key: String)
+    func set(_ value: String, forKey key: String)
+    func removeValue(forKey key: String)
+    func flush()
+}
 
-    var isICloudAccountAvailable: Bool {
+@MainActor
+protocol ICloudPreferencesKeyValueStoring: AnyObject {
+    func object(forKey aKey: String) -> Any?
+    func bool(forKey aKey: String) -> Bool
+    func string(forKey aKey: String) -> String?
+    func set(_ value: Any?, forKey aKey: String)
+    func removeObject(forKey aKey: String)
+    func synchronize() -> Bool
+}
+
+extension NSUbiquitousKeyValueStore: ICloudPreferencesKeyValueStoring {}
+
+protocol ICloudKeyValueStoreAvailabilityChecking {
+    var isAvailable: Bool { get }
+    var hasAccount: Bool { get }
+    var hasEntitlement: Bool { get }
+}
+
+struct SystemICloudKeyValueStoreAvailability: ICloudKeyValueStoreAvailabilityChecking {
+    var isAvailable: Bool {
+        ICloudKeyValueStoreAvailability.isAvailable
+    }
+
+    var hasAccount: Bool {
         ICloudKeyValueStoreAvailability.hasAccount
     }
 
+    var hasEntitlement: Bool {
+        ICloudKeyValueStoreAvailability.hasEntitlement
+    }
+}
+
+@MainActor
+final class ICloudPreferencesSync: PreferencesSyncing {
+    private let availability: any ICloudKeyValueStoreAvailabilityChecking
+    private let storeProvider: @MainActor () -> any ICloudPreferencesKeyValueStoring
+    private let notificationCenter: NotificationCenter
+    private var store: (any ICloudPreferencesKeyValueStoring)?
+    private(set) var isEnabled = false
+    private var synchronizeTask: Task<Void, Never>?
+    private var synchronizeGeneration = 0
+
+    init(
+        availability: any ICloudKeyValueStoreAvailabilityChecking = SystemICloudKeyValueStoreAvailability(),
+        storeProvider: @escaping @MainActor () -> any ICloudPreferencesKeyValueStoring = {
+            NSUbiquitousKeyValueStore.default
+        },
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.availability = availability
+        self.storeProvider = storeProvider
+        self.notificationCenter = notificationCenter
+    }
+
+    var isAvailable: Bool {
+        availability.isAvailable
+    }
+
+    var isICloudAccountAvailable: Bool {
+        availability.hasAccount
+    }
+
     var availabilityDescription: String {
-        guard ICloudKeyValueStoreAvailability.hasEntitlement else {
+        guard availability.hasEntitlement else {
             return "iCloud sync requires an iCloud Key-Value Storage entitlement in the signed app."
         }
 
@@ -25,43 +94,64 @@ final class ICloudPreferencesSync {
     }
 
     func setEnabled(_ enabled: Bool) {
-        isEnabled = enabled && ICloudKeyValueStoreAvailability.isAvailable
-        guard isEnabled else {
+        isEnabled = enabled && isAvailable
+        guard isEnabled,
+              let store = resolveStore() else {
+            synchronizeGeneration &+= 1
+            synchronizeTask?.cancel()
+            synchronizeTask = nil
             return
         }
 
-        store.synchronize()
+        _ = store.synchronize()
     }
 
     func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
+        notificationCenter.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: nil,
             queue: .main
-        ) { notification in
+        ) { [weak self] notification in
+            let changedStoreIdentifier = (notification.object as AnyObject?).map(ObjectIdentifier.init)
             let keys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
-            handler(keys)
+            MainActor.assumeIsolated {
+                guard let self,
+                      let store = self.store,
+                      let changedStoreIdentifier,
+                      changedStoreIdentifier == ObjectIdentifier(store as AnyObject) else {
+                    return
+                }
+
+                handler(keys)
+            }
         }
     }
 
     func removeObserver(_ token: NSObjectProtocol) {
-        NotificationCenter.default.removeObserver(token)
+        notificationCenter.removeObserver(token)
+    }
+
+    func hasValue(forKey key: String) -> Bool {
+        guard isEnabled,
+              let store = resolveStore() else {
+            return false
+        }
+
+        return store.object(forKey: key) != nil
     }
 
     func bool(forKey key: String) -> Bool? {
-        guard isEnabled else {
+        guard isEnabled,
+              let store = resolveStore() else {
             return nil
         }
 
-        guard store.object(forKey: key) != nil else {
-            return nil
-        }
-
-        return store.bool(forKey: key)
+        return Self.strictBool(store.object(forKey: key))
     }
 
     func string(forKey key: String) -> String? {
-        guard isEnabled else {
+        guard isEnabled,
+              let store = resolveStore() else {
             return nil
         }
 
@@ -69,7 +159,12 @@ final class ICloudPreferencesSync {
     }
 
     func set(_ value: Bool, forKey key: String) {
-        guard isEnabled else {
+        guard isEnabled,
+              let store = resolveStore() else {
+            return
+        }
+
+        guard Self.strictBool(store.object(forKey: key)) != value else {
             return
         }
 
@@ -78,7 +173,12 @@ final class ICloudPreferencesSync {
     }
 
     func set(_ value: String, forKey key: String) {
-        guard isEnabled else {
+        guard isEnabled,
+              let store = resolveStore() else {
+            return
+        }
+
+        guard store.string(forKey: key) != value else {
             return
         }
 
@@ -86,26 +186,74 @@ final class ICloudPreferencesSync {
         scheduleSynchronize()
     }
 
-    func flush() {
-        synchronizeTask?.cancel()
-        synchronizeTask = nil
-        guard isEnabled else {
+    func removeValue(forKey key: String) {
+        guard isEnabled,
+              let store = resolveStore() else {
             return
         }
 
-        store.synchronize()
+        guard store.object(forKey: key) != nil else {
+            return
+        }
+
+        store.removeObject(forKey: key)
+        scheduleSynchronize()
+    }
+
+    func flush() {
+        synchronizeGeneration &+= 1
+        synchronizeTask?.cancel()
+        synchronizeTask = nil
+        guard isEnabled,
+              let store = resolveStore() else {
+            return
+        }
+
+        _ = store.synchronize()
     }
 
     private func scheduleSynchronize() {
+        synchronizeGeneration &+= 1
+        let generation = synchronizeGeneration
         synchronizeTask?.cancel()
         synchronizeTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(750))
-            guard Task.isCancelled == false else {
+            guard let self else {
                 return
             }
 
-            self?.store.synchronize()
-            self?.synchronizeTask = nil
+            try? await Task.sleep(for: .milliseconds(750))
+            guard Task.isCancelled == false,
+                  synchronizeGeneration == generation,
+                  isEnabled,
+                  let store = resolveStore() else {
+                return
+            }
+
+            _ = store.synchronize()
+            if synchronizeGeneration == generation {
+                synchronizeTask = nil
+            }
         }
+    }
+
+    static func strictBool(_ value: Any?) -> Bool? {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) == CFBooleanGetTypeID() else {
+            return nil
+        }
+
+        return number.boolValue
+    }
+
+    private func resolveStore() -> (any ICloudPreferencesKeyValueStoring)? {
+        guard isAvailable else {
+            return nil
+        }
+
+        if store == nil {
+            store = storeProvider()
+        }
+
+        return store
     }
 }

@@ -8,11 +8,13 @@ struct BatteryFreshnessView: View {
 
     @State private var pulseToken = 0
     @State private var isPulseActive = false
+    @State private var pulseUpdateTask: Task<Void, Never>?
+    @State private var pulseTask: Task<Void, Never>?
 
     var body: some View {
-        TimelineView(.everyMinute) { context in
+        TimelineView(BatteryFreshnessTimelineSchedule(lastUpdated: lastUpdated, isRefreshing: isRefreshing)) { context in
             HStack(spacing: 6) {
-                freshnessIndicator
+                freshnessIndicator(now: context.date)
 
                 Text(BatteryFreshnessFormatting.statusText(
                     lastUpdated: lastUpdated,
@@ -27,13 +29,34 @@ struct BatteryFreshnessView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
         }
+        .onAppear {
+            schedulePulse()
+        }
         .onChange(of: lastUpdated) { _, _ in
-            triggerPulse()
+            schedulePulse()
+        }
+        .onChange(of: isRefreshing) { _, isRefreshing in
+            if isRefreshing {
+                schedulePulseCancellation()
+            } else {
+                schedulePulse()
+            }
+        }
+        .onChange(of: reduceMotion) { _, reduceMotion in
+            if reduceMotion {
+                schedulePulseCancellation()
+            } else {
+                schedulePulse()
+            }
+        }
+        .onDisappear {
+            cancelPulseUpdate()
+            cancelPulse()
         }
     }
 
     @ViewBuilder
-    private var freshnessIndicator: some View {
+    private func freshnessIndicator(now: Date) -> some View {
         if isRefreshing {
             ProgressView()
                 .controlSize(.small)
@@ -41,7 +64,7 @@ struct BatteryFreshnessView: View {
                 .frame(width: 8, height: 8)
         } else {
             Circle()
-                .fill(indicatorTint)
+                .fill(indicatorTint(now: now))
                 .frame(width: 6, height: 6)
                 .scaleEffect(isPulseActive ? 1.45 : 1)
                 .opacity(isPulseActive ? 1 : 0.72)
@@ -50,16 +73,53 @@ struct BatteryFreshnessView: View {
         }
     }
 
-    private var indicatorTint: Color {
-        lastUpdated == nil ? .secondary : .green
+    private func indicatorTint(now: Date) -> Color {
+        BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: now) ? .green : .secondary
     }
 
     private var pulseAnimation: Animation? {
         reduceMotion ? nil : .smooth(duration: 0.28)
     }
 
+    private func schedulePulse() {
+        pulseUpdateTask?.cancel()
+        pulseUpdateTask = Task { @MainActor in
+            await Task.yield()
+            guard Task.isCancelled == false else {
+                return
+            }
+
+            pulseUpdateTask = nil
+            triggerPulse()
+        }
+    }
+
+    private func schedulePulseCancellation() {
+        pulseUpdateTask?.cancel()
+        pulseUpdateTask = Task { @MainActor in
+            await Task.yield()
+            guard Task.isCancelled == false else {
+                return
+            }
+
+            pulseUpdateTask = nil
+            cancelPulse()
+        }
+    }
+
+    private func cancelPulseUpdate() {
+        pulseUpdateTask?.cancel()
+        pulseUpdateTask = nil
+    }
+
     private func triggerPulse() {
-        guard lastUpdated != nil, reduceMotion == false else {
+        pulseTask?.cancel()
+
+        guard isRefreshing == false,
+              lastUpdated != nil,
+              BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date()),
+              reduceMotion == false else {
+            isPulseActive = false
             return
         }
 
@@ -67,13 +127,49 @@ struct BatteryFreshnessView: View {
         pulseToken = nextToken
         isPulseActive = true
 
-        Task { @MainActor in
+        pulseTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(320))
-            guard pulseToken == nextToken else {
+            guard Task.isCancelled == false, pulseToken == nextToken else {
                 return
             }
 
             isPulseActive = false
+            pulseTask = nil
+        }
+    }
+
+    private func cancelPulse() {
+        pulseTask?.cancel()
+        pulseTask = nil
+        isPulseActive = false
+    }
+}
+
+private struct BatteryFreshnessTimelineSchedule: TimelineSchedule {
+    let lastUpdated: Date?
+    let isRefreshing: Bool
+
+    func entries(from startDate: Date, mode: Mode) -> Entries {
+        Entries(
+            nextDate: startDate,
+            lastUpdated: lastUpdated,
+            isRefreshing: isRefreshing
+        )
+    }
+
+    struct Entries: Sequence, IteratorProtocol {
+        var nextDate: Date
+        let lastUpdated: Date?
+        let isRefreshing: Bool
+
+        mutating func next() -> Date? {
+            let date = nextDate
+            nextDate = BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: lastUpdated,
+                now: date,
+                isRefreshing: isRefreshing
+            )
+            return date
         }
     }
 }

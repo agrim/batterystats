@@ -12,22 +12,34 @@ final class BatteryMonitor {
         case unsupported
     }
 
+    private static let noRawSnapshotText = "No battery snapshot has been captured yet."
+    private static let noParsedSnapshotText = "No parsed battery snapshot has been captured yet."
+    private static let unavailableRawSnapshotText = "Raw battery diagnostics are unavailable for the latest snapshot."
+    private static let unsupportedRawSnapshotText = "No supported internal battery is currently available."
+    private static let unsupportedParsedSnapshotText = "Unsupported"
+    static let timerRunLoopMode: RunLoop.Mode = .common
+
     var availabilityState: AvailabilityState = .loading
     var snapshot: BatterySnapshot?
-    var recentSnapshots: [BatterySnapshot] = []
     var lastUpdated: Date?
     var isRefreshing = false
+    private(set) var isCopyingRawSnapshot = false
+    private(set) var canCopyParsedSnapshot = false
 
     @ObservationIgnored private let reader: BatteryReadingClient
     @ObservationIgnored private var refreshPolicy = BatteryRefreshPolicy()
+    @ObservationIgnored private var preferenceMonitoringDemand = BatteryMonitoringDemand()
+    @ObservationIgnored private var visibleSurfaceDemandCount = 0
     @ObservationIgnored private var monitoringDemand = BatteryMonitoringDemand()
     @ObservationIgnored private weak var historyStore: BatteryHistoryStore?
     @ObservationIgnored private var alertPolicy = BatteryAlertPolicy.disabled
-    @ObservationIgnored private let alertCoordinator = BatteryAlertCoordinator()
+    @ObservationIgnored private let alertCoordinator: BatteryAlertCoordinator
+    @ObservationIgnored private let pasteboardCopy: @MainActor (String) -> Void
     @ObservationIgnored private var dischargeSamples: [Int] = []
     @ObservationIgnored private var refreshTimer: Timer?
     @ObservationIgnored private var energyProbeTimer: Timer?
     @ObservationIgnored private var currentRefreshInterval: TimeInterval?
+    @ObservationIgnored private var currentEnergyProbeInterval: TimeInterval?
     @ObservationIgnored private var lastPublishedEnergyUse: Double?
     @ObservationIgnored private var powerSourceNotificationToken: PowerSourceReader.NotificationToken?
     @ObservationIgnored private var wakeObserver: NSObjectProtocol?
@@ -35,27 +47,45 @@ final class BatteryMonitor {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var energyProbeTask: Task<Void, Never>?
     @ObservationIgnored private var diagnosticsTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshGeneration = 0
+    @ObservationIgnored private var energyProbeGeneration = 0
+    @ObservationIgnored private var diagnosticsGeneration = 0
+    @ObservationIgnored private var readSequence = 0
+    @ObservationIgnored private var lastAppliedReadSequence = 0
     @ObservationIgnored private var pendingRefresh = false
     @ObservationIgnored private var pendingRefreshNeedsDiagnostics = false
-    @ObservationIgnored private var latestRawSnapshotText = "No battery snapshot has been captured yet."
-    @ObservationIgnored private var latestParsedSnapshotText = "No parsed battery snapshot has been captured yet."
+    @ObservationIgnored private var latestRawSnapshotText = BatteryMonitor.noRawSnapshotText
+    @ObservationIgnored private var latestParsedSnapshotText = BatteryMonitor.noParsedSnapshotText
     @ObservationIgnored private var isStarted = false
+    @ObservationIgnored private let widgetSnapshotStore: any BatteryWidgetSnapshotStoring
     @ObservationIgnored private let widgetTimelineReloader: @MainActor () -> Void
     @ObservationIgnored private let widgetTimelineReloadMinimumInterval: TimeInterval
+    @ObservationIgnored private let now: @MainActor () -> Date
     @ObservationIgnored private var lastWidgetTimelineReloadDate: Date?
     @ObservationIgnored private var lastWidgetTimelineReloadSignature: WidgetTimelineReloadSignature?
-    @ObservationIgnored private let recentSnapshotLimit = 12
 
     init(
         reader: BatteryReadingClient = .live(),
+        alertCoordinator: BatteryAlertCoordinator = BatteryAlertCoordinator(),
+        pasteboardCopy: @escaping @MainActor (String) -> Void = PasteboardCopying.copy,
+        widgetSnapshotStore: any BatteryWidgetSnapshotStoring = BatteryWidgetSnapshotStore.shared,
         widgetTimelineReloader: @escaping @MainActor () -> Void = {
             WidgetCenter.shared.reloadTimelines(ofKind: BatteryWidgetTimeline.kind)
         },
-        widgetTimelineReloadMinimumInterval: TimeInterval = 60
+        widgetTimelineReloadMinimumInterval: TimeInterval = 60,
+        now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.reader = reader
+        self.alertCoordinator = alertCoordinator
+        self.pasteboardCopy = pasteboardCopy
+        self.widgetSnapshotStore = widgetSnapshotStore
         self.widgetTimelineReloader = widgetTimelineReloader
         self.widgetTimelineReloadMinimumInterval = widgetTimelineReloadMinimumInterval
+        self.now = now
+    }
+
+    isolated deinit {
+        tearDownMonitoringResources()
     }
 
     func updateRefreshPolicy(_ policy: BatteryRefreshPolicy) {
@@ -68,30 +98,54 @@ final class BatteryMonitor {
     }
 
     func updateMonitoringDemand(_ demand: BatteryMonitoringDemand) {
-        guard monitoringDemand != demand else {
+        guard preferenceMonitoringDemand != demand else {
             return
         }
 
-        monitoringDemand = demand
-        resetTimers()
+        preferenceMonitoringDemand = demand
+        refreshEffectiveMonitoringDemand()
+    }
+
+    func beginVisibleSurfaceMonitoring() {
+        visibleSurfaceDemandCount += 1
+        refreshEffectiveMonitoringDemand()
+    }
+
+    func endVisibleSurfaceMonitoring() {
+        guard visibleSurfaceDemandCount > 0 else {
+            return
+        }
+
+        visibleSurfaceDemandCount -= 1
+        refreshEffectiveMonitoringDemand()
     }
 
     func updateHistory(store: BatteryHistoryStore, policy: BatteryHistoryPolicy) {
         historyStore = store
-        store.updatePolicy(policy)
+        let startedRecording = store.updatePolicy(policy)
+        if startedRecording,
+           let snapshot {
+            store.record(snapshot)
+        }
     }
 
     func updateAlerts(_ policy: BatteryAlertPolicy) {
         alertPolicy = policy
+        alertCoordinator.updatePolicy(policy, currentSnapshot: snapshot)
     }
 
-    func start() {
+    @discardableResult
+    func start() -> Bool {
+        guard isStarted == false else {
+            return false
+        }
+
         isStarted = true
 
         if powerSourceNotificationToken == nil {
             powerSourceNotificationToken = reader.makeNotificationToken { [weak self] in
                 Task { @MainActor in
-                    self?.refresh()
+                    self?.refreshIfStarted()
                 }
             }
         }
@@ -103,7 +157,7 @@ final class BatteryMonitor {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in
-                    self?.refresh()
+                    self?.refreshIfStarted()
                 }
             }
         }
@@ -115,80 +169,154 @@ final class BatteryMonitor {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in
-                    self?.refresh()
+                    self?.refreshIfStarted()
                 }
             }
         }
 
         resetTimers()
         refresh()
+        return true
+    }
+
+    func stop() {
+        tearDownMonitoringResources()
     }
 
     func refresh() {
         requestRefresh()
     }
 
+    func refreshForVisibleSurface() {
+        guard isStarted else {
+            return
+        }
+
+        requestRefresh()
+    }
+
+    private func refreshIfStarted() {
+        guard isStarted else {
+            return
+        }
+
+        requestRefresh()
+    }
+
     private func probeEnergyUse() {
+        guard shouldUseEnergyChangeProbe else {
+            return
+        }
+
         guard refreshTask == nil,
               energyProbeTask == nil else {
             return
         }
 
+        let generation = energyProbeGeneration
         energyProbeTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
             }
+            defer {
+                if energyProbeGeneration == generation {
+                    energyProbeTask = nil
+                }
+            }
 
-            let result = await reader.read(.now, .standard)
-            handleEnergyProbeResult(result)
-            energyProbeTask = nil
+            let readSequence = nextReadSequence()
+            let readDate = now()
+            let result = await reader.read(readDate, .standard)
+            guard Task.isCancelled == false,
+                  energyProbeGeneration == generation,
+                  shouldUseEnergyChangeProbe else {
+                return
+            }
+
+            handleEnergyProbeResult(result, readSequence: readSequence, publicationDate: readDate)
         }
     }
 
-    private func handleEnergyProbeResult(_ result: BatteryReadResult) {
+    private func handleEnergyProbeResult(_ result: BatteryReadResult, readSequence: Int, publicationDate: Date) {
         guard let probedSnapshot = result.snapshot else {
-            if availabilityState != .unsupported {
-                apply(result)
-            }
+            apply(result, readSequence: readSequence, publicationDate: publicationDate)
             return
         }
 
         let currentEnergyUse = probedSnapshot.energyUseComparisonValue
-        if BatteryRefreshPolicy.isSignificantEnergyChange(
+        let hasEnergyChange = BatteryRefreshPolicy.isSignificantEnergyChange(
             previous: lastPublishedEnergyUse,
             current: currentEnergyUse,
             thresholdPercent: refreshPolicy.energyChangeThresholdPercent
-        ) {
-            apply(result)
+        )
+        let hasPresentationChange = hasPresentationStateChange(for: probedSnapshot, publicationDate: publicationDate)
+
+        if hasAlertStateChange(for: probedSnapshot) || hasEnergyChange || hasPresentationChange {
+            apply(result, readSequence: readSequence, publicationDate: publicationDate)
         }
     }
 
+    private func hasPresentationStateChange(for probedSnapshot: BatterySnapshot, publicationDate: Date) -> Bool {
+        guard let snapshot else {
+            return true
+        }
+
+        return EnergyProbePresentationSignature(snapshot: snapshot) != EnergyProbePresentationSignature(
+            snapshot: probedSnapshot,
+            publicationDate: publicationDate
+        )
+    }
+
+    private func hasAlertStateChange(for probedSnapshot: BatterySnapshot) -> Bool {
+        let currentAlertTypes: Set<BatteryAlertType>
+        if let snapshot {
+            currentAlertTypes = BatteryAlertEvaluator.activeAlertTypes(snapshot: snapshot, policy: alertPolicy)
+        } else {
+            currentAlertTypes = []
+        }
+
+        let probedAlertTypes = BatteryAlertEvaluator.activeAlertTypes(snapshot: probedSnapshot, policy: alertPolicy)
+        return currentAlertTypes != probedAlertTypes
+    }
+
     private func requestRefresh(options: BatteryReadOptions = .standard) {
+        cancelEnergyProbe()
+
         if refreshTask != nil {
             pendingRefresh = true
             pendingRefreshNeedsDiagnostics = pendingRefreshNeedsDiagnostics || options.includesDiagnostics
             return
         }
 
+        let generation = refreshGeneration
         refreshTask = Task { @MainActor [weak self] in
-            await self?.runRefreshLoop(initialOptions: options)
+            await self?.runRefreshLoop(initialOptions: options, generation: generation)
         }
     }
 
-    private func runRefreshLoop(initialOptions: BatteryReadOptions) async {
+    private func runRefreshLoop(initialOptions: BatteryReadOptions, generation: Int) async {
         isRefreshing = true
         defer {
-            isRefreshing = false
-            refreshTask = nil
-            pendingRefresh = false
-            pendingRefreshNeedsDiagnostics = false
+            if refreshGeneration == generation {
+                isRefreshing = false
+                refreshTask = nil
+                pendingRefresh = false
+                pendingRefreshNeedsDiagnostics = false
+            }
         }
 
         var options = initialOptions
 
         while true {
-            let result = await reader.read(.now, options)
-            apply(result)
+            let readSequence = nextReadSequence()
+            let readDate = now()
+            let result = await reader.read(readDate, options)
+            guard Task.isCancelled == false,
+                  refreshGeneration == generation else {
+                break
+            }
+
+            apply(result, readSequence: readSequence, publicationDate: readDate)
 
             guard pendingRefresh else {
                 break
@@ -200,32 +328,50 @@ final class BatteryMonitor {
         }
     }
 
-    private func apply(_ result: BatteryReadResult) {
+    @discardableResult
+    private func apply(_ result: BatteryReadResult, readSequence: Int, publicationDate: Date) -> Bool {
+        guard readSequence > lastAppliedReadSequence else {
+            return false
+        }
+
+        lastAppliedReadSequence = readSequence
+
         if let rawSnapshotText = result.rawSnapshotText {
             latestRawSnapshotText = rawSnapshotText
         }
 
         if let parsedSnapshotText = result.parsedSnapshotText {
             latestParsedSnapshotText = parsedSnapshotText
+            canCopyParsedSnapshot = true
         }
 
-        let publicationDate = Date()
         lastUpdated = publicationDate
 
         guard var snapshot = result.snapshot else {
+            if result.rawSnapshotText == nil {
+                latestRawSnapshotText = Self.unsupportedRawSnapshotText
+            }
+
+            if result.parsedSnapshotText == nil {
+                latestParsedSnapshotText = Self.unsupportedParsedSnapshotText
+            }
+
             availabilityState = .unsupported
             self.snapshot = nil
-            recentSnapshots.removeAll()
+            canCopyParsedSnapshot = true
             lastPublishedEnergyUse = nil
             dischargeSamples.removeAll()
+            alertCoordinator.clearActiveAlerts()
+            widgetSnapshotStore.clear()
             requestWidgetTimelineReload(for: nil, at: publicationDate)
             resetTimers()
-            return
+            return true
         }
 
         availabilityState = .available
 
-        if let dischargeRate = snapshot.dischargeRateMilliamps {
+        if (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging),
+           let dischargeRate = snapshot.dischargeRateMilliamps {
             dischargeSamples.append(dischargeRate)
             if dischargeSamples.count > 8 {
                 dischargeSamples.removeFirst(dischargeSamples.count - 8)
@@ -239,32 +385,32 @@ final class BatteryMonitor {
             fallback: snapshot.dischargeRateMilliamps
         )
         snapshot = snapshot.updating(
-            rateBasedTimeRemainingMinutes: BatteryCalculations.timeRemainingMinutes(
-                currentChargeMilliampHours: snapshot.currentChargeMilliampHours,
-                dischargeRateMilliamps: smoothedRate
-            )
+            rateBasedTimeRemainingMinutes: (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging)
+                ? BatteryCalculations.timeRemainingMinutes(
+                    currentChargeMilliampHours: snapshot.currentChargeMilliampHours,
+                    dischargeRateMilliamps: smoothedRate
+                )
+                : nil,
+            timestamp: publicationDate
         )
 
         self.snapshot = snapshot
-        appendRecentSnapshot(snapshot)
+        canCopyParsedSnapshot = true
         lastPublishedEnergyUse = snapshot.energyUseComparisonValue
         historyStore?.record(snapshot)
         alertCoordinator.evaluate(snapshot: snapshot, policy: alertPolicy)
+        widgetSnapshotStore.save(snapshot)
         requestWidgetTimelineReload(for: snapshot, at: publicationDate)
         resetTimers()
-    }
-
-    private func appendRecentSnapshot(_ snapshot: BatterySnapshot) {
-        recentSnapshots.append(snapshot)
-        if recentSnapshots.count > recentSnapshotLimit {
-            recentSnapshots.removeFirst(recentSnapshots.count - recentSnapshotLimit)
-        }
+        return true
     }
 
     private func requestWidgetTimelineReload(for snapshot: BatterySnapshot?, at date: Date) {
         let signature = WidgetTimelineReloadSignature(snapshot: snapshot)
         let elapsed = lastWidgetTimelineReloadDate.map { date.timeIntervalSince($0) } ?? .infinity
-        guard signature != lastWidgetTimelineReloadSignature || elapsed >= widgetTimelineReloadMinimumInterval else {
+        guard signature != lastWidgetTimelineReloadSignature
+            || elapsed < 0
+            || elapsed >= widgetTimelineReloadMinimumInterval else {
             return
         }
 
@@ -274,31 +420,86 @@ final class BatteryMonitor {
     }
 
     func copyRawSnapshot() {
+        diagnosticsGeneration &+= 1
+        let generation = diagnosticsGeneration
+
         diagnosticsTask?.cancel()
+        isCopyingRawSnapshot = true
         diagnosticsTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
             }
-
-            let result = await reader.read(.now, .diagnostics)
-            if let rawSnapshotText = result.rawSnapshotText {
-                latestRawSnapshotText = rawSnapshotText
-                PasteboardCopying.copy(rawSnapshotText)
-            } else {
-                PasteboardCopying.copy(latestRawSnapshotText)
+            defer {
+                if diagnosticsGeneration == generation {
+                    diagnosticsTask = nil
+                    isCopyingRawSnapshot = false
+                }
             }
 
-            diagnosticsTask = nil
+            let readSequence = nextReadSequence()
+            let readDate = now()
+            let result = await reader.read(readDate, .diagnostics)
+            guard Task.isCancelled == false,
+                  diagnosticsGeneration == generation else {
+                return
+            }
+
+            let rawSnapshotText = rawSnapshotCopyText(for: result)
+            let didPublish = publishDiagnosticsResultIfAvailable(
+                result,
+                readSequence: readSequence,
+                publicationDate: readDate
+            )
+
+            if didPublish, result.rawSnapshotText == nil {
+                latestRawSnapshotText = rawSnapshotText
+            }
+
+            if didPublish,
+               result.parsedSnapshotText == nil,
+               let parsedSnapshotText = snapshot?.debugSummary ?? result.snapshot?.debugSummary {
+                latestParsedSnapshotText = parsedSnapshotText
+            }
+
+            pasteboardCopy(rawSnapshotText)
         }
     }
 
+    private func publishDiagnosticsResultIfAvailable(
+        _ result: BatteryReadResult,
+        readSequence: Int,
+        publicationDate: Date
+    ) -> Bool {
+        guard result.snapshot != nil else {
+            return false
+        }
+
+        return apply(result, readSequence: readSequence, publicationDate: publicationDate)
+    }
+
+    private func rawSnapshotCopyText(for result: BatteryReadResult) -> String {
+        if let rawSnapshotText = result.rawSnapshotText {
+            return rawSnapshotText
+        }
+
+        guard result.snapshot != nil else {
+            return Self.unsupportedRawSnapshotText
+        }
+
+        return Self.unavailableRawSnapshotText
+    }
+
     func copyParsedSnapshot() {
+        guard canCopyParsedSnapshot else {
+            return
+        }
+
         if let snapshot {
             let parsedSnapshotText = snapshot.debugSummary
             latestParsedSnapshotText = parsedSnapshotText
-            PasteboardCopying.copy(parsedSnapshotText)
+            pasteboardCopy(parsedSnapshotText)
         } else {
-            PasteboardCopying.copy(latestParsedSnapshotText)
+            pasteboardCopy(latestParsedSnapshotText)
         }
     }
 
@@ -310,28 +511,105 @@ final class BatteryMonitor {
         let desiredRefreshInterval = refreshPolicy.refreshInterval(for: snapshot)
         if currentRefreshInterval != desiredRefreshInterval {
             refreshTimer?.invalidate()
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: desiredRefreshInterval, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    self?.refresh()
-                }
+            refreshTimer = Self.scheduledMonitoringTimer(withTimeInterval: desiredRefreshInterval) { [weak self] in
+                self?.refreshIfStarted()
             }
             refreshTimer?.tolerance = max(1, min(30, desiredRefreshInterval * 0.2))
             currentRefreshInterval = desiredRefreshInterval
         }
 
-        if refreshPolicy.usesEnergyChangeProbe(for: monitoringDemand) {
-            if energyProbeTimer == nil {
-                energyProbeTimer = Timer.scheduledTimer(withTimeInterval: refreshPolicy.energyProbeInterval, repeats: true) { [weak self] _ in
-                    Task { @MainActor in
-                        self?.probeEnergyUse()
-                    }
+        if shouldUseEnergyChangeProbe {
+            let desiredEnergyProbeInterval = refreshPolicy.energyProbeInterval
+            if currentEnergyProbeInterval != desiredEnergyProbeInterval {
+                energyProbeTimer?.invalidate()
+                energyProbeTimer = Self.scheduledMonitoringTimer(withTimeInterval: desiredEnergyProbeInterval) { [weak self] in
+                    self?.probeEnergyUse()
                 }
                 energyProbeTimer?.tolerance = 3
+                currentEnergyProbeInterval = desiredEnergyProbeInterval
             }
         } else {
-            energyProbeTimer?.invalidate()
-            energyProbeTimer = nil
+            cancelEnergyProbe()
         }
+    }
+
+    private var shouldUseEnergyChangeProbe: Bool {
+        isStarted
+            && availabilityState == .available
+            && snapshot != nil
+            && refreshPolicy.usesEnergyChangeProbe(for: monitoringDemand)
+    }
+
+    private func refreshEffectiveMonitoringDemand() {
+        let visibleSurfaceDemand = BatteryMonitoringDemand(
+            needsEnergyChangeAwareness: visibleSurfaceDemandCount > 0
+        )
+        let nextDemand = preferenceMonitoringDemand.combined(with: visibleSurfaceDemand)
+        guard monitoringDemand != nextDemand else {
+            return
+        }
+
+        monitoringDemand = nextDemand
+        resetTimers()
+    }
+
+    private func cancelEnergyProbe() {
+        energyProbeGeneration &+= 1
+        energyProbeTimer?.invalidate()
+        energyProbeTimer = nil
+        currentEnergyProbeInterval = nil
+        energyProbeTask?.cancel()
+        energyProbeTask = nil
+        lastPublishedEnergyUse = nil
+    }
+
+    private static func scheduledMonitoringTimer(
+        withTimeInterval interval: TimeInterval,
+        block: @escaping @MainActor @Sendable () -> Void
+    ) -> Timer {
+        let timer = Timer(timeInterval: interval, repeats: true) { _ in
+            Task { @MainActor in
+                block()
+            }
+        }
+        RunLoop.main.add(timer, forMode: timerRunLoopMode)
+        return timer
+    }
+
+    private func tearDownMonitoringResources() {
+        isStarted = false
+        refreshGeneration &+= 1
+        visibleSurfaceDemandCount = 0
+        monitoringDemand = preferenceMonitoringDemand
+
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        currentRefreshInterval = nil
+
+        cancelEnergyProbe()
+
+        powerSourceNotificationToken = nil
+
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+            self.wakeObserver = nil
+        }
+
+        if let activeObserver {
+            NotificationCenter.default.removeObserver(activeObserver)
+            self.activeObserver = nil
+        }
+
+        refreshTask?.cancel()
+        diagnosticsTask?.cancel()
+        refreshTask = nil
+        diagnosticsTask = nil
+        diagnosticsGeneration &+= 1
+        isRefreshing = false
+        isCopyingRawSnapshot = false
+
+        pendingRefresh = false
+        pendingRefreshNeedsDiagnostics = false
     }
 
     func waitForIdleForTesting() async {
@@ -339,20 +617,239 @@ final class BatteryMonitor {
             try? await Task.sleep(for: .milliseconds(10))
         }
     }
+
+    func probeEnergyUseForTesting() {
+        probeEnergyUse()
+    }
+
+    private func nextReadSequence() -> Int {
+        readSequence &+= 1
+        return readSequence
+    }
 }
 
 private struct WidgetTimelineReloadSignature: Equatable {
     let powerState: BatteryPowerState?
+    let statusDisplayTitle: String?
+    let batterySymbolName: String
+    let updatedMinute: Int?
     let chargePercent: Int?
+    let chargeTint: String
     let healthPercent: Int?
+    let healthTint: String
     let displayedTimeMinutes: Int?
+    let timeTint: String
     let activePowerDeciwatts: Int?
+    let usesInputPowerWatts: Bool
+    let statusSymbolName: String
+    let statusRingTint: String
+    let statusContentTint: String
 
     init(snapshot: BatterySnapshot?) {
+        let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
         powerState = snapshot?.powerState
-        chargePercent = snapshot?.stateOfChargePercent.map { Int($0.rounded()) }
-        healthPercent = snapshot?.healthPercent.map { Int($0.rounded()) }
+        statusDisplayTitle = snapshot?.statusDisplayTitle
+        batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
+        updatedMinute = Self.minuteIdentifier(snapshot?.timestamp)
+        chargePercent = Self.roundedInt(snapshot?.presentationStateOfChargePercent)
+        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).identityToken
+        healthPercent = Self.roundedInt(snapshot?.presentationHealthPercent)
+        healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).identityToken
         displayedTimeMinutes = snapshot?.displayedTimeMinutes
-        activePowerDeciwatts = snapshot?.activePowerWatts.map { Int(($0 * 10).rounded()) }
+        timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).identityToken
+        activePowerDeciwatts = Self.roundedInt(snapshot?.activePowerWatts, multiplier: 10)
+        usesInputPowerWatts = Self.usesInputPowerWatts(snapshot)
+        statusSymbolName = statusDescriptor.symbolName
+        statusRingTint = statusDescriptor.ringTintStyle.identityToken
+        statusContentTint = statusDescriptor.contentTintStyle.identityToken
+    }
+
+    private static func usesInputPowerWatts(_ snapshot: BatterySnapshot?) -> Bool {
+        guard let snapshot else {
+            return false
+        }
+
+        switch snapshot.powerState {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            return snapshot.visibleInputPowerWatts != nil
+        case .onBattery, .unknown:
+            return false
+        }
+    }
+
+    private static func minuteIdentifier(_ date: Date?) -> Int? {
+        guard let date else {
+            return nil
+        }
+
+        return roundedInt(date.timeIntervalSince1970, multiplier: 1.0 / 60.0, roundingRule: .down)
+    }
+
+    private static func roundedInt(
+        _ value: Double?,
+        multiplier: Double = 1,
+        roundingRule: FloatingPointRoundingRule = .toNearestOrAwayFromZero
+    ) -> Int? {
+        guard let value, value.isFinite else {
+            return nil
+        }
+
+        let scaledValue = value * multiplier
+        guard scaledValue.isFinite,
+              scaledValue >= Double(Int.min),
+              scaledValue <= Double(Int.max) else {
+            return nil
+        }
+
+        return Int(scaledValue.rounded(roundingRule))
+    }
+}
+
+private struct EnergyProbePresentationSignature: Equatable {
+    let powerState: BatteryPowerState
+    let statusDisplayTitle: String
+    let batterySymbolName: String
+    let updatedMinute: Int?
+    let currentChargeMilliampHours: Int?
+    let fullChargeCapacityMilliampHours: Int?
+    let designCapacityMilliampHours: Int?
+    let chargePercent: Int?
+    let chargeTint: String
+    let healthPercent: Int?
+    let healthTint: String
+    let displayedTimeMinutes: Int?
+    let visibleCurrentMilliamps: Int?
+    let timeTint: String
+    let activePowerDeciwatts: Int?
+    let usesInputPowerWatts: Bool
+    let voltageMillivolts: Int?
+    let currentChargeDeciwattHours: Int?
+    let fullChargeCapacityDeciwattHours: Int?
+    let temperatureTenthsCelsius: Int?
+    let cycleCount: Int?
+    let manufactureDateDay: Int?
+    let batteryAgeMonths: Int?
+    let statusSymbolName: String
+    let statusRingTint: String
+    let statusContentTint: String
+
+    init(snapshot: BatterySnapshot, publicationDate: Date? = nil) {
+        let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
+        powerState = snapshot.powerState
+        statusDisplayTitle = snapshot.statusDisplayTitle
+        batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
+        updatedMinute = Self.minuteIdentifier(publicationDate ?? snapshot.timestamp)
+        currentChargeMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.currentChargeMilliampHours)
+        fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
+            snapshot.fullChargeCapacityMilliampHours,
+            allowsZero: false
+        )
+        designCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
+            snapshot.designCapacityMilliampHours,
+            allowsZero: false
+        )
+        chargePercent = Self.roundedInt(snapshot.presentationStateOfChargePercent)
+        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).identityToken
+        healthPercent = Self.roundedInt(snapshot.presentationHealthPercent)
+        healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).identityToken
+        displayedTimeMinutes = snapshot.displayedTimeMinutes
+        visibleCurrentMilliamps = Self.visibleCurrentMilliamps(snapshot)
+        timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).identityToken
+        activePowerDeciwatts = Self.roundedInt(snapshot.activePowerWatts, multiplier: 10)
+        usesInputPowerWatts = Self.usesInputPowerWatts(snapshot)
+        voltageMillivolts = BatteryCalculations.plausibleVoltageMillivolts(snapshot.voltageMillivolts)
+        currentChargeDeciwattHours = Self.roundedInt(
+            BatteryCalculations.plausibleWattHours(snapshot.currentChargeWattHours),
+            multiplier: 10
+        )
+        fullChargeCapacityDeciwattHours = Self.roundedInt(
+            BatteryCalculations.plausibleWattHours(snapshot.fullChargeCapacityWattHours),
+            multiplier: 10
+        )
+        temperatureTenthsCelsius = Self.roundedInt(snapshot.presentationTemperatureCelsius, multiplier: 10)
+        cycleCount = BatteryCalculations.plausibleCycleCount(snapshot.cycleCount)
+        manufactureDateDay = Self.dayIdentifier(snapshot.validatedManufactureDate)
+        batteryAgeMonths = Self.monthIdentifier(snapshot.validatedBatteryAgeComponents)
+        statusSymbolName = statusDescriptor.symbolName
+        statusRingTint = statusDescriptor.ringTintStyle.identityToken
+        statusContentTint = statusDescriptor.contentTintStyle.identityToken
+    }
+
+    private static func usesInputPowerWatts(_ snapshot: BatterySnapshot) -> Bool {
+        switch snapshot.powerState {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            return snapshot.visibleInputPowerWatts != nil
+        case .onBattery, .unknown:
+            return false
+        }
+    }
+
+    private static func visibleCurrentMilliamps(_ snapshot: BatterySnapshot) -> Int? {
+        switch snapshot.powerState {
+        case .onBattery, .connectedDischarging:
+            return BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps)
+        case .charging:
+            guard BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) == nil else {
+                return nil
+            }
+
+            return BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps)
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return nil
+        }
+    }
+
+    private static func roundedInt(_ value: Double?, multiplier: Double = 1) -> Int? {
+        guard let value, value.isFinite else {
+            return nil
+        }
+
+        let scaledValue = value * multiplier
+        guard scaledValue.isFinite,
+              scaledValue >= Double(Int.min),
+              scaledValue <= Double(Int.max) else {
+            return nil
+        }
+
+        return Int(scaledValue.rounded(.toNearestOrAwayFromZero))
+    }
+
+    private static func minuteIdentifier(_ date: Date?) -> Int? {
+        guard let date else {
+            return nil
+        }
+
+        return roundedInt(date.timeIntervalSince1970, multiplier: 1.0 / 60.0, roundingRule: .down)
+    }
+
+    private static func dayIdentifier(_ date: Date?) -> Int? {
+        guard let date else {
+            return nil
+        }
+
+        return roundedInt(date.timeIntervalSince1970, multiplier: 1.0 / (24 * 60 * 60), roundingRule: .down)
+    }
+
+    private static func roundedInt(
+        _ value: Double?,
+        multiplier: Double = 1,
+        roundingRule: FloatingPointRoundingRule
+    ) -> Int? {
+        guard let value, value.isFinite else {
+            return nil
+        }
+
+        let scaledValue = value * multiplier
+        guard scaledValue.isFinite,
+              scaledValue >= Double(Int.min),
+              scaledValue <= Double(Int.max) else {
+            return nil
+        }
+
+        return Int(scaledValue.rounded(roundingRule))
+    }
+
+    private static func monthIdentifier(_ components: DateComponents?) -> Int? {
+        BatteryCalculations.displayableBatteryAgeMonthCount(components)
     }
 }

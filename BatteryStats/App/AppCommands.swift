@@ -1,7 +1,10 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let showBatteryStatsSettingsWindow = Notification.Name("BatteryStats.showSettingsWindow")
+}
+
 struct AppCommands: Commands {
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -11,11 +14,12 @@ struct AppCommands: Commands {
                 NSApp.activate(ignoringOtherApps: true)
             }
             .keyboardShortcut("1", modifiers: [.command])
+        }
 
-            Divider()
-
+        CommandGroup(replacing: .appSettings) {
             Button("Settings…") {
-                openSettings()
+                NotificationCenter.default.post(name: .showBatteryStatsSettingsWindow, object: nil)
+                NSApp.activate(ignoringOtherApps: true)
             }
             .keyboardShortcut(",", modifiers: [.command])
         }

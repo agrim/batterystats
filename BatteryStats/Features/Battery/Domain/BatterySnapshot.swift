@@ -8,7 +8,11 @@ enum BatteryLevelTone: String, Equatable, Sendable {
     case green
 }
 
-struct BatterySnapshot: Equatable, Sendable {
+enum BatteryInputPowerEvidence: String, Codable, Equatable, Sendable {
+    case counterBacked
+}
+
+struct BatterySnapshot: Codable, Equatable, Sendable {
     let timestamp: Date
     let powerState: BatteryPowerState
     let isCharging: Bool
@@ -27,6 +31,8 @@ struct BatterySnapshot: Equatable, Sendable {
     let currentMilliampsSigned: Int?
     let dischargeRateMilliamps: Int?
     let chargeRateWatts: Double?
+    let inputPowerWatts: Double?
+    let inputPowerEvidence: BatteryInputPowerEvidence?
     let dischargeRateWatts: Double?
 
     let rateBasedTimeRemainingMinutes: Int?
@@ -41,14 +47,131 @@ struct BatterySnapshot: Equatable, Sendable {
     let adapterMaxWatts: Int?
     let notes: [String]
 
+    init(
+        timestamp: Date,
+        powerState: BatteryPowerState,
+        isCharging: Bool,
+        isExternalPowerConnected: Bool,
+        currentChargeMilliampHours: Int?,
+        currentChargeWattHours: Double?,
+        fullChargeCapacityMilliampHours: Int?,
+        fullChargeCapacityWattHours: Double?,
+        designCapacityMilliampHours: Int?,
+        designCapacityWattHours: Double?,
+        healthPercent: Double?,
+        stateOfChargePercent: Double?,
+        voltageMillivolts: Int?,
+        currentMilliampsSigned: Int?,
+        dischargeRateMilliamps: Int?,
+        chargeRateWatts: Double?,
+        inputPowerWatts: Double? = nil,
+        inputPowerEvidence: BatteryInputPowerEvidence? = nil,
+        dischargeRateWatts: Double?,
+        rateBasedTimeRemainingMinutes: Int?,
+        systemTimeRemainingMinutes: Int?,
+        timeToFullMinutes: Int?,
+        cycleCount: Int?,
+        manufactureDate: Date?,
+        batteryAgeComponents: DateComponents?,
+        temperatureCelsius: Double?,
+        adapterMaxWatts: Int?,
+        notes: [String]
+    ) {
+        self.timestamp = timestamp
+        self.powerState = powerState
+        self.isCharging = isCharging
+        self.isExternalPowerConnected = isExternalPowerConnected
+        self.currentChargeMilliampHours = currentChargeMilliampHours
+        self.currentChargeWattHours = currentChargeWattHours
+        self.fullChargeCapacityMilliampHours = fullChargeCapacityMilliampHours
+        self.fullChargeCapacityWattHours = fullChargeCapacityWattHours
+        self.designCapacityMilliampHours = designCapacityMilliampHours
+        self.designCapacityWattHours = designCapacityWattHours
+        self.healthPercent = healthPercent
+        self.stateOfChargePercent = stateOfChargePercent
+        self.voltageMillivolts = voltageMillivolts
+        self.currentMilliampsSigned = currentMilliampsSigned
+        self.dischargeRateMilliamps = dischargeRateMilliamps
+        self.chargeRateWatts = chargeRateWatts
+        self.inputPowerWatts = inputPowerWatts
+        self.inputPowerEvidence = inputPowerEvidence
+        self.dischargeRateWatts = dischargeRateWatts
+        self.rateBasedTimeRemainingMinutes = rateBasedTimeRemainingMinutes
+        self.systemTimeRemainingMinutes = systemTimeRemainingMinutes
+        self.timeToFullMinutes = timeToFullMinutes
+        self.cycleCount = cycleCount
+        self.manufactureDate = manufactureDate
+        self.batteryAgeComponents = batteryAgeComponents
+        self.temperatureCelsius = temperatureCelsius
+        self.adapterMaxWatts = adapterMaxWatts
+        self.notes = notes
+    }
+
+    var presentationHealthPercent: Double? {
+        Self.presentationPercent(healthPercent, maximumAllowed: 120)
+    }
+
+    var presentationStateOfChargePercent: Double? {
+        Self.presentationPercent(stateOfChargePercent, maximumAllowed: 105)
+    }
+
+    var presentationTemperatureCelsius: Double? {
+        BatteryCalculations.plausibleTemperatureCelsius(temperatureCelsius)
+    }
+
+    var visibleInputPowerWatts: Double? {
+        switch powerState {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            return validatedInputPowerWatts
+        case .onBattery, .unknown:
+            return nil
+        }
+    }
+
     var activePowerWatts: Double? {
         switch powerState {
         case .charging:
-            return chargeRateWatts
+            return visibleInputPowerWatts ?? BatteryCalculations.plausibleWatts(chargeRateWatts)
+        case .connectedDischarging:
+            return visibleInputPowerWatts ?? BatteryCalculations.plausibleWatts(dischargeRateWatts)
         case .onBattery:
-            return dischargeRateWatts
-        case .connectedNotCharging, .fullOnAC, .unknown:
-            return chargeRateWatts ?? dischargeRateWatts
+            return BatteryCalculations.plausibleWatts(dischargeRateWatts)
+        case .connectedNotCharging, .fullOnAC:
+            return visibleInputPowerWatts
+        case .unknown:
+            return nil
+        }
+    }
+
+    private var displayableChargeRateWatts: Double? {
+        guard powerState == .charging else {
+            return nil
+        }
+
+        return BatteryCalculations.plausibleWatts(chargeRateWatts)
+    }
+
+    private var displayableDischargeRateWatts: Double? {
+        switch powerState {
+        case .onBattery, .connectedDischarging:
+            return BatteryCalculations.plausibleWatts(dischargeRateWatts)
+        case .charging, .connectedNotCharging, .fullOnAC, .unknown:
+            return nil
+        }
+    }
+
+    private var validatedInputPowerWatts: Double? {
+        switch inputPowerEvidence {
+        case .counterBacked:
+            return BatteryCalculations.displayableCounterBackedInputPowerWatts(
+                inputPowerWatts,
+                adapterMaxWatts: adapterMaxWatts
+            )
+        case nil:
+            return BatteryCalculations.displayableInputPowerWatts(
+                inputPowerWatts,
+                adapterMaxWatts: adapterMaxWatts
+            )
         }
     }
 
@@ -56,11 +179,24 @@ struct BatterySnapshot: Equatable, Sendable {
         switch powerState {
         case .charging:
             return BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned)
-        case .onBattery:
-            return dischargeRateMilliamps
+        case .onBattery, .connectedDischarging:
+            return BatteryCalculations.plausibleDischargeRateMilliamps(dischargeRateMilliamps)
+                ?? BatteryCalculations.dischargeRateMilliamps(from: currentMilliampsSigned)
         case .connectedNotCharging, .fullOnAC, .unknown:
-            return currentMilliampsSigned.map(abs)
+            return nil
         }
+    }
+
+    var validatedManufactureDate: Date? {
+        BatteryCalculations.plausibleManufactureDate(manufactureDate, now: timestamp)
+    }
+
+    var validatedBatteryAgeComponents: DateComponents? {
+        guard let manufactureDate = validatedManufactureDate else {
+            return nil
+        }
+
+        return BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: timestamp)
     }
 
     var energyUseComparisonValue: Double? {
@@ -73,26 +209,37 @@ struct BatterySnapshot: Equatable, Sendable {
 
     var displayedTimeMinutes: Int? {
         switch powerState {
-        case .onBattery:
-            return rateBasedTimeRemainingMinutes ?? systemTimeRemainingMinutes
+        case .onBattery, .connectedDischarging:
+            return Self.displayableMinutes(rateBasedTimeRemainingMinutes) ?? Self.displayableMinutes(systemTimeRemainingMinutes)
         case .charging:
-            return timeToFullMinutes
-        default:
-            return systemTimeRemainingMinutes
+            return Self.displayableMinutes(timeToFullMinutes)
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return nil
         }
+    }
+
+    private static func displayableMinutes(_ minutes: Int?) -> Int? {
+        BatteryCalculations.plausibleDurationMinutes(minutes)
     }
 
     var statusDisplayTitle: String {
         switch powerState {
         case .onBattery:
-            if let stateOfChargePercent, stateOfChargePercent <= 20 {
+            if let stateOfChargePercent = presentationStateOfChargePercent, stateOfChargePercent <= 20 {
                 return "On Battery Low Power"
             }
             return "On Battery"
         case .charging:
             return "Charging"
-        case .connectedNotCharging, .fullOnAC:
-            return "Plugged In"
+        case .connectedDischarging:
+            if let stateOfChargePercent = presentationStateOfChargePercent, stateOfChargePercent <= 20 {
+                return "Connected, Discharging Low Power"
+            }
+            return "Connected, Discharging"
+        case .connectedNotCharging:
+            return "Connected, Not Charging"
+        case .fullOnAC:
+            return "Fully Charged"
         case .unknown:
             return "Unknown"
         }
@@ -102,17 +249,29 @@ struct BatterySnapshot: Equatable, Sendable {
         switch powerState {
         case .onBattery:
             return "Using internal battery"
+        case .connectedDischarging:
+            if visibleInputPowerWatts != nil {
+                return activePowerWatts.map { "Input power \(BatteryFormatting.watts($0)), battery discharging" }
+                    ?? "External power connected"
+            }
+            return activePowerWatts.map { "Discharging at \(BatteryFormatting.watts($0))" } ?? "External power connected"
         case .charging:
-            return chargeRateWatts.map { "Charging at \(BatteryFormatting.watts($0))" } ?? "External power connected"
+            if let visibleInputPowerWatts {
+                return "Input power \(BatteryFormatting.watts(visibleInputPowerWatts))"
+            }
+
+            return BatteryCalculations.plausibleWatts(chargeRateWatts)
+                .map { "Charging at \(BatteryFormatting.watts($0))" }
+                ?? "External power connected"
         case .connectedNotCharging, .fullOnAC:
-            return "External power connected"
+            return activePowerWatts.map { "Input power \(BatteryFormatting.watts($0))" } ?? "External power connected"
         case .unknown:
             return nil
         }
     }
 
     var healthTone: BatteryLevelTone {
-        guard let healthPercent else {
+        guard let healthPercent = presentationHealthPercent else {
             return .green
         }
 
@@ -136,7 +295,7 @@ struct BatterySnapshot: Equatable, Sendable {
     }
 
     var chargeTone: BatteryLevelTone {
-        guard let stateOfChargePercent else {
+        guard let stateOfChargePercent = presentationStateOfChargePercent else {
             return .green
         }
 
@@ -160,12 +319,12 @@ struct BatterySnapshot: Equatable, Sendable {
     }
 
     var batterySymbolName: String {
-        guard let stateOfChargePercent else {
+        guard let stateOfChargePercent = presentationStateOfChargePercent else {
             return "questionmark"
         }
 
         switch stateOfChargePercent {
-        case ..<10:
+        case ...0:
             return "battery.0"
         case ..<37.5:
             return "battery.25"
@@ -182,15 +341,23 @@ struct BatterySnapshot: Equatable, Sendable {
         var lines: [String] = []
         lines.append("Timestamp: \(timestamp.formatted(date: .numeric, time: .standard))")
         lines.append("Power state: \(powerState.displayTitle)")
-        lines.append("State of charge: \(BatteryFormatting.percent(stateOfChargePercent))")
-        lines.append("Full charge capacity: \(BatteryFormatting.milliampHours(fullChargeCapacityMilliampHours))")
-        lines.append("Design capacity: \(BatteryFormatting.milliampHours(designCapacityMilliampHours))")
+        lines.append("State of charge: \(BatteryFormatting.percent(presentationStateOfChargePercent))")
+        lines.append("Health: \(BatteryFormatting.percent(presentationHealthPercent, decimals: 1))")
+        lines.append("Full charge capacity: \(BatteryFormatting.milliampHours(fullChargeCapacityMilliampHours, allowsZero: false))")
+        lines.append("Design capacity: \(BatteryFormatting.milliampHours(designCapacityMilliampHours, allowsZero: false))")
         lines.append("Current charge: \(BatteryFormatting.milliampHours(currentChargeMilliampHours))")
+        lines.append("Energy: \(BatteryFormatting.compactWattHourPair(current: currentChargeWattHours, maximum: fullChargeCapacityWattHours))")
         lines.append("Voltage: \(BatteryFormatting.millivolts(voltageMillivolts))")
         lines.append("Signed current: \(BatteryFormatting.signedMilliamps(currentMilliampsSigned))")
-        lines.append("Temperature: \(BatteryFormatting.temperature(temperatureCelsius, unitPreference: .celsius))")
-        lines.append("Cycle count: \(cycleCount.map(String.init) ?? "Unavailable")")
-        lines.append("Manufacture date: \(BatteryFormatting.date(manufactureDate))")
+        lines.append("\(debugTimeTitle): \(BatteryFormatting.duration(minutes: displayedTimeMinutes))")
+        lines.append("Active power: \(BatteryFormatting.watts(activePowerWatts))")
+        lines.append("Input power: \(BatteryFormatting.watts(validatedInputPowerWatts))")
+        lines.append("Charge rate: \(BatteryFormatting.watts(displayableChargeRateWatts))")
+        lines.append("Discharge rate: \(BatteryFormatting.watts(displayableDischargeRateWatts))")
+        lines.append("Adapter max power: \(Self.debugAdapterMaxWatts(adapterMaxWatts))")
+        lines.append("Temperature: \(BatteryFormatting.temperature(presentationTemperatureCelsius, unitPreference: .celsius))")
+        lines.append("Cycle count: \(BatteryCalculations.plausibleCycleCount(cycleCount).map(String.init) ?? "Unavailable")")
+        lines.append("Manufacture date: \(BatteryFormatting.date(validatedManufactureDate))")
 
         if notes.isEmpty == false {
             lines.append("Notes:")
@@ -200,9 +367,46 @@ struct BatterySnapshot: Equatable, Sendable {
         return lines.joined(separator: "\n")
     }
 
-    func updating(rateBasedTimeRemainingMinutes: Int?) -> BatterySnapshot {
-        BatterySnapshot(
-            timestamp: timestamp,
+    private var debugTimeTitle: String {
+        switch powerState {
+        case .charging:
+            return "Time to full"
+        case .onBattery, .connectedDischarging:
+            return "Time left"
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return "Time"
+        }
+    }
+
+    private static func debugAdapterMaxWatts(_ value: Int?) -> String {
+        guard let value = BatteryCalculations.plausibleAdapterWatts(value) else {
+            return "Unavailable"
+        }
+
+        return "\(value) W"
+    }
+
+    private static func presentationPercent(_ value: Double?, maximumAllowed: Double) -> Double? {
+        guard let value,
+              value.isFinite,
+              value >= 0,
+              value <= maximumAllowed else {
+            return nil
+        }
+
+        return min(100, value)
+    }
+
+    func updating(rateBasedTimeRemainingMinutes: Int?, timestamp: Date? = nil) -> BatterySnapshot {
+        let nextTimestamp = timestamp ?? self.timestamp
+        let nextManufactureDate = BatteryCalculations.plausibleManufactureDate(manufactureDate, now: nextTimestamp)
+        let nextBatteryAgeComponents = BatteryCalculations.batteryAgeComponents(
+            from: nextManufactureDate,
+            now: nextTimestamp
+        )
+
+        return BatterySnapshot(
+            timestamp: nextTimestamp,
             powerState: powerState,
             isCharging: isCharging,
             isExternalPowerConnected: isExternalPowerConnected,
@@ -218,13 +422,15 @@ struct BatterySnapshot: Equatable, Sendable {
             currentMilliampsSigned: currentMilliampsSigned,
             dischargeRateMilliamps: dischargeRateMilliamps,
             chargeRateWatts: chargeRateWatts,
+            inputPowerWatts: inputPowerWatts,
+            inputPowerEvidence: inputPowerEvidence,
             dischargeRateWatts: dischargeRateWatts,
             rateBasedTimeRemainingMinutes: rateBasedTimeRemainingMinutes,
             systemTimeRemainingMinutes: systemTimeRemainingMinutes,
             timeToFullMinutes: timeToFullMinutes,
             cycleCount: cycleCount,
-            manufactureDate: manufactureDate,
-            batteryAgeComponents: batteryAgeComponents,
+            manufactureDate: nextManufactureDate,
+            batteryAgeComponents: nextBatteryAgeComponents,
             temperatureCelsius: temperatureCelsius,
             adapterMaxWatts: adapterMaxWatts,
             notes: notes

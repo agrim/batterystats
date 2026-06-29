@@ -2,6 +2,25 @@ import XCTest
 @testable import BatteryStats
 
 final class BatteryFreshnessFormattingTests: XCTestCase {
+    func testFreshnessViewDefersPulseUntilRefreshCompletes() throws {
+        let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
+
+        XCTAssertTrue(source.contains(".onAppear {\n            schedulePulse()\n        }"))
+        XCTAssertTrue(source.contains(".onChange(of: isRefreshing)"))
+        XCTAssertTrue(source.contains("if isRefreshing {\n                schedulePulseCancellation()\n            } else {\n                schedulePulse()\n            }"))
+        XCTAssertTrue(source.contains("private func schedulePulse()"))
+        XCTAssertTrue(source.contains("await Task.yield()"))
+        XCTAssertTrue(source.contains("guard isRefreshing == false,\n              lastUpdated != nil,"))
+        XCTAssertTrue(source.contains("BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date())"))
+    }
+
+    func testFreshnessViewRearmsPulseWhenReduceMotionTurnsOff() throws {
+        let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
+
+        XCTAssertTrue(source.contains(".onChange(of: reduceMotion) { _, reduceMotion in"))
+        XCTAssertTrue(source.contains("if reduceMotion {\n                schedulePulseCancellation()\n            } else {\n                schedulePulse()\n            }"))
+    }
+
     func testRefreshingTextTakesPriority() {
         let now = Date(timeIntervalSinceReferenceDate: 1_000)
 
@@ -28,7 +47,29 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
         )
     }
 
-    func testMinuteHourAndDayUpdateText() {
+    func testSmallFutureClockSkewStillLooksFresh() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+        let lastUpdated = now.addingTimeInterval(30)
+
+        XCTAssertTrue(BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: now))
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.statusText(lastUpdated: lastUpdated, now: now, isRefreshing: false),
+            "Live - Updated just now"
+        )
+    }
+
+    func testFutureUpdateBeyondClockSkewDoesNotLookFresh() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+        let lastUpdated = now.addingTimeInterval(120)
+
+        XCTAssertFalse(BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: now))
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.statusText(lastUpdated: lastUpdated, now: now, isRefreshing: false),
+            "Waiting for battery change"
+        )
+    }
+
+    func testMinuteUpdateText() {
         let now = Date(timeIntervalSinceReferenceDate: 10_000)
 
         XCTAssertEqual(
@@ -39,13 +80,30 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
             ),
             "Live - Updated 2m ago"
         )
+    }
+
+    func testStaleUpdateTextDoesNotClaimToBeLive() {
+        let now = Date(timeIntervalSinceReferenceDate: 10_000)
+
+        XCTAssertFalse(BatteryFreshnessFormatting.hasUsableUpdate(
+            lastUpdated: now.addingTimeInterval(-(12 * 60)),
+            now: now
+        ))
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.statusText(
+                lastUpdated: now.addingTimeInterval(-(12 * 60)),
+                now: now,
+                isRefreshing: false
+            ),
+            "Stale - Updated 12m ago"
+        )
         XCTAssertEqual(
             BatteryFreshnessFormatting.statusText(
                 lastUpdated: now.addingTimeInterval(-(2 * 60 * 60)),
                 now: now,
                 isRefreshing: false
             ),
-            "Live - Updated 2h ago"
+            "Stale - Updated 2h ago"
         )
         XCTAssertEqual(
             BatteryFreshnessFormatting.statusText(
@@ -53,7 +111,124 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
                 now: now,
                 isRefreshing: false
             ),
-            "Live - Updated 3d ago"
+            "Stale - Updated 3d ago"
         )
+    }
+
+    func testNextStatusChangeDateWakesAtFirstVisibleMinuteBoundary() {
+        let lastUpdated = Date(timeIntervalSinceReferenceDate: 1_000)
+        let now = lastUpdated.addingTimeInterval(20)
+
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: lastUpdated,
+                now: now,
+                isRefreshing: false
+            ),
+            lastUpdated.addingTimeInterval(60)
+        )
+    }
+
+    func testNextStatusChangeDateWakesAtNextRelativeMinuteBoundary() {
+        let lastUpdated = Date(timeIntervalSinceReferenceDate: 1_000)
+        let now = lastUpdated.addingTimeInterval(125)
+
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: lastUpdated,
+                now: now,
+                isRefreshing: false
+            ),
+            lastUpdated.addingTimeInterval(180)
+        )
+    }
+
+    func testNextStatusChangeDateWakesAtStaleBoundaryWithoutMinutePolling() {
+        let lastUpdated = Date(timeIntervalSinceReferenceDate: 1_000)
+        let now = lastUpdated.addingTimeInterval((10 * 60) - 5)
+
+        XCTAssertTrue(BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: now))
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: lastUpdated,
+                now: now,
+                isRefreshing: false
+            ),
+            lastUpdated.addingTimeInterval(10 * 60)
+        )
+    }
+
+    func testNextStatusChangeDateDoesNotMissStaleTransitionAtExactLiveBoundary() {
+        let lastUpdated = Date(timeIntervalSinceReferenceDate: 1_000)
+        let liveBoundary = lastUpdated.addingTimeInterval(10 * 60)
+
+        XCTAssertTrue(BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: liveBoundary))
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: lastUpdated,
+                now: liveBoundary,
+                isRefreshing: false
+            ),
+            liveBoundary.addingTimeInterval(1)
+        )
+    }
+
+    func testNextStatusChangeDateUsesHourlyBoundariesAfterOneHour() {
+        let lastUpdated = Date(timeIntervalSinceReferenceDate: 1_000)
+        let now = lastUpdated.addingTimeInterval((2 * 60 * 60) + 120)
+
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: lastUpdated,
+                now: now,
+                isRefreshing: false
+            ),
+            lastUpdated.addingTimeInterval(3 * 60 * 60)
+        )
+    }
+
+    func testNextStatusChangeDateHandlesFutureClockSkewBoundary() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+        let lastUpdated = now.addingTimeInterval(120)
+
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: lastUpdated,
+                now: now,
+                isRefreshing: false
+            ),
+            lastUpdated.addingTimeInterval(-BatteryFreshnessFormatting.allowableFutureSkew)
+        )
+    }
+
+    func testNextStatusChangeDateFallsBackToLowFrequencyWhenStatusCannotAge() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: nil,
+                now: now,
+                isRefreshing: false
+            ),
+            now.addingTimeInterval(60)
+        )
+        XCTAssertEqual(
+            BatteryFreshnessFormatting.nextStatusChangeDate(
+                lastUpdated: now,
+                now: now,
+                isRefreshing: true
+            ),
+            now.addingTimeInterval(60)
+        )
+    }
+
+    private static func loadSource(relativePath: String) throws -> String {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let root = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = root.appendingPathComponent(relativePath)
+        return try String(contentsOf: sourceURL, encoding: .utf8)
     }
 }

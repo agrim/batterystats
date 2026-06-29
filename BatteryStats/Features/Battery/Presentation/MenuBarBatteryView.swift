@@ -3,11 +3,28 @@ import Observation
 import SwiftUI
 
 struct MenuBarBatteryView: View {
-    @Environment(\.openSettings) private var openSettings
-
     @Bindable var monitor: BatteryMonitor
     @Bindable var preferences: PreferencesStore
     let historyStore: BatteryHistoryStore
+    private let prepareForSettingsAction: @MainActor () -> Void
+    private let openSettingsAction: @MainActor () -> Void
+
+    init(
+        monitor: BatteryMonitor,
+        preferences: PreferencesStore,
+        historyStore: BatteryHistoryStore,
+        prepareForSettingsAction: @escaping @MainActor () -> Void = {},
+        openSettingsAction: @escaping @MainActor () -> Void = {
+            NotificationCenter.default.post(name: .showBatteryStatsSettingsWindow, object: nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    ) {
+        self.monitor = monitor
+        self.preferences = preferences
+        self.historyStore = historyStore
+        self.prepareForSettingsAction = prepareForSettingsAction
+        self.openSettingsAction = openSettingsAction
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,6 +54,7 @@ struct MenuBarBatteryView: View {
                 } label: {
                     Image(systemName: "doc.on.doc")
                 }
+                .disabled(monitor.canCopyParsedSnapshot == false)
                 .help("Copy Snapshot")
 
                 Button {
@@ -50,7 +68,8 @@ struct MenuBarBatteryView: View {
                 Spacer(minLength: 16)
 
                 Button {
-                    openSettings()
+                    prepareForSettingsAction()
+                    openSettingsAction()
                 } label: {
                     Image(systemName: "gearshape")
                 }
@@ -73,69 +92,1026 @@ struct MenuBarBatteryView: View {
 }
 
 struct MenuBarBatteryLabelView: View {
-    let snapshot: BatterySnapshot?
-    let displayMode: MenuBarDisplayMode
+    @Bindable var model: MenuBarBatteryLabelModel
+
+    init(model: MenuBarBatteryLabelModel) {
+        self.model = model
+    }
 
     var body: some View {
-        let symbolName = snapshot?.batterySymbolName ?? "questionmark"
-        let symbolTint = BatteryPresentationStyle.chargeTint(for: snapshot)
-        let value = displayValue
+        MenuBarBatteryLabelContentView(state: state)
+            .id(state.identity)
+    }
 
-        HStack(spacing: value == nil ? 0 : 3) {
-            Image(systemName: symbolName)
+    @MainActor
+    var state: MenuBarBatteryLabelState {
+        model.state
+    }
+}
+
+private struct MenuBarBatteryLabelContentView: View {
+    let state: MenuBarBatteryLabelState
+
+    var body: some View {
+        HStack(spacing: state.value == nil ? 0 : 3) {
+            Image(systemName: state.symbolName)
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(symbolTint)
+                .foregroundStyle(state.symbolTint)
 
-            if let value {
+            if let value = state.value {
                 Text(value)
                     .lineLimit(1)
                     .fixedSize()
             }
         }
         .monospacedDigit()
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityLabel(state.accessibilityLabel)
+    }
+}
+
+@MainActor
+@Observable
+final class MenuBarBatteryLabelModel {
+    private(set) var state: MenuBarBatteryLabelState
+
+    @ObservationIgnored var stateDidChange: ((MenuBarBatteryLabelState) -> Void)?
+    @ObservationIgnored private let monitor: BatteryMonitor
+    @ObservationIgnored private let preferences: PreferencesStore
+    @ObservationIgnored private var observationGeneration = 0
+    @ObservationIgnored private var displayPreferenceObserver: NSObjectProtocol?
+
+    init(monitor: BatteryMonitor, preferences: PreferencesStore) {
+        self.monitor = monitor
+        self.preferences = preferences
+        state = MenuBarBatteryLabelState(snapshot: monitor.snapshot, preferences: preferences)
+        observeDisplayPreferenceNotifications()
+        observeInputs()
     }
 
-    private var displayValue: String? {
+    isolated deinit {
+        if let displayPreferenceObserver {
+            NotificationCenter.default.removeObserver(displayPreferenceObserver)
+        }
+    }
+
+    func refreshNow() {
+        let nextState = MenuBarBatteryLabelState(snapshot: monitor.snapshot, preferences: preferences)
+        guard nextState.identity != state.identity else {
+            return
+        }
+
+        state = nextState
+        stateDidChange?(nextState)
+    }
+
+    private func observeInputs() {
+        observationGeneration += 1
+        let generation = observationGeneration
+
+        withObservationTracking {
+            _ = monitor.snapshot
+            _ = preferences.menuBarDisplayMode
+            _ = preferences.temperatureUnitPreference
+            _ = preferences.temperatureUnitResolutionToken
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      observationGeneration == generation else {
+                    return
+                }
+
+                refreshNow()
+                observeInputs()
+            }
+        }
+    }
+
+    private func observeDisplayPreferenceNotifications() {
+        displayPreferenceObserver = NotificationCenter.default.addObserver(
+            forName: .menuBarDisplayPreferencesDidChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            let invalidation = MenuBarDisplayPreferencesInvalidation(notification: notification)
+            if Thread.isMainThread {
+                MainActor.assumeIsolated {
+                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
+                }
+            } else {
+                Task { @MainActor [weak self] in
+                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
+                }
+            }
+        }
+    }
+
+    private func refreshFromDisplayPreferenceInvalidation(_ invalidation: MenuBarDisplayPreferencesInvalidation) {
+        guard preferences.shouldAcceptMenuBarDisplayPreferencesInvalidation(invalidation) else {
+            return
+        }
+
+        preferences.refreshMenuBarDisplayPreferences(from: invalidation.displayPreferences)
+        refreshNow()
+    }
+}
+
+@MainActor
+final class MenuBarStatusItemController: NSObject {
+    private static let panelGlobalDismissalGrace: TimeInterval = 1.25
+    private static let panelCollectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllApplications,
+        .fullScreenAuxiliary,
+        .moveToActiveSpace,
+        .transient,
+        .ignoresCycle
+    ]
+
+    private let monitor: BatteryMonitor
+    private let preferences: PreferencesStore
+    private let historyStore: BatteryHistoryStore
+    private let labelModel: MenuBarBatteryLabelModel
+    private let statusBar: NSStatusBar
+    private var statusItem: NSStatusItem
+    private var panel: NSPanel?
+    private var statusItemObservationGeneration = 0
+    private var appliedIdentity: String?
+    private var installedDisplayPreferences: MenuBarDisplayPreferences?
+    private var displayPreferenceObserver: NSObjectProtocol?
+    private var deferredDisplayPreferenceRefreshTask: Task<Void, Never>?
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
+    private var activeSpaceObserver: NSObjectProtocol?
+    private var lastPanelShowDate: Date?
+    private var deferredPanelPresentationTask: Task<Void, Never>?
+    private var deferredPanelDismissalTask: Task<Void, Never>?
+    private var isStarted = false
+
+    init(
+        monitor: BatteryMonitor,
+        preferences: PreferencesStore,
+        historyStore: BatteryHistoryStore,
+        labelModel: MenuBarBatteryLabelModel,
+        statusBar: NSStatusBar = .system
+    ) {
+        self.monitor = monitor
+        self.preferences = preferences
+        self.historyStore = historyStore
+        self.labelModel = labelModel
+        self.statusBar = statusBar
+        statusItem = statusBar.statusItem(withLength: NSStatusItem.variableLength)
+        super.init()
+    }
+
+    isolated deinit {
+        deferredDisplayPreferenceRefreshTask?.cancel()
+        deferredPanelPresentationTask?.cancel()
+        deferredPanelDismissalTask?.cancel()
+        closePanel()
+
+        if let displayPreferenceObserver {
+            NotificationCenter.default.removeObserver(displayPreferenceObserver)
+        }
+
+        if let activeSpaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activeSpaceObserver)
+        }
+
+        statusBar.removeStatusItem(statusItem)
+    }
+
+    func start() {
+        guard isStarted == false else {
+            return
+        }
+
+        isStarted = true
+        configureButton()
+        installedDisplayPreferences = currentDisplayPreferences
+        applyCurrentStatusItemState()
+        labelModel.stateDidChange = { [weak self] _ in
+            self?.applyCurrentStatusItemState()
+        }
+        observeStatusItemInputs()
+        observeDisplayPreferenceNotifications()
+        observeActiveSpaceChanges()
+    }
+
+    #if DEBUG
+    func currentButtonSnapshot() -> MenuBarStatusItemButtonSnapshot {
+        MenuBarStatusItemButtonSnapshot(statusItem: statusItem)
+    }
+
+    func overwriteButtonTitleForTesting(_ title: String) {
+        statusItem.button?.title = title
+    }
+
+    func currentStatusItemIdentityForTesting() -> ObjectIdentifier {
+        ObjectIdentifier(statusItem)
+    }
+
+    func showPanelForTesting() {
+        guard let button = statusItem.button else {
+            return
+        }
+
+        showPanel(relativeTo: button)
+    }
+
+    func closePanelForTesting() {
+        closePanel()
+    }
+
+    func overwriteLastPanelShowDateForTesting(_ date: Date) {
+        lastPanelShowDate = date
+    }
+
+    func closePanelFromGlobalEventForTesting(now: Date) {
+        closePanelFromGlobalEventIfNeeded(now: now)
+    }
+
+    func cancelDeferredPanelDismissalForTesting() {
+        cancelDeferredPanelDismissal()
+    }
+
+    func currentPanelSnapshotForTesting() -> MenuBarPanelPresentationSnapshot? {
+        panel.map(MenuBarPanelPresentationSnapshot.init(panel:))
+    }
+    #endif
+
+    private func configureButton() {
+        guard let button = statusItem.button else {
+            return
+        }
+
+        button.target = self
+        button.action = #selector(togglePanel(_:))
+        button.sendAction(on: [.leftMouseDown, .rightMouseDown])
+        button.imageScaling = .scaleProportionallyDown
+        button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    }
+
+    private func apply(_ state: MenuBarBatteryLabelState, force: Bool = false) {
+        guard force || state.identity != appliedIdentity else {
+            return
+        }
+
+        let content = MenuBarStatusItemContent(state: state)
+        if MenuBarStatusItemRenderer.apply(content, to: statusItem) {
+            appliedIdentity = state.identity
+        }
+    }
+
+    private func observeStatusItemInputs() {
+        statusItemObservationGeneration += 1
+        let generation = statusItemObservationGeneration
+
+        withObservationTracking {
+            _ = monitor.snapshot
+            _ = preferences.menuBarDisplayMode
+            _ = preferences.temperatureUnitPreference
+            _ = preferences.temperatureUnitResolutionToken
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      statusItemObservationGeneration == generation else {
+                    return
+                }
+
+                refreshStatusItemNow()
+                observeStatusItemInputs()
+            }
+        }
+    }
+
+    private func observeDisplayPreferenceNotifications() {
+        guard displayPreferenceObserver == nil else {
+            return
+        }
+
+        displayPreferenceObserver = NotificationCenter.default.addObserver(
+            forName: .menuBarDisplayPreferencesDidChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            let invalidation = MenuBarDisplayPreferencesInvalidation(notification: notification)
+            if Thread.isMainThread {
+                MainActor.assumeIsolated {
+                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
+                }
+            } else {
+                Task { @MainActor [weak self] in
+                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
+                }
+            }
+        }
+    }
+
+    private func observeActiveSpaceChanges() {
+        guard activeSpaceObserver == nil else {
+            return
+        }
+
+        activeSpaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.repositionPanelForActiveSpaceChangeIfNeeded()
+            }
+        }
+    }
+
+    private func refreshFromDisplayPreferenceInvalidation(_ invalidation: MenuBarDisplayPreferencesInvalidation) {
+        guard preferences.shouldAcceptMenuBarDisplayPreferencesInvalidation(invalidation) else {
+            return
+        }
+
+        let didChangeDisplayPreferences = preferences.refreshMenuBarDisplayPreferences(from: invalidation.displayPreferences)
+        if didChangeDisplayPreferences || currentDisplayPreferences != installedDisplayPreferences {
+            reinstallStatusItemForDisplayPreferenceChange()
+        }
+        refreshStatusItemNow(force: true)
+        scheduleDeferredDisplayPreferenceRefresh()
+    }
+
+    private func reinstallStatusItemForDisplayPreferenceChange() {
+        closePanel()
+        statusBar.removeStatusItem(statusItem)
+        statusItem = statusBar.statusItem(withLength: NSStatusItem.variableLength)
+        appliedIdentity = nil
+        configureButton()
+        installedDisplayPreferences = currentDisplayPreferences
+    }
+
+    private var currentDisplayPreferences: MenuBarDisplayPreferences {
+        MenuBarDisplayPreferences(
+            displayMode: preferences.menuBarDisplayMode,
+            temperatureUnitPreference: preferences.temperatureUnitPreference
+        )
+    }
+
+    private func scheduleDeferredDisplayPreferenceRefresh() {
+        deferredDisplayPreferenceRefreshTask?.cancel()
+        deferredDisplayPreferenceRefreshTask = Task { @MainActor [weak self] in
+            for delay in [20_000_000, 120_000_000, 320_000_000] {
+                try? await Task.sleep(nanoseconds: UInt64(delay))
+
+                guard Task.isCancelled == false else {
+                    return
+                }
+
+                self?.refreshStatusItemNow(force: true)
+            }
+        }
+    }
+
+    private func refreshStatusItemNow(force: Bool = false) {
+        labelModel.refreshNow()
+        applyCurrentStatusItemState(force: force)
+    }
+
+    private func applyCurrentStatusItemState(force: Bool = false) {
+        apply(
+            MenuBarBatteryLabelState(snapshot: monitor.snapshot, preferences: preferences),
+            force: force
+        )
+    }
+
+    @objc
+    private func togglePanel(_ sender: AnyObject?) {
+        guard let button = statusItem.button else {
+            return
+        }
+
+        if isPanelShown {
+            closePanel()
+        } else {
+            showPanel(relativeTo: button)
+        }
+    }
+
+    private var isPanelShown: Bool {
+        panel?.isVisible == true
+    }
+
+    private func showPanel(relativeTo button: NSStatusBarButton) {
+        closePanel()
+
+        let panel = makePanel()
+        self.panel = panel
+
+        layoutPanel(panel, relativeTo: button)
+        lastPanelShowDate = Date()
+
+        presentPanel(panel, relativeTo: button)
+        scheduleDeferredPanelPresentationRetries(for: panel, relativeTo: button)
+        installDismissalMonitors()
+    }
+
+    private func presentPanel(_ panel: NSPanel, relativeTo _: NSStatusBarButton) {
+        preparePanelForActiveSpacePresentation(panel)
+        panel.level = .popUpMenu
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        panel.displayIfNeeded()
+    }
+
+    private func preparePanelForActiveSpacePresentation(_ panel: NSPanel) {
+        panel.parent?.removeChildWindow(panel)
+        panel.collectionBehavior = Self.panelCollectionBehavior
+        panel.level = .popUpMenu
+    }
+
+    private func scheduleDeferredPanelPresentationRetries(for panel: NSPanel, relativeTo button: NSStatusBarButton) {
+        deferredPanelPresentationTask?.cancel()
+        deferredPanelPresentationTask = Task { @MainActor [weak self, weak panel, weak button] in
+            for delay in [50_000_000, 180_000_000, 450_000_000, 900_000_000] {
+                try? await Task.sleep(nanoseconds: UInt64(delay))
+
+                guard Task.isCancelled == false,
+                      let self,
+                      let panel,
+                      self.panel === panel,
+                      let button else {
+                    return
+                }
+
+                self.layoutPanel(panel, relativeTo: button)
+                self.presentPanel(panel, relativeTo: button)
+            }
+        }
+    }
+
+    private func makePanel() -> NSPanel {
+        let rootView = MenuBarBatteryView(
+            monitor: monitor,
+            preferences: preferences,
+            historyStore: historyStore,
+            prepareForSettingsAction: { [weak self] in
+                self?.closePanel()
+            },
+            openSettingsAction: {
+                NotificationCenter.default.post(name: .showBatteryStatsSettingsWindow, object: nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        )
+        .environment(monitor)
+        .environment(preferences)
+        .monitorConfiguration(
+            monitor: monitor,
+            preferences: preferences,
+            historyStore: historyStore,
+            startsMonitor: true
+        )
+
+        let hostingView = NSHostingView(rootView: rootView)
+        let panel = MenuBarStatusPanel(
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: BatterySurfaceLayout.minimumWidth,
+                height: BatterySurfaceLayout.menuBarPanelMinimumHeight
+            ),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.contentView = hostingView
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.isFloatingPanel = true
+        panel.becomesKeyOnlyIfNeeded = false
+        panel.canHide = false
+        panel.isMovable = false
+        panel.worksWhenModal = true
+        panel.level = .popUpMenu
+        panel.collectionBehavior = Self.panelCollectionBehavior
+        return panel
+    }
+
+    private func layoutPanel(_ panel: NSPanel, relativeTo button: NSStatusBarButton) {
+        let size = panelContentSize(panel)
+        panel.setContentSize(size)
+
+        guard let frame = panelFrame(size: size, anchoredTo: button) else {
+            panel.center()
+            return
+        }
+
+        panel.setFrame(frame, display: true)
+    }
+
+    private func panelContentSize(_ panel: NSPanel) -> NSSize {
+        guard let contentView = panel.contentView else {
+            return NSSize(
+                width: BatterySurfaceLayout.minimumWidth,
+                height: BatterySurfaceLayout.menuBarPanelMinimumHeight
+            )
+        }
+
+        contentView.setFrameSize(NSSize(
+            width: BatterySurfaceLayout.minimumWidth,
+            height: BatterySurfaceLayout.menuBarPanelMinimumHeight
+        ))
+        let fittingSize = contentView.fittingSize
+
+        return NSSize(
+            width: max(BatterySurfaceLayout.minimumWidth, fittingSize.width),
+            height: max(BatterySurfaceLayout.menuBarPanelMinimumHeight, fittingSize.height)
+        )
+    }
+
+    private func panelFrame(size: NSSize, anchoredTo button: NSStatusBarButton) -> NSRect? {
+        guard let buttonWindow = button.window else {
+            return MenuBarPanelLayout.fallbackFrame(size: size, near: NSEvent.mouseLocation)
+        }
+
+        let buttonRectInWindow = button.convert(button.bounds, to: nil)
+        let buttonRectInScreen = buttonWindow.convertToScreen(buttonRectInWindow)
+        let screenFrame = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? buttonRectInScreen
+        return MenuBarPanelLayout.frame(
+            size: size,
+            anchoredTo: buttonRectInScreen,
+            screenFrame: screenFrame
+        )
+    }
+
+    private func installDismissalMonitors() {
+        removeDismissalMonitors()
+
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown]) { [weak self] event in
+            guard let self else {
+                return event
+            }
+
+            if event.type == .keyDown, event.keyCode == 53 {
+                self.closePanel()
+                return nil
+            }
+
+            if event.type != .keyDown {
+                if self.isEventInsidePanel(event) || self.isEventInsideStatusButton(event) {
+                    self.cancelDeferredPanelDismissal()
+                    return event
+                }
+
+                self.closePanel()
+            }
+
+            return event
+        }
+
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.closePanelFromGlobalEventIfNeeded()
+            }
+        }
+    }
+
+    private func removeDismissalMonitors() {
+        if let localEventMonitor {
+            NSEvent.removeMonitor(localEventMonitor)
+            self.localEventMonitor = nil
+        }
+
+        if let globalEventMonitor {
+            NSEvent.removeMonitor(globalEventMonitor)
+            self.globalEventMonitor = nil
+        }
+
+    }
+
+    private func isEventInsidePanel(_ event: NSEvent) -> Bool {
+        guard let panel else {
+            return false
+        }
+
+        return event.window === panel
+    }
+
+    private func isEventInsideStatusButton(_ event: NSEvent) -> Bool {
+        guard let button = statusItem.button,
+              event.window === button.window else {
+            return false
+        }
+
+        let point = button.convert(event.locationInWindow, from: nil)
+        return button.bounds.contains(point)
+    }
+
+    private func closePanel() {
+        deferredPanelPresentationTask?.cancel()
+        deferredPanelPresentationTask = nil
+        cancelDeferredPanelDismissal()
+        lastPanelShowDate = nil
+        removeDismissalMonitors()
+        if let panel {
+            panel.parent?.removeChildWindow(panel)
+            panel.orderOut(nil)
+        }
+        panel = nil
+    }
+
+    private func repositionPanelForActiveSpaceChangeIfNeeded() {
+        guard isPanelShown else {
+            return
+        }
+
+        guard let panel,
+              let button = statusItem.button else {
+            closePanel()
+            return
+        }
+
+        layoutPanel(panel, relativeTo: button)
+        presentPanel(panel, relativeTo: button)
+    }
+
+    private func closePanelFromGlobalEventIfNeeded(now: Date = Date()) {
+        guard isPanelShown else {
+            return
+        }
+
+        if let lastPanelShowDate,
+           now.timeIntervalSince(lastPanelShowDate) < Self.panelGlobalDismissalGrace {
+            let remainingDelay = Self.panelGlobalDismissalGrace - max(0, now.timeIntervalSince(lastPanelShowDate))
+            scheduleDeferredPanelDismissal(remainingDelay: remainingDelay)
+            return
+        }
+
+        closePanel()
+    }
+
+    private func scheduleDeferredPanelDismissal(remainingDelay: TimeInterval) {
+        guard deferredPanelDismissalTask == nil else {
+            return
+        }
+
+        let delayNanoseconds = UInt64(max(0, remainingDelay) * 1_000_000_000)
+        deferredPanelDismissalTask = Task { @MainActor [weak self] in
+            if delayNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+
+            guard Task.isCancelled == false,
+                  let self else {
+                return
+            }
+
+            deferredPanelDismissalTask = nil
+            closePanel()
+        }
+    }
+
+    private func cancelDeferredPanelDismissal() {
+        deferredPanelDismissalTask?.cancel()
+        deferredPanelDismissalTask = nil
+    }
+
+}
+
+@MainActor
+private final class MenuBarStatusPanel: NSPanel {
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override var canBecomeMain: Bool {
+        false
+    }
+}
+
+#if DEBUG
+struct MenuBarPanelPresentationSnapshot {
+    let isVisible: Bool
+    let level: NSWindow.Level
+    let collectionBehavior: NSWindow.CollectionBehavior
+    let styleMask: NSWindow.StyleMask
+    let canBecomeKey: Bool
+    let canBecomeMain: Bool
+    let becomesKeyOnlyIfNeeded: Bool
+    let isFloatingPanel: Bool
+    let hidesOnDeactivate: Bool
+
+    @MainActor
+    init(panel: NSPanel) {
+        isVisible = panel.isVisible
+        level = panel.level
+        collectionBehavior = panel.collectionBehavior
+        styleMask = panel.styleMask
+        canBecomeKey = panel.canBecomeKey
+        canBecomeMain = panel.canBecomeMain
+        becomesKeyOnlyIfNeeded = panel.becomesKeyOnlyIfNeeded
+        isFloatingPanel = panel.isFloatingPanel
+        hidesOnDeactivate = panel.hidesOnDeactivate
+    }
+}
+#endif
+
+enum MenuBarPanelLayout {
+    static let margin: CGFloat = 6
+
+    static func frame(size: NSSize, anchoredTo anchorRect: NSRect, screenFrame: NSRect) -> NSRect {
+        let originX = clampedHorizontalOrigin(
+            preferredMidX: anchorRect.midX,
+            width: size.width,
+            screenFrame: screenFrame
+        )
+        let originY = verticalOrigin(
+            preferredBelowY: anchorRect.minY - size.height - margin,
+            fallbackAboveY: anchorRect.maxY + margin,
+            height: size.height,
+            screenFrame: screenFrame
+        )
+
+        return NSRect(origin: NSPoint(x: originX, y: originY), size: size)
+    }
+
+    @MainActor
+    static func fallbackFrame(size: NSSize, near point: NSPoint) -> NSRect {
+        let screenFrame = (NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main)?.visibleFrame
+            ?? NSRect(origin: .zero, size: size)
+        return fallbackFrame(size: size, near: point, screenFrame: screenFrame)
+    }
+
+    static func fallbackFrame(size: NSSize, near point: NSPoint, screenFrame: NSRect) -> NSRect {
+        let originX = clampedHorizontalOrigin(
+            preferredMidX: point.x,
+            width: size.width,
+            screenFrame: screenFrame
+        )
+        let originY = verticalOrigin(
+            preferredBelowY: point.y - size.height - margin,
+            fallbackAboveY: point.y + margin,
+            height: size.height,
+            screenFrame: screenFrame
+        )
+
+        return NSRect(origin: NSPoint(x: originX, y: originY), size: size)
+    }
+
+    private static func clampedHorizontalOrigin(
+        preferredMidX: CGFloat,
+        width: CGFloat,
+        screenFrame: NSRect
+    ) -> CGFloat {
+        let minimumX = screenFrame.minX + margin
+        let maximumX = screenFrame.maxX - width - margin
+        guard minimumX <= maximumX else {
+            return screenFrame.midX - (width / 2)
+        }
+
+        return min(max(preferredMidX - (width / 2), minimumX), maximumX)
+    }
+
+    private static func verticalOrigin(
+        preferredBelowY: CGFloat,
+        fallbackAboveY: CGFloat,
+        height: CGFloat,
+        screenFrame: NSRect
+    ) -> CGFloat {
+        let minimumY = screenFrame.minY + margin
+        let maximumY = screenFrame.maxY - height - margin
+        var originY = preferredBelowY
+
+        if originY < minimumY {
+            originY = min(fallbackAboveY, maximumY)
+        }
+
+        if minimumY <= maximumY {
+            return min(max(originY, minimumY), maximumY)
+        }
+
+        return screenFrame.midY - (height / 2)
+    }
+}
+
+struct MenuBarStatusItemContent: Equatable {
+    let symbolName: String
+    let symbolTintStyle: BatteryPresentationTint
+    let title: String
+    let accessibilityLabel: String
+
+    var length: CGFloat {
+        title.isEmpty ? NSStatusItem.squareLength : NSStatusItem.variableLength
+    }
+
+    var imagePosition: NSControl.ImagePosition {
+        title.isEmpty ? .imageOnly : .imageLeft
+    }
+
+    init(state: MenuBarBatteryLabelState) {
+        symbolName = state.symbolName
+        symbolTintStyle = state.symbolTintStyle
+        title = state.statusItemTitle
+        accessibilityLabel = state.accessibilityLabel
+    }
+}
+
+@MainActor
+enum MenuBarStatusItemRenderer {
+    @discardableResult
+    static func apply(_ content: MenuBarStatusItemContent, to statusItem: NSStatusItem) -> Bool {
+        statusItem.length = content.length
+
+        guard let button = statusItem.button else {
+            return false
+        }
+
+        let image = statusImage(systemName: content.symbolName)
+
+        button.image = nil
+        button.alternateImage = nil
+        button.imagePosition = .noImage
+        button.title = ""
+        button.alternateTitle = ""
+        button.attributedTitle = NSAttributedString(string: "")
+        button.toolTip = nil
+        button.contentTintColor = nil
+        button.setAccessibilityLabel(nil)
+
+        statusItem.length = content.length
+        let renderedTitle = attributedStatusTitle(content.title, font: button.font)
+        button.image = image
+        button.title = content.title
+        button.attributedTitle = renderedTitle
+        button.imagePosition = content.imagePosition
+        button.imageScaling = .scaleProportionallyDown
+        button.contentTintColor = statusItemTintColor(for: content.symbolTintStyle)
+        button.toolTip = content.accessibilityLabel
+        button.setAccessibilityLabel(content.accessibilityLabel)
+        button.imagePosition = content.imagePosition
+        button.invalidateIntrinsicContentSize()
+        button.needsLayout = true
+        button.needsDisplay = true
+
+        statusItem.length = content.length
+        return true
+    }
+
+    private static func statusImage(systemName: String) -> NSImage {
+        let image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)
+            ?? NSImage(systemSymbolName: "questionmark", accessibilityDescription: nil)
+            ?? NSImage()
+        image.isTemplate = true
+        return image
+    }
+
+    private static func statusItemTintColor(for tint: BatteryPresentationTint) -> NSColor? {
+        switch tint {
+        case .primary:
+            return nil
+        case .secondary:
+            return .secondaryLabelColor
+        case .green:
+            return .systemGreen
+        case .yellow:
+            return .systemYellow
+        case .red:
+            return .systemRed
+        }
+    }
+
+    private static func attributedStatusTitle(_ title: String, font: NSFont?) -> NSAttributedString {
+        let attributes: [NSAttributedString.Key: Any]
+        if let font {
+            attributes = [.font: font]
+        } else {
+            attributes = [:]
+        }
+
+        return NSAttributedString(string: title, attributes: attributes)
+    }
+}
+
+#if DEBUG
+struct MenuBarStatusItemButtonSnapshot: Equatable {
+    let title: String
+    let attributedTitle: String
+    let imagePosition: NSControl.ImagePosition
+    let length: CGFloat
+    let toolTip: String?
+
+    @MainActor
+    init(statusItem: NSStatusItem) {
+        title = statusItem.button?.title ?? ""
+        attributedTitle = statusItem.button?.attributedTitle.string ?? ""
+        imagePosition = statusItem.button?.imagePosition ?? .noImage
+        length = statusItem.length
+        toolTip = statusItem.button?.toolTip
+    }
+}
+#endif
+
+struct MenuBarBatteryLabelState {
+    let symbolName: String
+    let symbolTintStyle: BatteryPresentationTint
+    let symbolTint: Color
+    let value: String?
+    let accessibilityLabel: String
+    let identity: String
+
+    var statusItemTitle: String {
+        value ?? ""
+    }
+
+    @MainActor
+    init(snapshot: BatterySnapshot?, preferences: PreferencesStore) {
+        self.init(
+            snapshot: snapshot,
+            displayMode: preferences.menuBarDisplayMode,
+            temperatureUnitPreference: preferences.temperatureUnitPreference
+        )
+    }
+
+    init(
+        snapshot: BatterySnapshot?,
+        displayMode: MenuBarDisplayMode,
+        temperatureUnitPreference: TemperatureUnitPreference
+    ) {
+        let symbolTintStyle = BatteryPresentationStyle.chargeTintStyle(for: snapshot)
+        symbolName = Self.symbolName(for: snapshot)
+        self.symbolTintStyle = symbolTintStyle
+        symbolTint = symbolTintStyle.color
+        value = MenuBarBatteryLabelFormatting.displayValue(
+            snapshot: snapshot,
+            displayMode: displayMode,
+            temperatureUnitPreference: temperatureUnitPreference
+        )
+        accessibilityLabel = MenuBarBatteryLabelFormatting.accessibilityLabel(
+            snapshot: snapshot,
+            displayMode: displayMode,
+            temperatureUnitPreference: temperatureUnitPreference
+        )
+        identity = [
+            displayMode.rawValue,
+            temperatureUnitPreference.rawValue,
+            snapshot?.powerState.rawValue ?? "missingPowerState",
+            symbolName,
+            symbolTintStyle.identityToken,
+            value ?? "iconOnly",
+            accessibilityLabel
+        ].joined(separator: "|")
+    }
+
+    private static func symbolName(for snapshot: BatterySnapshot?) -> String {
+        BatteryPresentationStyle.batterySymbolName(for: snapshot)
+    }
+}
+
+enum MenuBarBatteryLabelFormatting {
+    static func displayValue(
+        snapshot: BatterySnapshot?,
+        displayMode: MenuBarDisplayMode,
+        temperatureUnitPreference: TemperatureUnitPreference
+    ) -> String? {
         switch displayMode {
         case .iconOnly:
             return nil
         case .iconAndPercentage:
-            return abbreviatedPercent(snapshot?.stateOfChargePercent)
+            return abbreviatedPercent(snapshot?.presentationStateOfChargePercent)
         case .iconAndTimeRemaining:
             return BatteryFormatting.compactWidgetDuration(minutes: snapshot?.displayedTimeMinutes)
         case .iconAndHealth:
-            return abbreviatedPercent(snapshot?.healthPercent)
+            return abbreviatedPercent(snapshot?.presentationHealthPercent)
         case .iconAndFullCharge:
             return abbreviatedCapacity(snapshot?.fullChargeCapacityMilliampHours)
         case .iconAndTemperature:
-            return abbreviatedTemperature(snapshot?.temperatureCelsius)
+            return abbreviatedTemperature(snapshot?.presentationTemperatureCelsius, unitPreference: temperatureUnitPreference)
         case .iconAndPower:
-            return abbreviatedPower(snapshot?.activePowerWatts)
+            return abbreviatedPower(for: snapshot)
         }
     }
 
-    private var accessibilityLabel: String {
+    static func accessibilityLabel(
+        snapshot: BatterySnapshot?,
+        displayMode: MenuBarDisplayMode,
+        temperatureUnitPreference: TemperatureUnitPreference
+    ) -> String {
         switch displayMode {
         case .iconOnly:
             return snapshot?.statusDisplayTitle ?? "Battery status unavailable"
         case .iconAndPercentage:
-            return "Battery \(BatteryFormatting.percent(snapshot?.stateOfChargePercent))"
+            return "Battery \(BatteryFormatting.percent(snapshot?.presentationStateOfChargePercent))"
         case .iconAndTimeRemaining:
             return "Battery time \(BatteryFormatting.duration(minutes: snapshot?.displayedTimeMinutes))"
         case .iconAndHealth:
-            return "Battery health \(BatteryFormatting.percent(snapshot?.healthPercent, decimals: 0))"
+            return "Battery health \(BatteryFormatting.percent(snapshot?.presentationHealthPercent, decimals: 0))"
         case .iconAndFullCharge:
-            return "Battery full charge capacity \(BatteryFormatting.milliampHours(snapshot?.fullChargeCapacityMilliampHours))"
+            return "Battery full charge capacity \(BatteryFormatting.milliampHours(snapshot?.fullChargeCapacityMilliampHours, allowsZero: false))"
         case .iconAndTemperature:
-            return "Battery temperature \(BatteryFormatting.temperature(snapshot?.temperatureCelsius, unitPreference: .celsius))"
+            return "Battery temperature \(BatteryFormatting.temperature(snapshot?.presentationTemperatureCelsius, unitPreference: temperatureUnitPreference))"
         case .iconAndPower:
-            return "Battery power \(BatteryFormatting.watts(snapshot?.activePowerWatts))"
+            return powerAccessibilityLabel(for: snapshot)
         }
     }
 
-    private func abbreviatedPercent(_ value: Double?) -> String {
-        guard let value else {
+    private static func abbreviatedPercent(_ value: Double?) -> String {
+        guard let value, value.isFinite else {
             return "—"
         }
 
@@ -143,8 +1119,8 @@ struct MenuBarBatteryLabelView: View {
         return "\(clamped.formatted(.number.precision(.fractionLength(0))))%"
     }
 
-    private func abbreviatedCapacity(_ milliampHours: Int?) -> String {
-        guard let milliampHours else {
+    private static func abbreviatedCapacity(_ milliampHours: Int?) -> String {
+        guard let milliampHours = BatteryCalculations.plausibleCapacityMilliampHours(milliampHours, allowsZero: false) else {
             return "—"
         }
 
@@ -152,20 +1128,77 @@ struct MenuBarBatteryLabelView: View {
         return "\(ampHours.formatted(.number.precision(.fractionLength(1))))Ah"
     }
 
-    private func abbreviatedTemperature(_ celsius: Double?) -> String {
-        guard let celsius else {
+    private static func abbreviatedTemperature(_ celsius: Double?, unitPreference: TemperatureUnitPreference) -> String {
+        guard let celsius = BatteryCalculations.plausibleTemperatureCelsius(celsius) else {
             return "—"
         }
 
-        return "\(celsius.formatted(.number.precision(.fractionLength(0))))°"
+        let value: Double
+        switch unitPreference.resolvedUnit {
+        case .celsius:
+            value = celsius
+        case .fahrenheit:
+            value = (celsius * 9 / 5) + 32
+        }
+
+        return "\(value.formatted(.number.precision(.fractionLength(0))))°"
     }
 
-    private func abbreviatedPower(_ watts: Double?) -> String {
-        guard let watts else {
+    private static func abbreviatedPower(_ watts: Double?) -> String {
+        guard let watts = BatteryCalculations.plausibleWatts(watts) else {
             return "—"
         }
 
         return "\(watts.formatted(.number.precision(.fractionLength(1))))W"
+    }
+
+    private static func abbreviatedPower(for snapshot: BatterySnapshot?) -> String {
+        let powerText = abbreviatedPower(snapshot?.activePowerWatts)
+        guard let snapshot,
+              powerText != "—" else {
+            return powerText
+        }
+
+        switch snapshot.powerState {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "In \(powerText)"
+            }
+
+            return powerText
+        case .onBattery, .unknown:
+            return powerText
+        }
+    }
+
+    private static func powerAccessibilityLabel(for snapshot: BatterySnapshot?) -> String {
+        let powerText = BatteryFormatting.watts(snapshot?.activePowerWatts)
+        guard let snapshot else {
+            return "Battery power \(powerText)"
+        }
+
+        switch snapshot.powerState {
+        case .charging:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "Battery input power \(powerText)"
+            }
+
+            return "Battery charge rate \(powerText)"
+        case .connectedDischarging:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "Battery input power \(powerText), battery discharging"
+            }
+
+            return "Battery drain \(powerText)"
+        case .connectedNotCharging, .fullOnAC:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "Battery input power \(powerText)"
+            }
+
+            return "Battery power \(powerText)"
+        case .onBattery, .unknown:
+            return "Battery power \(powerText)"
+        }
     }
 }
 
