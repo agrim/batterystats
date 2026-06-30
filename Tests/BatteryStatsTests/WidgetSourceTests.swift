@@ -17,14 +17,17 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertFalse(source.contains("BatteryMediumWidgetView(\n                    snapshot: entry.snapshot"))
     }
 
-    func testMainSummaryUsesMeasuredPowerTitleInsteadOfStaticAdapterSpeed() throws {
+    func testMainSummarySeparatesAdapterCapabilityFromChargingSpeed() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatterySummaryGridView.swift")
 
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.powerTitle(for: snapshot)"))
         XCTAssertTrue(source.contains("return \"Input Power\""))
         XCTAssertTrue(source.contains("return \"Charge Rate\""))
-        XCTAssertFalse(source.contains("BatteryDetailRowView(title: \"Adapter\""))
-        XCTAssertFalse(source.contains("BatterySummaryDetailFormatting.adapter("))
+        XCTAssertTrue(source.contains("powerConnectionRows\n\n                    if showsAdvancedValues {"))
+        XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts)"))
+        XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"))
+        XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Adapter\", value: adapter)"))
+        XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Charging Speed\", value: chargingSpeed)"))
     }
 
     func testMediumWidgetUsesMeasuredPowerTitleWhileCharging() throws {

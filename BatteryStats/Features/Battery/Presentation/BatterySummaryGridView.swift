@@ -61,6 +61,8 @@ struct BatterySummaryGridView: View {
                         .id(temperatureUnitResolutionToken)
                     }
 
+                    powerConnectionRows
+
                     if showsAdvancedValues {
                         advancedRows
                     }
@@ -77,6 +79,23 @@ struct BatterySummaryGridView: View {
 
     private var timeSummary: String {
         BatterySummaryDetailFormatting.timeSummary(for: snapshot)
+    }
+
+    @ViewBuilder
+    private var powerConnectionRows: some View {
+        if let adapter = BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts) {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Adapter", value: adapter)
+        }
+
+        if let chargingSpeed = BatterySummaryDetailFormatting.chargingSpeed(for: snapshot) {
+            Divider()
+                .gridCellColumns(2)
+
+            BatteryDetailRowView(title: "Charging Speed", value: chargingSpeed)
+        }
     }
 
     @ViewBuilder
@@ -217,6 +236,30 @@ enum BatterySummaryDetailFormatting {
         }
 
         return BatteryFormatting.watts(value)
+    }
+
+    static func adapter(_ value: Int?) -> String? {
+        guard let value = BatteryCalculations.plausibleAdapterWatts(value) else {
+            return nil
+        }
+
+        return "\(value.formatted(.number.grouping(.automatic))) W"
+    }
+
+    static func chargingSpeed(for snapshot: BatterySnapshot) -> String? {
+        guard snapshot.powerState == .charging else {
+            return nil
+        }
+
+        if let visibleInputPowerWatts = snapshot.visibleInputPowerWatts {
+            return BatteryFormatting.watts(visibleInputPowerWatts)
+        }
+
+        guard let chargeRateWatts = BatteryCalculations.plausibleWatts(snapshot.chargeRateWatts) else {
+            return nil
+        }
+
+        return BatteryFormatting.watts(chargeRateWatts)
     }
 
     static func powerTitle(for snapshot: BatterySnapshot) -> String {

@@ -539,6 +539,14 @@ final class FormatterTests: XCTestCase {
         XCTAssertNil(BatterySummaryDetailFormatting.temperature(180, unitPreference: .celsius))
         XCTAssertNil(BatterySummaryDetailFormatting.power(-4.2))
         XCTAssertNil(BatterySummaryDetailFormatting.power(.greatestFiniteMagnitude))
+        XCTAssertNil(BatterySummaryDetailFormatting.adapter(-70))
+        XCTAssertNil(BatterySummaryDetailFormatting.adapter(Int.max))
+        XCTAssertNil(BatterySummaryDetailFormatting.chargingSpeed(for: makeSnapshot(stateOfChargePercent: 55, powerState: .onBattery)))
+        XCTAssertNil(BatterySummaryDetailFormatting.chargingSpeed(for: makeSnapshot(
+            stateOfChargePercent: 85,
+            powerState: .connectedNotCharging,
+            inputPowerWatts: 39.8
+        )))
         XCTAssertNil(BatterySummaryDetailFormatting.voltage(-12_000))
         XCTAssertNil(BatterySummaryDetailFormatting.voltage(Int.max))
         XCTAssertNil(BatterySummaryDetailFormatting.energy(current: nil, maximum: nil))
@@ -552,8 +560,35 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatterySummaryDetailFormatting.cycleCount(120), "120")
         XCTAssertEqual(BatterySummaryDetailFormatting.temperature(34.2, unitPreference: .fahrenheit), "93.6 °F")
         XCTAssertEqual(BatterySummaryDetailFormatting.power(13.9), "13.9 W")
+        XCTAssertEqual(BatterySummaryDetailFormatting.adapter(140), "140 W")
         XCTAssertEqual(BatterySummaryDetailFormatting.voltage(12_780), "12,780 mV")
         XCTAssertEqual(BatterySummaryDetailFormatting.energy(current: 40.2, maximum: nil), "40.2 Wh")
+    }
+
+    func testSummaryChargingSpeedUsesLiveInputPowerWhileCharging() throws {
+        let snapshot = makeSnapshot(
+            stateOfChargePercent: 55,
+            powerState: .charging,
+            chargeRateWatts: 25.4,
+            inputPowerWatts: 69.42,
+            inputPowerEvidence: .counterBacked,
+            adapterMaxWatts: 70
+        )
+
+        XCTAssertEqual(BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts), "70 W")
+        XCTAssertEqual(BatterySummaryDetailFormatting.chargingSpeed(for: snapshot), "69.4 W")
+    }
+
+    func testSummaryChargingSpeedFallsBackToChargeRateWhenInputPowerIsUnavailable() {
+        let snapshot = makeSnapshot(
+            stateOfChargePercent: 55,
+            powerState: .charging,
+            chargeRateWatts: 25.4,
+            inputPowerWatts: 100,
+            adapterMaxWatts: 100
+        )
+
+        XCTAssertEqual(BatterySummaryDetailFormatting.chargingSpeed(for: snapshot), "25.4 W")
     }
 
     func testSummaryPowerTitleReflectsChargingPowerSource() {
