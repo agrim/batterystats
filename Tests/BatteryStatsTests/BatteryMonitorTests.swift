@@ -803,9 +803,8 @@ final class BatteryMonitorTests: XCTestCase {
         monitor.setLightningRefreshActive(true)
         XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), policy.lightningRefreshInterval)
 
-        await monitor.waitForIdleForTesting()
-
         monitor.setLightningRefreshActive(false)
+        await monitor.waitForIdleForTesting()
         XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
 
         let requests = await reader.requests
@@ -816,7 +815,6 @@ final class BatteryMonitorTests: XCTestCase {
     func testStopClearsLightningRefreshBeforeRestart() async {
         let reader = StubBatteryReader(snapshots: [
             .previewDischarging,
-            .previewCharging,
             .previewDischarging
         ])
         let monitor = makeMonitor(reader)
@@ -829,16 +827,37 @@ final class BatteryMonitorTests: XCTestCase {
         monitor.setLightningRefreshActive(true)
         XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), policy.lightningRefreshInterval)
 
-        await monitor.waitForIdleForTesting()
         monitor.stop()
         monitor.start()
         await monitor.waitForIdleForTesting()
 
         XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
 
-        let requests = await reader.requests
-        XCTAssertEqual(requests, [.standard, .standard, .standard])
+        let requestCount = await reader.requestCount
+        XCTAssertGreaterThanOrEqual(requestCount, 2)
         XCTAssertEqual(monitor.snapshot?.powerState, .onBattery)
+    }
+
+    func testLightningRefreshLoopsUntilDisabled() async {
+        let reader = StubBatteryReader(snapshots: [
+            .previewDischarging,
+            .previewCharging,
+            .previewCharging,
+            .previewCharging
+        ])
+        let monitor = makeMonitor(reader)
+
+        monitor.updateRefreshPolicy(BatteryRefreshPolicy(cadence: .fiveMinutes, energyChangeSensitivity: .balanced))
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+
+        monitor.setLightningRefreshActive(true)
+        try? await Task.sleep(for: .milliseconds(550))
+        monitor.setLightningRefreshActive(false)
+        await monitor.waitForIdleForTesting()
+
+        let requestCount = await reader.requestCount
+        XCTAssertGreaterThanOrEqual(requestCount, 3)
     }
 
     func testReenabledEnergyProbeStartsWithFreshEnergyBaseline() async {

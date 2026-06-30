@@ -26,8 +26,9 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertTrue(source.contains("powerConnectionRows\n\n                    if showsAdvancedValues {"))
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts)"))
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"))
-        XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Adapter\", value: adapter)"))
+        XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Adapter Rating\", value: adapter)"))
         XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Charging Speed\", value: chargingSpeed)"))
+        XCTAssertTrue(source.contains("if BatterySummaryDetailFormatting.chargingSpeed(for: snapshot) == nil,"))
     }
 
     func testMediumWidgetUsesMeasuredPowerTitleWhileCharging() throws {

@@ -100,7 +100,7 @@ struct BatteryRefreshPolicy: Equatable {
     }
 
     var lightningRefreshInterval: TimeInterval {
-        0.5
+        0.2
     }
 
     var usesEnergyChangeProbe: Bool {

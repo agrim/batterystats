@@ -87,7 +87,7 @@ struct BatterySummaryGridView: View {
             Divider()
                 .gridCellColumns(2)
 
-            BatteryDetailRowView(title: "Adapter", value: adapter)
+            BatteryDetailRowView(title: "Adapter Rating", value: adapter)
         }
 
         if let chargingSpeed = BatterySummaryDetailFormatting.chargingSpeed(for: snapshot) {
@@ -100,7 +100,8 @@ struct BatterySummaryGridView: View {
 
     @ViewBuilder
     private var advancedRows: some View {
-        if let power = BatterySummaryDetailFormatting.power(snapshot.activePowerWatts) {
+        if BatterySummaryDetailFormatting.chargingSpeed(for: snapshot) == nil,
+           let power = BatterySummaryDetailFormatting.power(snapshot.activePowerWatts) {
             Divider()
                 .gridCellColumns(2)
 

@@ -17,6 +17,7 @@ final class BatteryMonitor {
     private static let unavailableRawSnapshotText = "Raw battery diagnostics are unavailable for the latest snapshot."
     private static let unsupportedRawSnapshotText = "No supported internal battery is currently available."
     private static let unsupportedParsedSnapshotText = "Unsupported"
+    private static let lightningRefreshLoopDelay: Duration = .milliseconds(200)
     static let timerRunLoopMode: RunLoop.Mode = .common
 
     var availabilityState: AvailabilityState = .loading
@@ -332,14 +333,29 @@ final class BatteryMonitor {
 
             apply(result, readSequence: readSequence, publicationDate: readDate)
 
-            guard pendingRefresh else {
-                break
-            }
+            if pendingRefresh {
+                options = pendingRefreshNeedsDiagnostics ? .diagnostics : .standard
+                pendingRefresh = false
+                pendingRefreshNeedsDiagnostics = false
+            } else {
+                guard shouldContinueLightningRefreshLoop(for: generation) else {
+                    break
+                }
 
-            options = pendingRefreshNeedsDiagnostics ? .diagnostics : .standard
-            pendingRefresh = false
-            pendingRefreshNeedsDiagnostics = false
+                try? await Task.sleep(for: Self.lightningRefreshLoopDelay)
+                guard shouldContinueLightningRefreshLoop(for: generation) else {
+                    break
+                }
+
+                options = .standard
+            }
         }
+    }
+
+    private func shouldContinueLightningRefreshLoop(for generation: Int) -> Bool {
+        Task.isCancelled == false
+            && refreshGeneration == generation
+            && monitoringDemand.needsLightningRefresh
     }
 
     @discardableResult
