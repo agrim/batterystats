@@ -5,6 +5,7 @@ import SwiftUI
 enum BatterySurfaceLayout {
     static let minimumWidth: CGFloat = 248
     static let menuBarPanelMinimumHeight: CGFloat = 260
+    static let menuBarPanelCornerRadius: CGFloat = 18
     static let horizontalPadding: CGFloat = 14
     static let topPadding: CGFloat = 14
     static let bottomPadding: CGFloat = 14

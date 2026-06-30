@@ -478,6 +478,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertFalse(panel.becomesKeyOnlyIfNeeded)
         XCTAssertTrue(panel.isFloatingPanel)
         XCTAssertFalse(panel.hidesOnDeactivate)
+        XCTAssertFalse(panel.isOpaque)
+        XCTAssertEqual(panel.backgroundAlpha, 0)
+        XCTAssertEqual(panel.contentViewClassName, "NSVisualEffectView")
+        XCTAssertEqual(panel.contentViewCornerRadius, BatterySurfaceLayout.menuBarPanelCornerRadius)
         XCTAssertFalse(panel.collectionBehavior.contains(.canJoinAllSpaces))
         XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllApplications))
         XCTAssertTrue(panel.collectionBehavior.contains(.fullScreenAuxiliary))
@@ -570,6 +574,8 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertEqual(statusItem.button?.imagePosition, .imageLeft)
         XCTAssertEqual(statusItem.length, NSStatusItem.variableLength)
         XCTAssertEqual(statusItem.button?.toolTip, "Battery 92%")
+        XCTAssertTrue(statusItem.button?.image?.isTemplate == true)
+        XCTAssertNil(statusItem.button?.contentTintColor)
 
         statusItem.button?.title = "stale title"
         statusItem.button?.alternateTitle = "stale alternate"
@@ -588,6 +594,8 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertEqual(statusItem.button?.attributedTitle.string, "")
         XCTAssertEqual(statusItem.button?.imagePosition, .imageOnly)
         XCTAssertEqual(statusItem.length, NSStatusItem.squareLength)
+        XCTAssertTrue(statusItem.button?.image?.isTemplate == true)
+        XCTAssertNil(statusItem.button?.contentTintColor)
 
         let power = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
             snapshot: .previewDischarging,
@@ -601,10 +609,12 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertEqual(statusItem.button?.imagePosition, .imageLeft)
         XCTAssertEqual(statusItem.length, NSStatusItem.variableLength)
         XCTAssertEqual(statusItem.button?.toolTip, "Battery power 13.9 W")
+        XCTAssertTrue(statusItem.button?.image?.isTemplate == true)
+        XCTAssertNil(statusItem.button?.contentTintColor)
     }
 
     @MainActor
-    func testStatusItemRendererAppliesTintChangesInsideSameSymbolBucket() {
+    func testStatusItemRendererKeepsTemplateImageAdaptiveInsideSameSymbolBucket() {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         defer {
             NSStatusBar.system.removeStatusItem(statusItem)
@@ -624,10 +634,12 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertEqual(green.symbolName, yellow.symbolName)
 
         XCTAssertTrue(MenuBarStatusItemRenderer.apply(green, to: statusItem))
-        XCTAssertTrue(statusItem.button?.contentTintColor?.isEqual(NSColor.systemGreen) == true)
+        XCTAssertTrue(statusItem.button?.image?.isTemplate == true)
+        XCTAssertNil(statusItem.button?.contentTintColor)
 
         XCTAssertTrue(MenuBarStatusItemRenderer.apply(yellow, to: statusItem))
-        XCTAssertTrue(statusItem.button?.contentTintColor?.isEqual(NSColor.systemYellow) == true)
+        XCTAssertTrue(statusItem.button?.image?.isTemplate == true)
+        XCTAssertNil(statusItem.button?.contentTintColor)
     }
 
     @MainActor

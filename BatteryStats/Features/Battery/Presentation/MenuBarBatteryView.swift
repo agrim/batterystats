@@ -565,7 +565,7 @@ final class MenuBarStatusItemController: NSObject {
             startsMonitor: true
         )
 
-        let hostingView = NSHostingView(rootView: rootView)
+        let contentView = makePanelContentView(rootView: rootView)
         let panel = MenuBarStatusPanel(
             contentRect: NSRect(
                 x: 0,
@@ -577,7 +577,7 @@ final class MenuBarStatusItemController: NSObject {
             backing: .buffered,
             defer: false
         )
-        panel.contentView = hostingView
+        panel.contentView = contentView
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
@@ -591,6 +591,29 @@ final class MenuBarStatusItemController: NSObject {
         panel.level = .popUpMenu
         panel.collectionBehavior = Self.panelCollectionBehavior
         return panel
+    }
+
+    private func makePanelContentView<Content: View>(rootView: Content) -> NSView {
+        let hostingView = NSHostingView(rootView: rootView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+
+        let backgroundView = NSVisualEffectView()
+        backgroundView.material = .popover
+        backgroundView.blendingMode = .behindWindow
+        backgroundView.state = .active
+        backgroundView.wantsLayer = true
+        backgroundView.layer?.cornerRadius = BatterySurfaceLayout.menuBarPanelCornerRadius
+        backgroundView.layer?.masksToBounds = true
+        backgroundView.addSubview(hostingView)
+
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: backgroundView.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: backgroundView.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: backgroundView.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: backgroundView.bottomAnchor)
+        ])
+
+        return backgroundView
     }
 
     private func layoutPanel(_ panel: NSPanel, relativeTo button: NSStatusBarButton) {
@@ -796,6 +819,10 @@ struct MenuBarPanelPresentationSnapshot {
     let becomesKeyOnlyIfNeeded: Bool
     let isFloatingPanel: Bool
     let hidesOnDeactivate: Bool
+    let isOpaque: Bool
+    let backgroundAlpha: CGFloat
+    let contentViewClassName: String
+    let contentViewCornerRadius: CGFloat?
 
     @MainActor
     init(panel: NSPanel) {
@@ -808,6 +835,10 @@ struct MenuBarPanelPresentationSnapshot {
         becomesKeyOnlyIfNeeded = panel.becomesKeyOnlyIfNeeded
         isFloatingPanel = panel.isFloatingPanel
         hidesOnDeactivate = panel.hidesOnDeactivate
+        isOpaque = panel.isOpaque
+        backgroundAlpha = panel.backgroundColor?.alphaComponent ?? 1
+        contentViewClassName = panel.contentView.map { String(describing: type(of: $0)) } ?? ""
+        contentViewCornerRadius = panel.contentView?.layer?.cornerRadius
     }
 }
 #endif
@@ -941,7 +972,7 @@ enum MenuBarStatusItemRenderer {
         button.attributedTitle = renderedTitle
         button.imagePosition = content.imagePosition
         button.imageScaling = .scaleProportionallyDown
-        button.contentTintColor = statusItemTintColor(for: content.symbolTintStyle)
+        button.contentTintColor = nil
         button.toolTip = content.accessibilityLabel
         button.setAccessibilityLabel(content.accessibilityLabel)
         button.imagePosition = content.imagePosition
@@ -961,27 +992,10 @@ enum MenuBarStatusItemRenderer {
         return image
     }
 
-    private static func statusItemTintColor(for tint: BatteryPresentationTint) -> NSColor? {
-        switch tint {
-        case .primary:
-            return nil
-        case .secondary:
-            return .secondaryLabelColor
-        case .green:
-            return .systemGreen
-        case .yellow:
-            return .systemYellow
-        case .red:
-            return .systemRed
-        }
-    }
-
     private static func attributedStatusTitle(_ title: String, font: NSFont?) -> NSAttributedString {
-        let attributes: [NSAttributedString.Key: Any]
+        var attributes: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.labelColor]
         if let font {
-            attributes = [.font: font]
-        } else {
-            attributes = [:]
+            attributes[.font] = font
         }
 
         return NSAttributedString(string: title, attributes: attributes)
