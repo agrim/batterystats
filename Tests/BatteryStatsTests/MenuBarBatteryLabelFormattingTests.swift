@@ -418,6 +418,24 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(dashboardSource.contains(".moveToActiveSpace"))
     }
 
+    func testDashboardLightningRefreshIsFocusBound() throws {
+        let dashboardSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryDashboardView.swift")
+        let monitorSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryMonitor.swift")
+
+        XCTAssertTrue(dashboardSource.contains("showsLightningRefreshButton: true"))
+        XCTAssertTrue(dashboardSource.contains("LightningRefreshButton"))
+        XCTAssertTrue(dashboardSource.contains("Image(systemName: isEnabled ? \"bolt.fill\" : \"bolt\")"))
+        XCTAssertTrue(dashboardSource.contains("LightningRefreshWindowLifecycleObserver"))
+        XCTAssertTrue(dashboardSource.contains("NSWindow.didResignKeyNotification"))
+        XCTAssertTrue(dashboardSource.contains("NSWindow.didMiniaturizeNotification"))
+        XCTAssertTrue(dashboardSource.contains("NSWindow.willCloseNotification"))
+        XCTAssertTrue(dashboardSource.contains("NSApplication.didResignActiveNotification"))
+        XCTAssertTrue(dashboardSource.contains("monitor.setLightningRefreshActive(isEnabled)"))
+        XCTAssertTrue(dashboardSource.contains(".onDisappear"))
+        XCTAssertTrue(monitorSource.contains("var isLightningRefreshActive = false"))
+        XCTAssertTrue(monitorSource.contains("func setLightningRefreshActive(_ isActive: Bool)"))
+    }
+
     func testMenuBarPanelFallbackLayoutStaysOnActiveScreenNearClick() {
         let screenFrame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
         let frame = MenuBarPanelLayout.fallbackFrame(

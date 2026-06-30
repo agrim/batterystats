@@ -28,7 +28,11 @@ struct MenuBarBatteryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            BatterySurfaceView(monitor: monitor, preferences: preferences)
+            BatterySurfaceView(
+                monitor: monitor,
+                preferences: preferences,
+                isLightningRefreshEnabled: .constant(false)
+            )
                 .frame(minWidth: BatterySurfaceLayout.minimumWidth, alignment: .topLeading)
 
             Divider()

@@ -786,6 +786,61 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.snapshot?.powerState, .onBattery)
     }
 
+    func testLightningRefreshOverridesTimerUntilDisabled() async {
+        let reader = StubBatteryReader(snapshots: [
+            .previewDischarging,
+            .previewCharging
+        ])
+        let monitor = makeMonitor(reader)
+        let policy = BatteryRefreshPolicy(cadence: .fiveMinutes, energyChangeSensitivity: .balanced)
+
+        monitor.updateRefreshPolicy(policy)
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
+
+        monitor.setLightningRefreshActive(true)
+        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), policy.lightningRefreshInterval)
+
+        await monitor.waitForIdleForTesting()
+
+        monitor.setLightningRefreshActive(false)
+        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
+
+        let requests = await reader.requests
+        XCTAssertEqual(requests, [.standard, .standard])
+        XCTAssertEqual(monitor.snapshot?.powerState, .charging)
+    }
+
+    func testStopClearsLightningRefreshBeforeRestart() async {
+        let reader = StubBatteryReader(snapshots: [
+            .previewDischarging,
+            .previewCharging,
+            .previewDischarging
+        ])
+        let monitor = makeMonitor(reader)
+        let policy = BatteryRefreshPolicy(cadence: .fiveMinutes, energyChangeSensitivity: .balanced)
+
+        monitor.updateRefreshPolicy(policy)
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+
+        monitor.setLightningRefreshActive(true)
+        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), policy.lightningRefreshInterval)
+
+        await monitor.waitForIdleForTesting()
+        monitor.stop()
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
+
+        let requests = await reader.requests
+        XCTAssertEqual(requests, [.standard, .standard, .standard])
+        XCTAssertEqual(monitor.snapshot?.powerState, .onBattery)
+    }
+
     func testReenabledEnergyProbeStartsWithFreshEnergyBaseline() async {
         let reader = ControlledDiagnosticsReader()
         var reloadCount = 0

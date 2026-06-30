@@ -30,6 +30,7 @@ final class BatteryMonitor {
     @ObservationIgnored private var refreshPolicy = BatteryRefreshPolicy()
     @ObservationIgnored private var preferenceMonitoringDemand = BatteryMonitoringDemand()
     @ObservationIgnored private var visibleSurfaceDemandCount = 0
+    @ObservationIgnored private var isLightningRefreshActive = false
     @ObservationIgnored private var monitoringDemand = BatteryMonitoringDemand()
     @ObservationIgnored private weak var historyStore: BatteryHistoryStore?
     @ObservationIgnored private var alertPolicy = BatteryAlertPolicy.disabled
@@ -118,6 +119,19 @@ final class BatteryMonitor {
 
         visibleSurfaceDemandCount -= 1
         refreshEffectiveMonitoringDemand()
+    }
+
+    func setLightningRefreshActive(_ isActive: Bool) {
+        guard isLightningRefreshActive != isActive else {
+            return
+        }
+
+        isLightningRefreshActive = isActive
+        refreshEffectiveMonitoringDemand()
+
+        if isActive {
+            refreshForVisibleSurface()
+        }
     }
 
     func updateHistory(store: BatteryHistoryStore, policy: BatteryHistoryPolicy) {
@@ -508,13 +522,13 @@ final class BatteryMonitor {
             return
         }
 
-        let desiredRefreshInterval = refreshPolicy.refreshInterval(for: snapshot)
+        let desiredRefreshInterval = refreshPolicy.refreshInterval(for: snapshot, demand: monitoringDemand)
         if currentRefreshInterval != desiredRefreshInterval {
             refreshTimer?.invalidate()
             refreshTimer = Self.scheduledMonitoringTimer(withTimeInterval: desiredRefreshInterval) { [weak self] in
                 self?.refreshIfStarted()
             }
-            refreshTimer?.tolerance = max(1, min(30, desiredRefreshInterval * 0.2))
+            refreshTimer?.tolerance = Self.refreshTimerTolerance(for: desiredRefreshInterval)
             currentRefreshInterval = desiredRefreshInterval
         }
 
@@ -544,7 +558,12 @@ final class BatteryMonitor {
         let visibleSurfaceDemand = BatteryMonitoringDemand(
             needsEnergyChangeAwareness: visibleSurfaceDemandCount > 0
         )
-        let nextDemand = preferenceMonitoringDemand.combined(with: visibleSurfaceDemand)
+        let lightningDemand = BatteryMonitoringDemand(
+            needsLightningRefresh: isLightningRefreshActive
+        )
+        let nextDemand = preferenceMonitoringDemand
+            .combined(with: visibleSurfaceDemand)
+            .combined(with: lightningDemand)
         guard monitoringDemand != nextDemand else {
             return
         }
@@ -561,6 +580,14 @@ final class BatteryMonitor {
         energyProbeTask?.cancel()
         energyProbeTask = nil
         lastPublishedEnergyUse = nil
+    }
+
+    private static func refreshTimerTolerance(for interval: TimeInterval) -> TimeInterval {
+        if interval <= 1 {
+            return interval * 0.1
+        }
+
+        return max(1, min(30, interval * 0.2))
     }
 
     private static func scheduledMonitoringTimer(
@@ -580,6 +607,7 @@ final class BatteryMonitor {
         isStarted = false
         refreshGeneration &+= 1
         visibleSurfaceDemandCount = 0
+        isLightningRefreshActive = false
         monitoringDemand = preferenceMonitoringDemand
 
         refreshTimer?.invalidate()
@@ -620,6 +648,10 @@ final class BatteryMonitor {
 
     func probeEnergyUseForTesting() {
         probeEnergyUse()
+    }
+
+    func currentRefreshIntervalForTesting() -> TimeInterval? {
+        currentRefreshInterval
     }
 
     private func nextReadSequence() -> Int {

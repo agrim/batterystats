@@ -18,6 +18,29 @@ final class RefreshPolicyTests: XCTestCase {
 
     func testDefaultMonitoringDemandDoesNotRequestEnergyProbe() {
         XCTAssertFalse(BatteryMonitoringDemand().needsEnergyChangeAwareness)
+        XCTAssertFalse(BatteryMonitoringDemand().needsLightningRefresh)
+    }
+
+    func testMonitoringDemandCombinesLightningRefresh() {
+        let backgroundDemand = BatteryMonitoringDemand(needsEnergyChangeAwareness: true)
+        let lightningDemand = BatteryMonitoringDemand(needsLightningRefresh: true)
+
+        XCTAssertEqual(
+            backgroundDemand.combined(with: lightningDemand),
+            BatteryMonitoringDemand(needsEnergyChangeAwareness: true, needsLightningRefresh: true)
+        )
+    }
+
+    func testLightningRefreshOverridesSelectedCadence() {
+        let policy = BatteryRefreshPolicy(cadence: .fiveMinutes, energyChangeSensitivity: .balanced)
+
+        XCTAssertEqual(
+            policy.refreshInterval(
+                for: .previewDischarging,
+                demand: BatteryMonitoringDemand(needsLightningRefresh: true)
+            ),
+            policy.lightningRefreshInterval
+        )
     }
 
     func testDynamicRefreshCadenceRespondsToPowerState() {
