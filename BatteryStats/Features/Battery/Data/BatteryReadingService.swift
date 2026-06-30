@@ -212,10 +212,13 @@ struct BatteryReadingService: Sendable {
 
         let currentImpliesCharging = BatteryCalculations.chargeRateMilliamps(from: smartBattery.signedCurrentMilliamps) != nil
         let isDischarging = BatteryCalculations.dischargeRateMilliamps(from: smartBattery.signedCurrentMilliamps) != nil
-        let isCharging = isDischarging ? false : currentImpliesCharging || smartBattery.isCharging == true
+        let reportsDisconnected = smartBattery.isExternalPowerConnected == false
+        let isCharging = reportsDisconnected == false
+            && isDischarging == false
+            && (currentImpliesCharging || smartBattery.isCharging == true)
         let isCharged = Self.reconciledChargedState(
             publicIsCharged: false,
-            smartIsFullyCharged: smartBattery.isFullyCharged,
+            smartIsFullyCharged: reportsDisconnected ? nil : smartBattery.isFullyCharged,
             signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
             currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours,
@@ -365,12 +368,8 @@ struct BatteryReadingService: Sendable {
         smartBattery: SmartBatteryDetails?,
         signedCurrentMilliamps: Int?
     ) -> Int? {
-        guard publicSnapshot.explicitlyReportsBatteryPower,
-              BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps) != nil else {
-            return signedCurrentMilliamps
-        }
-
-        if trustedInputPowerWatts(smartBattery: smartBattery) != nil {
+        guard BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps) != nil,
+              hasExplicitDisconnectEvidence(publicSnapshot: publicSnapshot, smartBattery: smartBattery) else {
             return signedCurrentMilliamps
         }
 
@@ -515,13 +514,17 @@ struct BatteryReadingService: Sendable {
             return true
         }
 
-        if trustedCounterBackedInputPowerWatts(smartBattery: smartBattery) != nil {
-            return true
-        }
-
         if publicSnapshot.explicitlyReportsBatteryPower,
            BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) != nil {
             return false
+        }
+
+        if hasExplicitDisconnectEvidence(publicSnapshot: publicSnapshot, smartBattery: smartBattery) {
+            return false
+        }
+
+        if trustedCounterBackedInputPowerWatts(smartBattery: smartBattery) != nil {
+            return true
         }
 
         if trustedInputPowerWatts(smartBattery: smartBattery) != nil {
@@ -583,8 +586,15 @@ struct BatteryReadingService: Sendable {
         publicSnapshot: PublicPowerSourceSnapshot,
         smartBattery: SmartBatteryDetails?
     ) -> Bool {
+        hasExplicitDisconnectEvidence(publicSnapshot: publicSnapshot, smartBattery: smartBattery)
+    }
+
+    private static func hasExplicitDisconnectEvidence(
+        publicSnapshot: PublicPowerSourceSnapshot,
+        smartBattery: SmartBatteryDetails?
+    ) -> Bool {
         publicSnapshot.explicitlyReportsBatteryPower
-            && trustedInputPowerWatts(smartBattery: smartBattery) == nil
+            || smartBattery?.isExternalPowerConnected == false
     }
 
     private static func trustedInputPowerWatts(smartBattery: SmartBatteryDetails?) -> Double? {
