@@ -228,9 +228,8 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         case .onBattery:
             return "Using internal battery"
         case .connectedDischarging:
-            if visibleInputPowerWatts != nil {
-                return activePowerWatts.map { "Input power \(BatteryFormatting.watts($0)), battery discharging" }
-                    ?? "External power connected"
+            if let visibleInputPowerWatts {
+                return "Input power \(BatteryFormatting.watts(visibleInputPowerWatts)), battery discharging"
             }
             return activePowerWatts.map { "Discharging at \(BatteryFormatting.watts($0))" } ?? "External power connected"
         case .charging:
@@ -242,7 +241,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
                 .map { "Charging at \(BatteryFormatting.watts($0))" }
                 ?? "External power connected"
         case .connectedNotCharging, .fullOnAC:
-            return activePowerWatts.map { "Input power \(BatteryFormatting.watts($0))" } ?? "External power connected"
+            return visibleInputPowerWatts.map { "Input power \(BatteryFormatting.watts($0))" } ?? "External power connected"
         case .unknown:
             return nil
         }
