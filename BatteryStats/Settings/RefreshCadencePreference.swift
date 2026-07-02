@@ -123,7 +123,7 @@ struct BatteryRefreshPolicy: Equatable {
         }
 
         if let stateOfChargePercent = snapshot.presentationStateOfChargePercent,
-           (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging),
+           snapshot.powerState.isBatteryDischarging,
            stateOfChargePercent <= 20 {
             return 30
         }

@@ -154,15 +154,8 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             publicPercentage: trustedStateOfChargePercent
         )
-        let storedExternalPowerConnected: Bool
-        switch snapshot.powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            storedExternalPowerConnected = true
-        case .onBattery:
-            storedExternalPowerConnected = false
-        case .unknown:
-            storedExternalPowerConnected = snapshot.isExternalPowerConnected
-        }
+        let storedExternalPowerConnected = snapshot.powerState.knownExternalPowerConnected
+            ?? snapshot.isExternalPowerConnected
         let derivedPowerState = BatteryCalculations.derivePowerState(
             isCharging: snapshot.isCharging || snapshot.powerState == .charging,
             isCharged: isStoredCharged,
@@ -181,7 +174,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
         )
         let flags = BatteryCalculations.normalizedPowerFlags(for: powerState)
         let storedDischargeRateMilliamps = BatteryCalculations.plausibleDischargeRateMilliamps(snapshot.dischargeRateMilliamps)
-        let dischargeRateMilliamps = (powerState == .onBattery || powerState == .connectedDischarging)
+        let dischargeRateMilliamps = powerState.isBatteryDischarging
             ? storedDischargeRateMilliamps
             : nil
         let chargeRateMilliamps = BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned)

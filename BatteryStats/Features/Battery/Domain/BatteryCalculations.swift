@@ -567,14 +567,7 @@ enum BatteryCalculations {
     }
 
     static func normalizedPowerFlags(for powerState: BatteryPowerState) -> (isCharging: Bool, isExternalPowerConnected: Bool) {
-        switch powerState {
-        case .charging:
-            return (true, true)
-        case .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            return (false, true)
-        case .onBattery, .unknown:
-            return (false, false)
-        }
+        (powerState == .charging, powerState.isExternallyPowered)
     }
 
     private static func chargeTaperMultiplier(forPercent chargePercent: Double) -> Double {

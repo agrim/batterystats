@@ -157,12 +157,11 @@ enum BatterySummaryDetailFormatting {
     }
 
     static func timeTitle(for snapshot: BatterySnapshot) -> String {
-        switch snapshot.powerState {
-        case .charging:
+        if snapshot.powerState == .charging {
             return "Time to Full"
-        case .onBattery, .connectedDischarging:
+        } else if snapshot.powerState.isBatteryDischarging {
             return "Time Left"
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        } else {
             return "Time"
         }
     }
@@ -181,8 +180,7 @@ enum BatterySummaryDetailFormatting {
         }
 
         let rateText: String?
-        switch snapshot.powerState {
-        case .charging:
+        if snapshot.powerState == .charging {
             if let activePowerWatts = BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) {
                 rateText = BatteryFormatting.watts(activePowerWatts)
             } else if let activeCurrentMilliamps = BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps) {
@@ -190,13 +188,13 @@ enum BatterySummaryDetailFormatting {
             } else {
                 rateText = nil
             }
-        case .onBattery, .connectedDischarging:
+        } else if snapshot.powerState.isBatteryDischarging {
             if let activeCurrentMilliamps = BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps) {
                 rateText = BatteryFormatting.milliamps(activeCurrentMilliamps)
             } else {
                 rateText = nil
             }
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        } else {
             rateText = nil
         }
 

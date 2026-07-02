@@ -120,12 +120,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     var visibleInputPowerWatts: Double? {
-        switch powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            return validatedInputPowerWatts
-        case .onBattery, .unknown:
-            return nil
-        }
+        powerState.isExternallyPowered ? validatedInputPowerWatts : nil
     }
 
     var activePowerWatts: Double? {
@@ -152,12 +147,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     private var displayableDischargeRateWatts: Double? {
-        switch powerState {
-        case .onBattery, .connectedDischarging:
-            return BatteryCalculations.plausibleWatts(dischargeRateWatts)
-        case .charging, .connectedNotCharging, .fullOnAC, .unknown:
-            return nil
-        }
+        powerState.isBatteryDischarging ? BatteryCalculations.plausibleWatts(dischargeRateWatts) : nil
     }
 
     private var validatedInputPowerWatts: Double? {
@@ -176,13 +166,12 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     var activeCurrentMilliamps: Int? {
-        switch powerState {
-        case .charging:
+        if powerState == .charging {
             return BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned)
-        case .onBattery, .connectedDischarging:
+        } else if powerState.isBatteryDischarging {
             return BatteryCalculations.plausibleDischargeRateMilliamps(dischargeRateMilliamps)
                 ?? BatteryCalculations.dischargeRateMilliamps(from: currentMilliampsSigned)
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        } else {
             return nil
         }
     }
@@ -208,12 +197,11 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     var displayedTimeMinutes: Int? {
-        switch powerState {
-        case .onBattery, .connectedDischarging:
+        if powerState.isBatteryDischarging {
             return Self.displayableMinutes(rateBasedTimeRemainingMinutes) ?? Self.displayableMinutes(systemTimeRemainingMinutes)
-        case .charging:
+        } else if powerState == .charging {
             return Self.displayableMinutes(timeToFullMinutes)
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        } else {
             return nil
         }
     }

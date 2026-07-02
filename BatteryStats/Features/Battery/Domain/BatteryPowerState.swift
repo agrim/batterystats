@@ -41,4 +41,28 @@ enum BatteryPowerState: String, Codable, Equatable, Sendable {
             return "questionmark.circle"
         }
     }
+
+    var knownExternalPowerConnected: Bool? {
+        switch self {
+        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
+            return true
+        case .onBattery:
+            return false
+        case .unknown:
+            return nil
+        }
+    }
+
+    var isExternallyPowered: Bool {
+        knownExternalPowerConnected == true
+    }
+
+    var isBatteryDischarging: Bool {
+        switch self {
+        case .onBattery, .connectedDischarging:
+            return true
+        case .charging, .connectedNotCharging, .fullOnAC, .unknown:
+            return false
+        }
+    }
 }

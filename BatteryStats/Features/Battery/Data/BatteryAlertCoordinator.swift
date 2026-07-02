@@ -12,7 +12,7 @@ enum BatteryAlertEvaluator {
         var activeTypes: Set<BatteryAlertType> = []
 
         if policy.isLowBatteryAlertEnabled,
-           (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging),
+           snapshot.powerState.isBatteryDischarging,
            let stateOfChargePercent = snapshot.presentationStateOfChargePercent,
            stateOfChargePercent <= policy.lowBatteryThresholdPercent {
             activeTypes.insert(.lowBattery)

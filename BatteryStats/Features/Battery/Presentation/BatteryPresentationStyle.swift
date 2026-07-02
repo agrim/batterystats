@@ -55,12 +55,7 @@ enum BatteryPresentationStyle {
             return snapshot.batterySymbolName
         }
 
-        switch snapshot.powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            return snapshot.powerState.symbolName
-        case .onBattery, .unknown:
-            return "questionmark"
-        }
+        return snapshot.powerState.isExternallyPowered ? snapshot.powerState.symbolName : "questionmark"
     }
 
     static func timeTint(for snapshot: BatterySnapshot?) -> Color {

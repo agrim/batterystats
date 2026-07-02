@@ -400,16 +400,12 @@ struct BatteryReadingService: Sendable {
     }
 
     static func displayableAdapterMaxWatts(_ adapterMaxWatts: Int?, powerState: BatteryPowerState) -> Int? {
-        guard let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
+        guard powerState.isExternallyPowered,
+              let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
             return nil
         }
 
-        switch powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            return adapterMaxWatts
-        case .onBattery, .unknown:
-            return nil
-        }
+        return adapterMaxWatts
     }
 
     static func displayableInputPowerWatts(
@@ -426,12 +422,7 @@ struct BatteryReadingService: Sendable {
             return nil
         }
 
-        switch powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            return inputPowerWatts
-        case .onBattery, .unknown:
-            return nil
-        }
+        return powerState.isExternallyPowered ? inputPowerWatts : nil
     }
 
     static func displayablePowerRates(
@@ -439,12 +430,11 @@ struct BatteryReadingService: Sendable {
         chargeRateWatts: Double?,
         dischargeRateWatts: Double?
     ) -> (chargeRateWatts: Double?, dischargeRateWatts: Double?) {
-        switch powerState {
-        case .charging:
-            return (BatteryCalculations.plausibleWatts(chargeRateWatts), nil)
-        case .onBattery, .connectedDischarging:
+        if powerState.isBatteryDischarging {
             return (nil, BatteryCalculations.plausibleWatts(dischargeRateWatts))
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        } else if powerState == .charging {
+            return (BatteryCalculations.plausibleWatts(chargeRateWatts), nil)
+        } else {
             return (nil, nil)
         }
     }
@@ -467,20 +457,19 @@ struct BatteryReadingService: Sendable {
         systemTimeRemainingMinutes: Int?,
         timeToFullMinutes: Int?
     ) -> (rateBasedTimeRemainingMinutes: Int?, systemTimeRemainingMinutes: Int?, timeToFullMinutes: Int?) {
-        switch powerState {
-        case .onBattery, .connectedDischarging:
+        if powerState.isBatteryDischarging {
             return (
                 BatteryCalculations.plausibleDurationMinutes(rateBasedTimeRemainingMinutes),
                 BatteryCalculations.plausibleDurationMinutes(systemTimeRemainingMinutes),
                 nil
             )
-        case .charging:
+        } else if powerState == .charging {
             return (
                 nil,
                 nil,
                 BatteryCalculations.plausibleDurationMinutes(timeToFullMinutes)
             )
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        } else {
             return (nil, nil, nil)
         }
     }

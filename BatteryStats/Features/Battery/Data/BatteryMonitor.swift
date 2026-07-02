@@ -399,7 +399,7 @@ final class BatteryMonitor {
 
         availabilityState = .available
 
-        if (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging),
+        if snapshot.powerState.isBatteryDischarging,
            let dischargeRate = snapshot.dischargeRateMilliamps {
             dischargeSamples.append(dischargeRate)
             if dischargeSamples.count > 8 {
@@ -414,7 +414,7 @@ final class BatteryMonitor {
             fallback: snapshot.dischargeRateMilliamps
         )
         snapshot = snapshot.updating(
-            rateBasedTimeRemainingMinutes: (snapshot.powerState == .onBattery || snapshot.powerState == .connectedDischarging)
+            rateBasedTimeRemainingMinutes: snapshot.powerState.isBatteryDischarging
                 ? BatteryCalculations.timeRemainingMinutes(
                     currentChargeMilliampHours: snapshot.currentChargeMilliampHours,
                     dischargeRateMilliamps: smoothedRate
@@ -726,12 +726,7 @@ private struct WidgetTimelineReloadSignature: Equatable {
             return false
         }
 
-        switch snapshot.powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            return snapshot.visibleInputPowerWatts != nil
-        case .onBattery, .unknown:
-            return false
-        }
+        return snapshot.powerState.isExternallyPowered && snapshot.visibleInputPowerWatts != nil
     }
 
     private static func minuteIdentifier(_ date: Date?) -> Int? {
@@ -807,18 +802,16 @@ private struct EnergyProbePresentationSignature: Equatable {
     }
 
     private static func visibleCurrentMilliamps(_ snapshot: BatterySnapshot) -> Int? {
-        switch snapshot.powerState {
-        case .onBattery, .connectedDischarging:
+        if snapshot.powerState.isBatteryDischarging {
             return BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps)
-        case .charging:
-            guard BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) == nil else {
-                return nil
-            }
+        }
 
-            return BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps)
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        guard snapshot.powerState == .charging,
+              BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) == nil else {
             return nil
         }
+
+        return BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps)
     }
 
     private static func dayIdentifier(_ date: Date?) -> Int? {
