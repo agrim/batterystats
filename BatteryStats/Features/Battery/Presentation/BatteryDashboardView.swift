@@ -27,8 +27,7 @@ struct BatteryDashboardView: View {
             .frame(minWidth: BatterySurfaceLayout.minimumWidth, alignment: .topLeading)
             .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
             .containerBackground(.thinMaterial, for: .window)
-            .background(CurrentWindowSpaceConfigurator())
-            .background(LightningRefreshWindowLifecycleObserver(isEnabled: $isLightningRefreshEnabled))
+            .background(BatteryDashboardWindowObserver(isLightningRefreshEnabled: $isLightningRefreshEnabled))
             .onChange(of: isLightningRefreshEnabled) { _, isEnabled in
                 monitor.setLightningRefreshActive(isEnabled)
             }
@@ -47,78 +46,130 @@ struct BatteryDashboardView: View {
     }
 }
 
-private struct CurrentWindowSpaceConfigurator: NSViewRepresentable {
-    private static let windowConfigurationRetryDelays: [TimeInterval] = [0, 0.02, 0.12, 0.32]
+private struct BatteryDashboardWindowObserver: NSViewRepresentable {
+    @Binding var isLightningRefreshEnabled: Bool
+    private static let windowLookupRetryDelays: [TimeInterval] = [0, 0.02, 0.12, 0.32]
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(isLightningRefreshEnabled: $isLightningRefreshEnabled)
     }
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
-        context.coordinator.scheduleConfiguration(for: view)
+        context.coordinator.attach(to: view)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.scheduleConfiguration(for: nsView)
+        context.coordinator.update(isLightningRefreshEnabled: $isLightningRefreshEnabled)
+        context.coordinator.attach(to: nsView)
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stop()
     }
 
     @MainActor
     final class Coordinator {
-        private var configurationTask: Task<Void, Never>?
+        private var isLightningRefreshEnabled: Binding<Bool>
+        private weak var observedWindow: NSWindow?
+        private var observationTokens: [NSObjectProtocol] = []
+        private var windowLookupTask: Task<Void, Never>?
 
-        deinit {
-            configurationTask?.cancel()
+        init(isLightningRefreshEnabled: Binding<Bool>) {
+            self.isLightningRefreshEnabled = isLightningRefreshEnabled
         }
 
-        func scheduleConfiguration(for view: NSView) {
-            if Self.configureWindowIfAvailable(for: view) {
-                configurationTask?.cancel()
-                configurationTask = nil
+        isolated deinit {
+            windowLookupTask?.cancel()
+            removeObservers()
+        }
+
+        func update(isLightningRefreshEnabled: Binding<Bool>) {
+            self.isLightningRefreshEnabled = isLightningRefreshEnabled
+        }
+
+        func attach(to view: NSView) {
+            guard let window = view.window else {
+                scheduleWindowLookup(for: view)
                 return
             }
 
-            guard configurationTask == nil else {
+            windowLookupTask?.cancel()
+            windowLookupTask = nil
+            Self.configure(window)
+
+            guard observedWindow !== window else {
                 return
             }
 
-            configurationTask = Task { @MainActor [weak self, weak view] in
+            removeObservers()
+            observedWindow = window
+            observationTokens = [
+                observe(NSWindow.didResignKeyNotification, object: window),
+                observe(NSWindow.didMiniaturizeNotification, object: window),
+                observe(NSWindow.willCloseNotification, object: window),
+                observe(NSApplication.didResignActiveNotification, object: NSApp)
+            ]
+        }
+
+        func stop() {
+            windowLookupTask?.cancel()
+            windowLookupTask = nil
+            removeObservers()
+            observedWindow = nil
+        }
+
+        private func scheduleWindowLookup(for view: NSView) {
+            guard windowLookupTask == nil else {
+                return
+            }
+
+            windowLookupTask = Task { @MainActor [weak self, weak view] in
                 guard let self else {
                     return
                 }
 
-                for delay in CurrentWindowSpaceConfigurator.windowConfigurationRetryDelays {
+                for delay in BatteryDashboardWindowObserver.windowLookupRetryDelays {
                     if delay == 0 {
                         await Task.yield()
                     } else {
                         try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                     }
 
-                    guard Task.isCancelled == false else {
-                        return
+                    guard Task.isCancelled == false,
+                          let view else {
+                        break
                     }
 
-                    guard let view else {
-                        configurationTask = nil
-                        return
-                    }
-
-                    if Self.configureWindowIfAvailable(for: view) {
-                        configurationTask = nil
-                        return
+                    if view.window != nil {
+                        attach(to: view)
+                        break
                     }
                 }
 
-                self.configurationTask = nil
+                windowLookupTask = nil
             }
         }
 
-        private static func configureWindowIfAvailable(for view: NSView) -> Bool {
-            guard let window = view.window else {
-                return false
+        private func observe(_ name: Notification.Name, object: Any?) -> NSObjectProtocol {
+            NotificationCenter.default.addObserver(
+                forName: name,
+                object: object,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.isLightningRefreshEnabled.wrappedValue = false
+                }
             }
+        }
 
+        private func removeObservers() {
+            observationTokens.forEach(NotificationCenter.default.removeObserver)
+            observationTokens.removeAll()
+        }
+
+        private static func configure(_ window: NSWindow) {
             var behavior = window.collectionBehavior
             behavior.remove(.canJoinAllSpaces)
             behavior.formUnion([
@@ -127,7 +178,6 @@ private struct CurrentWindowSpaceConfigurator: NSViewRepresentable {
                 .moveToActiveSpace
             ])
             window.collectionBehavior = behavior
-            return true
         }
     }
 }
@@ -216,135 +266,6 @@ private struct LightningRefreshButton: View {
         .help(isEnabled ? "Turn Off Lightning Refresh" : "Lightning Refresh")
         .accessibilityLabel("Lightning Refresh")
         .accessibilityValue(isEnabled ? "On" : "Off")
-    }
-}
-
-private struct LightningRefreshWindowLifecycleObserver: NSViewRepresentable {
-    @Binding var isEnabled: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(isEnabled: $isEnabled)
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        context.coordinator.observeWindow(for: view)
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.update(isEnabled: $isEnabled)
-        context.coordinator.observeWindow(for: nsView)
-    }
-
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.stopObserving()
-    }
-
-    @MainActor
-    final class Coordinator {
-        private var isEnabled: Binding<Bool>
-        private weak var observedWindow: NSWindow?
-        private var observationTokens: [NSObjectProtocol] = []
-        private var windowLookupTask: Task<Void, Never>?
-
-        init(isEnabled: Binding<Bool>) {
-            self.isEnabled = isEnabled
-        }
-
-        deinit {
-            windowLookupTask?.cancel()
-        }
-
-        func update(isEnabled: Binding<Bool>) {
-            self.isEnabled = isEnabled
-        }
-
-        func observeWindow(for view: NSView) {
-            guard let window = view.window else {
-                scheduleWindowLookup(for: view)
-                return
-            }
-
-            windowLookupTask?.cancel()
-            windowLookupTask = nil
-
-            guard observedWindow !== window else {
-                return
-            }
-
-            stopObserving()
-            observedWindow = window
-            observationTokens = [
-                NotificationCenter.default.addObserver(
-                    forName: NSWindow.didResignKeyNotification,
-                    object: window,
-                    queue: .main
-                ) { [weak self] _ in
-                    Task { @MainActor in
-                        self?.disableLightningRefresh()
-                    }
-                },
-                NotificationCenter.default.addObserver(
-                    forName: NSWindow.didMiniaturizeNotification,
-                    object: window,
-                    queue: .main
-                ) { [weak self] _ in
-                    Task { @MainActor in
-                        self?.disableLightningRefresh()
-                    }
-                },
-                NotificationCenter.default.addObserver(
-                    forName: NSWindow.willCloseNotification,
-                    object: window,
-                    queue: .main
-                ) { [weak self] _ in
-                    Task { @MainActor in
-                        self?.disableLightningRefresh()
-                    }
-                },
-                NotificationCenter.default.addObserver(
-                    forName: NSApplication.didResignActiveNotification,
-                    object: NSApp,
-                    queue: .main
-                ) { [weak self] _ in
-                    Task { @MainActor in
-                        self?.disableLightningRefresh()
-                    }
-                }
-            ]
-        }
-
-        func stopObserving() {
-            observationTokens.forEach(NotificationCenter.default.removeObserver)
-            observationTokens.removeAll()
-            observedWindow = nil
-            windowLookupTask?.cancel()
-            windowLookupTask = nil
-        }
-
-        private func scheduleWindowLookup(for view: NSView) {
-            guard windowLookupTask == nil else {
-                return
-            }
-
-            windowLookupTask = Task { @MainActor [weak self, weak view] in
-                await Task.yield()
-
-                guard Task.isCancelled == false,
-                      let self,
-                      let view else {
-                    return
-                }
-
-                windowLookupTask = nil
-                observeWindow(for: view)
-            }
-        }
-
-        private func disableLightningRefresh() {
-            isEnabled.wrappedValue = false
-        }
     }
 }
 

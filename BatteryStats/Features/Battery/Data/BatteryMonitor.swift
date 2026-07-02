@@ -571,15 +571,10 @@ final class BatteryMonitor {
     }
 
     private func refreshEffectiveMonitoringDemand() {
-        let visibleSurfaceDemand = BatteryMonitoringDemand(
-            needsEnergyChangeAwareness: visibleSurfaceDemandCount > 0
-        )
-        let lightningDemand = BatteryMonitoringDemand(
+        let nextDemand = BatteryMonitoringDemand(
+            needsEnergyChangeAwareness: preferenceMonitoringDemand.needsEnergyChangeAwareness || visibleSurfaceDemandCount > 0,
             needsLightningRefresh: isLightningRefreshActive
         )
-        let nextDemand = preferenceMonitoringDemand
-            .combined(with: visibleSurfaceDemand)
-            .combined(with: lightningDemand)
         guard monitoringDemand != nextDemand else {
             return
         }
