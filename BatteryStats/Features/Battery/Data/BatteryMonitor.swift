@@ -294,7 +294,7 @@ final class BatteryMonitor {
     }
 
     private func requestRefresh(options: BatteryReadOptions = .standard) {
-        cancelEnergyProbe()
+        cancelEnergyProbeTask()
 
         if refreshTask != nil {
             pendingRefresh = true
@@ -582,13 +582,21 @@ final class BatteryMonitor {
     }
 
     private func cancelEnergyProbe() {
-        energyProbeGeneration &+= 1
         energyProbeTimer?.invalidate()
         energyProbeTimer = nil
         currentEnergyProbeInterval = nil
-        energyProbeTask?.cancel()
-        energyProbeTask = nil
+        cancelEnergyProbeTask()
         lastPublishedEnergyUse = nil
+    }
+
+    private func cancelEnergyProbeTask() {
+        guard let task = energyProbeTask else {
+            return
+        }
+
+        energyProbeGeneration &+= 1
+        task.cancel()
+        energyProbeTask = nil
     }
 
     private static func refreshTimerTolerance(for interval: TimeInterval) -> TimeInterval {
@@ -669,6 +677,10 @@ extension BatteryMonitor {
 
     func currentRefreshIntervalForTesting() -> TimeInterval? {
         currentRefreshInterval
+    }
+
+    func currentEnergyProbeIntervalForTesting() -> TimeInterval? {
+        currentEnergyProbeInterval
     }
 }
 #endif

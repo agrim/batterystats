@@ -1504,6 +1504,35 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reloadCount, 2)
     }
 
+    func testRefreshKeepsEnergyProbeTimerScheduled() async {
+        let reader = ControlledDiagnosticsReader()
+        let monitor = BatteryMonitor(
+            reader: makeClient(reader),
+            widgetTimelineReloader: {}
+        )
+
+        monitor.updateRefreshPolicy(BatteryRefreshPolicy(cadence: .dynamic, energyChangeSensitivity: .balanced))
+        enableEnergyProbeDemand(on: monitor)
+        monitor.start()
+        await reader.waitForRequestCount(1)
+        reader.resumeRequest(at: 0, snapshot: .previewDischarging)
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertEqual(monitor.currentEnergyProbeIntervalForTesting(), 15)
+
+        monitor.refresh()
+
+        XCTAssertEqual(monitor.currentEnergyProbeIntervalForTesting(), 15)
+
+        await reader.waitForRequestCount(2)
+        reader.resumeRequest(at: 1, snapshot: .previewCharging)
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertEqual(reader.requests, [.standard, .standard])
+        XCTAssertEqual(monitor.snapshot?.powerState, .charging)
+        XCTAssertEqual(monitor.currentEnergyProbeIntervalForTesting(), 15)
+    }
+
     func testRefreshRequestsWidgetTimelineReloadWhenSnapshotPublishes() async {
         let reader = StubBatteryReader(snapshots: [.previewDischarging])
         var reloadCount = 0
