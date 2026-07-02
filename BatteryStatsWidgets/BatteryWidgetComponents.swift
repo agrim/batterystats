@@ -129,7 +129,7 @@ struct BatteryMediumWidgetView: View {
                 GridRow {
                     BatteryMediumMetricView(
                         title: timeTitle,
-                        value: BatteryMediumWidgetFormatting.timeValue(for: snapshot),
+                        value: BatteryWidgetMetricFormatting.timeText(for: snapshot),
                         symbolName: "clock",
                         tint: timeTint
                     )
@@ -148,7 +148,7 @@ struct BatteryMediumWidgetView: View {
     }
 
     private var statusTitle: String {
-        BatteryMediumWidgetFormatting.statusTitle(for: snapshot)
+        snapshot?.statusDisplayTitle ?? "Unavailable"
     }
 
     private var timeTitle: String {

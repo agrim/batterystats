@@ -175,7 +175,7 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(BatteryWidgetMetricFormatting.timeProgress(for: snapshot)), 0.5, accuracy: 0.001)
     }
 
-    func testMediumWidgetTimeValueUsesRoundedWidgetDuration() {
+    func testWidgetTimeMetricTextUsesRoundedWidgetDuration() {
         let snapshot = makeSnapshot(
             stateOfChargePercent: 80,
             powerState: .onBattery,
@@ -183,8 +183,8 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(BatteryFormatting.compactDuration(minutes: snapshot.displayedTimeMinutes), "2h 5m")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.timeValue(for: snapshot), "2h")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.timeValue(for: nil), "—")
+        XCTAssertEqual(BatteryWidgetMetricFormatting.timeText(for: snapshot), "2h")
+        XCTAssertEqual(BatteryWidgetMetricFormatting.timeText(for: nil), "—")
     }
 
     func testMediumWidgetPowerTitleReflectsChargingPowerSource() {

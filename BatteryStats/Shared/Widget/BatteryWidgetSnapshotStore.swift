@@ -574,11 +574,7 @@ enum BatteryWidgetMetricFormatting {
     }
 
     static func powerText(for snapshot: BatterySnapshot?) -> String {
-        guard let snapshot else {
-            return "—"
-        }
-
-        guard let activePowerWatts = snapshot.activePowerWatts else {
+        guard let activePowerWatts = snapshot?.activePowerWatts else {
             return "—"
         }
 
@@ -602,14 +598,6 @@ enum BatteryWidgetMetricFormatting {
 }
 
 enum BatteryMediumWidgetFormatting {
-    static func statusTitle(for snapshot: BatterySnapshot?) -> String {
-        snapshot?.statusDisplayTitle ?? "Unavailable"
-    }
-
-    static func timeValue(for snapshot: BatterySnapshot?) -> String {
-        BatteryWidgetMetricFormatting.timeText(for: snapshot)
-    }
-
     static func powerTitle(for snapshot: BatterySnapshot?) -> String {
         BatteryPowerDisplayRole.role(for: snapshot).title
     }
