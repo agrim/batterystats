@@ -224,14 +224,14 @@ struct BatteryReadingService: Sendable {
             fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours,
             publicStateOfChargePercent: nil
         )
-        let isExternalPowerConnected = Self.smartExternalPowerConnected(
-            reportedExternalPowerConnected: smartBattery.isExternalPowerConnected,
-            isCharging: isCharging,
-            isCharged: isCharged,
-            inputPowerWatts: smartBattery.inputPowerWatts,
-            inputPowerEvidence: smartBattery.inputPowerEvidence,
-            adapterMaxWatts: smartBattery.adapterMaxWatts
-        )
+        let isExternalPowerConnected = isCharging
+            || isCharged
+            || BatteryCalculations.displayableInputPowerWatts(
+                smartBattery.inputPowerWatts,
+                evidence: smartBattery.inputPowerEvidence,
+                adapterMaxWatts: smartBattery.adapterMaxWatts
+            ) != nil
+            || smartBattery.isExternalPowerConnected == true
         let trustedStateOfChargePercent = isCharged && isDischarging == false ? 100.0 : nil
         let stateOfChargePercent = BatteryCalculations.stateOfChargePercent(
             currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
@@ -531,33 +531,6 @@ struct BatteryReadingService: Sendable {
         }
 
         return publicSnapshot.reportedExternalPowerConnected || isCharged
-    }
-
-    private static func smartExternalPowerConnected(
-        reportedExternalPowerConnected: Bool?,
-        isCharging: Bool,
-        isCharged: Bool,
-        inputPowerWatts: Double?,
-        inputPowerEvidence: BatteryInputPowerEvidence?,
-        adapterMaxWatts: Int?
-    ) -> Bool {
-        if isCharging {
-            return true
-        }
-
-        if isCharged {
-            return true
-        }
-
-        if BatteryCalculations.displayableInputPowerWatts(
-            inputPowerWatts,
-            evidence: inputPowerEvidence,
-            adapterMaxWatts: adapterMaxWatts
-        ) != nil {
-            return true
-        }
-
-        return reportedExternalPowerConnected ?? false
     }
 
     private static func hasExplicitDisconnectEvidence(
