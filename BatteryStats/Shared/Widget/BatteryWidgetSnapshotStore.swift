@@ -196,7 +196,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
                 stored: snapshot.chargeRateWatts,
                 computed: computedChargeRateWatts,
                 encodedFieldWasPresent: encodedPowerRateFields?.chargeRateWatts,
-                hasCurrentEvidence: BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned) != nil,
+                hasCurrentEvidence: chargeRateMilliamps != nil,
                 validatesInputPower: true,
                 adapterMaxWatts: adapterMaxWatts
             ),
@@ -364,14 +364,6 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
     private struct EncodedPowerRateFields {
         let chargeRateWatts: Bool
         let dischargeRateWatts: Bool
-    }
-
-    private static func finite(_ value: Double?) -> Double? {
-        guard let value, value.isFinite else {
-            return nil
-        }
-
-        return value
     }
 
     private static func derivedWattHours(
