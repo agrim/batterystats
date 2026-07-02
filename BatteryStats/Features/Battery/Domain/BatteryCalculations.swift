@@ -233,15 +233,8 @@ enum BatteryCalculations {
     }
 
     static func displayableInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
-        guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        guard plausibleAdapterWatts(adapterMaxWatts) != nil || value < maximumUnverifiedInputPowerWatts else {
-            return nil
-        }
-
-        guard isDistinctFromAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
+        guard let value = baseDisplayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
+              isDistinctFromAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
             return nil
         }
 
@@ -249,15 +242,8 @@ enum BatteryCalculations {
     }
 
     static func displayableCounterBackedInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
-        guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        guard plausibleAdapterWatts(adapterMaxWatts) != nil || value < maximumUnverifiedInputPowerWatts else {
-            return nil
-        }
-
-        guard isDistinctFromCounterBackedAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
+        guard let value = baseDisplayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
+              isDistinctFromCounterBackedAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
             return nil
         }
 
@@ -265,15 +251,20 @@ enum BatteryCalculations {
     }
 
     static func displayableLiveMeasuredInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        guard let value = baseDisplayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
+              isDistinctFromExactAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func baseDisplayableInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
         guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts) else {
             return nil
         }
 
         guard plausibleAdapterWatts(adapterMaxWatts) != nil || value < maximumUnverifiedInputPowerWatts else {
-            return nil
-        }
-
-        guard isDistinctFromExactAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
             return nil
         }
 
