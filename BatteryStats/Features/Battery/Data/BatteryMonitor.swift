@@ -282,13 +282,9 @@ final class BatteryMonitor {
     }
 
     private func hasAlertStateChange(for probedSnapshot: BatterySnapshot) -> Bool {
-        let currentAlertTypes: Set<BatteryAlertType>
-        if let snapshot {
-            currentAlertTypes = BatteryAlertEvaluator.activeAlertTypes(snapshot: snapshot, policy: alertPolicy)
-        } else {
-            currentAlertTypes = []
-        }
-
+        let currentAlertTypes = snapshot.map {
+            BatteryAlertEvaluator.activeAlertTypes(snapshot: $0, policy: alertPolicy)
+        } ?? []
         let probedAlertTypes = BatteryAlertEvaluator.activeAlertTypes(snapshot: probedSnapshot, policy: alertPolicy)
         return currentAlertTypes != probedAlertTypes
     }
@@ -707,11 +703,9 @@ private struct WidgetTimelineReloadSignature: Equatable {
     }
 
     private static func usesInputPowerWatts(_ snapshot: BatterySnapshot?) -> Bool {
-        guard let snapshot else {
-            return false
-        }
-
-        return snapshot.powerState.isExternallyPowered && snapshot.visibleInputPowerWatts != nil
+        snapshot.map {
+            $0.powerState.isExternallyPowered && $0.visibleInputPowerWatts != nil
+        } ?? false
     }
 
     private static func minuteIdentifier(_ date: Date?) -> Int? {
