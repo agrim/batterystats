@@ -692,12 +692,7 @@ enum BatteryWidgetUpdateFormatting {
             return now.addingTimeInterval(300)
         }
 
-        let futureOffset = updatedAt.timeIntervalSince(now)
-        if futureOffset > BatterySnapshotFreshnessPolicy.allowableFutureSkew {
-            return updatedAt.addingTimeInterval(-BatterySnapshotFreshnessPolicy.allowableFutureSkew)
-        }
-
-        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateDate(updatedAt: updatedAt, now: now)
+        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateBoundary(updatedAt: updatedAt, now: now)
         let staleDate = updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultMaximumAge + 1)
         let retentionDate = updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultRetentionAge + 1)
         return [nextRelativeDate, staleDate, retentionDate]
@@ -717,6 +712,14 @@ enum BatterySnapshotFreshnessPolicy {
 
     static func isWithinFutureSkew(updatedAt: Date, now: Date) -> Bool {
         updatedAt.timeIntervalSince(now) <= allowableFutureSkew
+    }
+
+    static func nextRelativeUpdateBoundary(updatedAt: Date, now: Date) -> Date {
+        if updatedAt.timeIntervalSince(now) > allowableFutureSkew {
+            return updatedAt.addingTimeInterval(-allowableFutureSkew)
+        }
+
+        return nextRelativeUpdateDate(updatedAt: updatedAt, now: now)
     }
 
     static func relativeUpdateText(updatedAt: Date, now: Date) -> String {
@@ -739,7 +742,7 @@ enum BatterySnapshotFreshnessPolicy {
         return "\(elapsedDays)d ago"
     }
 
-    static func nextRelativeUpdateDate(updatedAt: Date, now: Date) -> Date {
+    private static func nextRelativeUpdateDate(updatedAt: Date, now: Date) -> Date {
         let elapsedSeconds = max(0, now.timeIntervalSince(updatedAt))
         if elapsedSeconds < 60 {
             return updatedAt.addingTimeInterval(60)

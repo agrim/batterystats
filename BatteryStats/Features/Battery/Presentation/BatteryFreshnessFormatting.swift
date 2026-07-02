@@ -36,12 +36,7 @@ enum BatteryFreshnessFormatting {
             return now.addingTimeInterval(60)
         }
 
-        let futureOffset = lastUpdated.timeIntervalSince(now)
-        if futureOffset > BatterySnapshotFreshnessPolicy.allowableFutureSkew {
-            return lastUpdated.addingTimeInterval(-BatterySnapshotFreshnessPolicy.allowableFutureSkew)
-        }
-
-        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateDate(updatedAt: lastUpdated, now: now)
+        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateBoundary(updatedAt: lastUpdated, now: now)
 
         if hasUsableUpdate(lastUpdated: lastUpdated, now: now) {
             let staleDate = lastUpdated.addingTimeInterval(BatterySnapshotFreshnessPolicy.maximumLiveAge + 1)
