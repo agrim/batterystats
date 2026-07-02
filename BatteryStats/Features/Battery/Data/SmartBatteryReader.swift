@@ -505,31 +505,16 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func wattsFromCorroboratedSystemPowerIn(in properties: [String: Any], adapterMaxWatts: Int?) -> Double? {
-        guard hasLiveSystemPowerInCounter(in: properties) else {
+        guard let milliwatts = counterBackedSystemPowerInMilliwatts(in: properties) else {
             return nil
         }
 
-        guard let milliwatts = plausibleInteger(
-            for: [.nested("PowerTelemetryData", "SystemPowerIn")],
-            in: properties,
-            transform: { value in
-                guard value > 0,
-                      BatteryCalculations.plausibleWatts(Double(value) / 1_000) != nil else {
-                    return nil
-                }
-
-                return value
-            }
-        ) else {
-            return nil
-        }
-
-        let watts = Double(milliwatts) / 1_000
-        guard isDistinctFromCounterBackedNegotiatedInputPower(milliwatts: Double(milliwatts), in: properties),
-              isTrustedCounterBackedSystemPowerIn(milliwatts: Double(milliwatts), in: properties, adapterMaxWatts: adapterMaxWatts),
+        let watts = milliwatts / 1_000
+        guard isDistinctFromCounterBackedNegotiatedInputPower(milliwatts: milliwatts, in: properties),
+              isTrustedCounterBackedSystemPowerIn(milliwatts: milliwatts, in: properties, adapterMaxWatts: adapterMaxWatts),
               let displayableWatts = displayableCorroboratedSystemPowerInWatts(
                   watts,
-                  milliwatts: Double(milliwatts),
+                  milliwatts: milliwatts,
                   in: properties,
                   adapterMaxWatts: adapterMaxWatts
               ) else {
@@ -583,8 +568,22 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func counterBackedInputPowerCorroboratesNegotiatedPower(_ negotiatedWatts: Int, in properties: [String: Any]) -> Bool {
+        guard let systemMilliwatts = counterBackedSystemPowerInMilliwatts(in: properties) else {
+            return false
+        }
+
+        let negotiatedMilliwatts = Double(negotiatedWatts) * 1_000
+        let toleranceMilliwatts = max(1_000.0, negotiatedMilliwatts * 0.05)
+        guard abs(systemMilliwatts - negotiatedMilliwatts) <= toleranceMilliwatts else {
+            return false
+        }
+
+        return liveSystemTelemetryCorroborates(milliwatts: systemMilliwatts, in: properties)
+    }
+
+    private func counterBackedSystemPowerInMilliwatts(in properties: [String: Any]) -> Double? {
         guard hasLiveSystemPowerInCounter(in: properties),
-              let systemPowerIn = plausibleInteger(
+              let milliwatts = plausibleInteger(
                   for: [.nested("PowerTelemetryData", "SystemPowerIn")],
                   in: properties,
                   transform: { value in
@@ -596,17 +595,10 @@ final class SmartBatteryReader: @unchecked Sendable {
                       return value
                   }
               ) else {
-            return false
+            return nil
         }
 
-        let negotiatedMilliwatts = Double(negotiatedWatts) * 1_000
-        let systemMilliwatts = Double(systemPowerIn)
-        let toleranceMilliwatts = max(1_000.0, negotiatedMilliwatts * 0.05)
-        guard abs(systemMilliwatts - negotiatedMilliwatts) <= toleranceMilliwatts else {
-            return false
-        }
-
-        return liveSystemTelemetryCorroborates(milliwatts: systemMilliwatts, in: properties)
+        return Double(milliwatts)
     }
 
     private func liveSystemTelemetryCorroborates(milliwatts: Double, in properties: [String: Any]) -> Bool {
