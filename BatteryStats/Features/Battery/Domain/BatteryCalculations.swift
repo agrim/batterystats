@@ -349,6 +349,34 @@ enum BatteryCalculations {
         return currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold
     }
 
+    static func isEffectivelyEmpty(
+        currentChargeMilliampHours: Int?,
+        stateOfChargePercent: Double?
+    ) -> Bool {
+        if let stateOfChargePercent,
+           stateOfChargePercent.isFinite {
+            return stateOfChargePercent >= 0 && stateOfChargePercent <= 1
+        }
+
+        return plausibleCapacityMilliampHours(currentChargeMilliampHours) == 0
+    }
+
+    static func isEffectivelyFull(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        stateOfChargePercent: Double?
+    ) -> Bool {
+        if let stateOfChargePercent,
+           stateOfChargePercent.isFinite {
+            return stateOfChargePercent >= 99 && stateOfChargePercent <= 105
+        }
+
+        return chargedCapacityEvidence(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        ) == true
+    }
+
     static func estimatedTimeToFullMinutes(
         currentChargeMilliampHours: Int?,
         fullChargeCapacityMilliampHours: Int?,
@@ -598,10 +626,11 @@ enum BatteryCalculations {
             return .fullOnAC
         }
 
-        if chargedCapacityEvidence(
+        if isEffectivelyFull(
             currentChargeMilliampHours: currentChargeMilliampHours,
-            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
-        ) == true {
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            stateOfChargePercent: nil
+        ) {
             return .fullOnAC
         }
 

@@ -665,30 +665,21 @@ struct BatteryReadingService: Sendable {
             return true
         }
 
-        guard let stateOfChargePercent = publicSnapshot.stateOfChargePercent,
-              stateOfChargePercent.isFinite else {
-            return false
-        }
-
-        return stateOfChargePercent >= 99 && stateOfChargePercent <= 105
+        return BatteryCalculations.isEffectivelyFull(
+            currentChargeMilliampHours: nil,
+            fullChargeCapacityMilliampHours: nil,
+            stateOfChargePercent: publicSnapshot.stateOfChargePercent
+        )
     }
 
     private static func isEffectivelyEmptyForZeroTimeToEmpty(
         publicSnapshot: PublicPowerSourceSnapshot,
         smartBattery: SmartBatteryDetails?
     ) -> Bool {
-        if let stateOfChargePercent = publicSnapshot.stateOfChargePercent,
-           stateOfChargePercent.isFinite {
-            return stateOfChargePercent >= 0 && stateOfChargePercent <= 1
-        }
-
-        guard let currentChargeMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
-            smartBattery?.currentChargeMilliampHours
-        ) else {
-            return false
-        }
-
-        return currentChargeMilliampHours == 0
+        BatteryCalculations.isEffectivelyEmpty(
+            currentChargeMilliampHours: smartBattery?.currentChargeMilliampHours,
+            stateOfChargePercent: publicSnapshot.stateOfChargePercent
+        )
     }
 
     private static func reconciledChargedState(

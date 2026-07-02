@@ -405,7 +405,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             return minutes
         }
 
-        if isEffectivelyEmpty(
+        if BatteryCalculations.isEffectivelyEmpty(
             currentChargeMilliampHours: currentChargeMilliampHours,
             stateOfChargePercent: stateOfChargePercent
         ) {
@@ -431,7 +431,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             return minutes
         }
 
-        return isEffectivelyEmpty(
+        return BatteryCalculations.isEffectivelyEmpty(
             currentChargeMilliampHours: currentChargeMilliampHours,
             stateOfChargePercent: stateOfChargePercent
         ) ? 0 : nil
@@ -451,7 +451,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             chargeCurrentMilliamps: chargeRateMilliamps,
             reportedTimeToFullMinutes: nil
         )
-        let isFull = isEffectivelyFull(
+        let isFull = BatteryCalculations.isEffectivelyFull(
             currentChargeMilliampHours: currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             stateOfChargePercent: stateOfChargePercent
@@ -465,34 +465,6 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             computedTimeToFullMinutes: computedMinutes,
             reportedTimeToFullMinutes: reportedMinutes == 0 ? nil : reportedMinutes
         )
-    }
-
-    private static func isEffectivelyEmpty(
-        currentChargeMilliampHours: Int?,
-        stateOfChargePercent: Double?
-    ) -> Bool {
-        if let stateOfChargePercent,
-           stateOfChargePercent.isFinite {
-            return stateOfChargePercent >= 0 && stateOfChargePercent <= 1
-        }
-
-        return currentChargeMilliampHours == 0
-    }
-
-    private static func isEffectivelyFull(
-        currentChargeMilliampHours: Int?,
-        fullChargeCapacityMilliampHours: Int?,
-        stateOfChargePercent: Double?
-    ) -> Bool {
-        if let stateOfChargePercent,
-           stateOfChargePercent.isFinite {
-            return stateOfChargePercent >= 99 && stateOfChargePercent <= 105
-        }
-
-        return BatteryCalculations.chargedCapacityEvidence(
-            currentChargeMilliampHours: currentChargeMilliampHours,
-            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
-        ) == true
     }
 
     private static func reconciledStoredChargedState(
