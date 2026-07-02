@@ -1036,16 +1036,7 @@ enum MenuBarBatteryLabelFormatting {
             return powerText
         }
 
-        switch snapshot.powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "In \(powerText)"
-            }
-
-            return powerText
-        case .onBattery, .unknown:
-            return powerText
-        }
+        return BatteryPowerDisplayRole.role(for: snapshot) == .inputPower ? "In \(powerText)" : powerText
     }
 
     private static func powerAccessibilityLabel(for snapshot: BatterySnapshot?) -> String {
@@ -1054,28 +1045,11 @@ enum MenuBarBatteryLabelFormatting {
             return "Battery power \(powerText)"
         }
 
-        switch snapshot.powerState {
-        case .charging:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Battery input power \(powerText)"
-            }
-
-            return "Battery charge rate \(powerText)"
-        case .connectedDischarging:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Battery input power \(powerText), battery discharging"
-            }
-
-            return "Battery drain \(powerText)"
-        case .connectedNotCharging, .fullOnAC:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Battery input power \(powerText)"
-            }
-
-            return "Battery power \(powerText)"
-        case .onBattery, .unknown:
-            return "Battery power \(powerText)"
-        }
+        let role = BatteryPowerDisplayRole.role(for: snapshot)
+        let suffix = role == .inputPower && snapshot.powerState == .connectedDischarging
+            ? ", battery discharging"
+            : ""
+        return "Battery \(role.accessibilityNoun) \(powerText)\(suffix)"
     }
 }
 

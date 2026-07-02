@@ -680,37 +680,56 @@ enum BatteryMediumWidgetFormatting {
     }
 
     static func powerTitle(for snapshot: BatterySnapshot?) -> String {
-        BatteryPowerTitleFormatting.title(for: snapshot)
+        BatteryPowerDisplayRole.role(for: snapshot).title
     }
 }
 
-enum BatteryPowerTitleFormatting {
-    static func title(for snapshot: BatterySnapshot?) -> String {
-        guard let snapshot else {
+enum BatteryPowerDisplayRole {
+    case power
+    case inputPower
+    case chargeRate
+    case batteryDrain
+
+    var title: String {
+        switch self {
+        case .power:
             return "Power"
+        case .inputPower:
+            return "Input Power"
+        case .chargeRate:
+            return "Charge Rate"
+        case .batteryDrain:
+            return "Battery Drain"
+        }
+    }
+
+    var accessibilityNoun: String {
+        switch self {
+        case .power:
+            return "power"
+        case .inputPower:
+            return "input power"
+        case .chargeRate:
+            return "charge rate"
+        case .batteryDrain:
+            return "drain"
+        }
+    }
+
+    static func role(for snapshot: BatterySnapshot?) -> BatteryPowerDisplayRole {
+        guard let snapshot else {
+            return .power
         }
 
         switch snapshot.powerState {
         case .charging:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Input Power"
-            }
-
-            return "Charge Rate"
+            return snapshot.visibleInputPowerWatts == nil ? .chargeRate : .inputPower
         case .connectedDischarging:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Input Power"
-            }
-
-            return "Battery Drain"
+            return snapshot.visibleInputPowerWatts == nil ? .batteryDrain : .inputPower
         case .connectedNotCharging, .fullOnAC:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Input Power"
-            }
-
-            return "Power"
+            return snapshot.visibleInputPowerWatts == nil ? .power : .inputPower
         case .onBattery, .unknown:
-            return "Power"
+            return .power
         }
     }
 }

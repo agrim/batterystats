@@ -264,7 +264,7 @@ enum BatterySummaryDetailFormatting {
     }
 
     static func powerTitle(for snapshot: BatterySnapshot) -> String {
-        BatteryPowerTitleFormatting.title(for: snapshot)
+        BatteryPowerDisplayRole.role(for: snapshot).title
     }
 
     static func voltage(_ value: Int?) -> String? {
