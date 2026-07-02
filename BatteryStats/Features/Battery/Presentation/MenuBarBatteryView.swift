@@ -911,7 +911,7 @@ struct MenuBarBatteryLabelState {
         temperatureUnitPreference: TemperatureUnitPreference
     ) {
         let symbolTintStyle = BatteryPresentationStyle.chargeTintStyle(for: snapshot)
-        symbolName = Self.symbolName(for: snapshot)
+        symbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
         self.symbolTintStyle = symbolTintStyle
         symbolTint = symbolTintStyle.color
         value = MenuBarBatteryLabelFormatting.displayValue(
@@ -933,10 +933,6 @@ struct MenuBarBatteryLabelState {
             value ?? "iconOnly",
             accessibilityLabel
         ].joined(separator: "|")
-    }
-
-    private static func symbolName(for snapshot: BatterySnapshot?) -> String {
-        BatteryPresentationStyle.batterySymbolName(for: snapshot)
     }
 }
 

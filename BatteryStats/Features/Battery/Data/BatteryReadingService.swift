@@ -309,15 +309,14 @@ struct BatteryReadingService: Sendable {
         currentChargeMilliampHours: Int?,
         fullChargeCapacityMilliampHours: Int?
     ) -> Bool {
-        reconciledChargedState(
-            publicIsCharged: publicSnapshot.isCharged && shouldSuppressSmartExternalPowerEvidence(
-                publicSnapshot: publicSnapshot,
-                smartBattery: smartBattery
-            ) == false,
-            smartIsFullyCharged: shouldSuppressSmartExternalPowerEvidence(
-                publicSnapshot: publicSnapshot,
-                smartBattery: smartBattery
-            ) ? nil : smartBattery?.isFullyCharged,
+        let hasDisconnectEvidence = hasExplicitDisconnectEvidence(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery
+        )
+
+        return reconciledChargedState(
+            publicIsCharged: publicSnapshot.isCharged && hasDisconnectEvidence == false,
+            smartIsFullyCharged: hasDisconnectEvidence ? nil : smartBattery?.isFullyCharged,
             signedCurrentMilliamps: signedCurrentMilliamps,
             currentChargeMilliampHours: currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
@@ -338,7 +337,7 @@ struct BatteryReadingService: Sendable {
             smartBattery: smartBattery,
             signedCurrentMilliamps: signedCurrentMilliamps
         )
-        let suppressSmartExternalPowerEvidence = shouldSuppressSmartExternalPowerEvidence(
+        let suppressSmartExternalPowerEvidence = hasExplicitDisconnectEvidence(
             publicSnapshot: publicSnapshot,
             smartBattery: smartBattery
         )
@@ -569,13 +568,6 @@ struct BatteryReadingService: Sendable {
         }
 
         return false
-    }
-
-    private static func shouldSuppressSmartExternalPowerEvidence(
-        publicSnapshot: PublicPowerSourceSnapshot,
-        smartBattery: SmartBatteryDetails?
-    ) -> Bool {
-        hasExplicitDisconnectEvidence(publicSnapshot: publicSnapshot, smartBattery: smartBattery)
     }
 
     private static func hasExplicitDisconnectEvidence(
