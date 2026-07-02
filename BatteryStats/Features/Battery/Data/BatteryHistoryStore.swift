@@ -192,7 +192,6 @@ final class BatteryHistoryStore {
     }
 
     private static let emptyEntriesString = "[]"
-    private static let allowableFutureSkew: TimeInterval = 60
     private static let significantTemperatureChangeThresholdCelsius = 2.0
 
     var entries: [BatteryHistoryEntry] = []
@@ -620,12 +619,10 @@ final class BatteryHistoryStore {
     }
 
     private static func normalizedEntries(_ entries: [BatteryHistoryEntry], now: Date = Date()) -> [BatteryHistoryEntry] {
-        let latestAllowedTimestamp = now.addingTimeInterval(allowableFutureSkew)
-
         return Array(entries
             .reduce(into: [Date: BatteryHistoryEntry]()) { partialResult, entry in
                 let normalizedEntry = entry.normalized()
-                guard normalizedEntry.timestamp <= latestAllowedTimestamp else {
+                guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: normalizedEntry.timestamp, now: now) else {
                     return
                 }
 

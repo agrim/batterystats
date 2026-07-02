@@ -1,9 +1,6 @@
 import Foundation
 
 enum BatteryFreshnessFormatting {
-    static let allowableFutureSkew = BatterySnapshotFreshnessPolicy.allowableFutureSkew
-    static let maximumLiveAge = BatterySnapshotFreshnessPolicy.maximumLiveAge
-
     static func statusText(lastUpdated: Date?, now: Date, isRefreshing: Bool) -> String {
         if isRefreshing {
             return "Refreshing..."
@@ -40,14 +37,14 @@ enum BatteryFreshnessFormatting {
         }
 
         let futureOffset = lastUpdated.timeIntervalSince(now)
-        if futureOffset > allowableFutureSkew {
-            return lastUpdated.addingTimeInterval(-allowableFutureSkew)
+        if futureOffset > BatterySnapshotFreshnessPolicy.allowableFutureSkew {
+            return lastUpdated.addingTimeInterval(-BatterySnapshotFreshnessPolicy.allowableFutureSkew)
         }
 
         let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateDate(updatedAt: lastUpdated, now: now)
 
         if hasUsableUpdate(lastUpdated: lastUpdated, now: now) {
-            let staleDate = lastUpdated.addingTimeInterval(maximumLiveAge + 1)
+            let staleDate = lastUpdated.addingTimeInterval(BatterySnapshotFreshnessPolicy.maximumLiveAge + 1)
             if staleDate > now {
                 return min(nextRelativeDate, staleDate)
             }

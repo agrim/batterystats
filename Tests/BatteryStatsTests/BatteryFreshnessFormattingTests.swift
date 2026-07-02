@@ -197,7 +197,7 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
                 now: now,
                 isRefreshing: false
             ),
-            lastUpdated.addingTimeInterval(-BatteryFreshnessFormatting.allowableFutureSkew)
+            lastUpdated.addingTimeInterval(-BatterySnapshotFreshnessPolicy.allowableFutureSkew)
         )
     }
 

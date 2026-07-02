@@ -12,7 +12,6 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
     static let defaultRetentionAge: TimeInterval = 6 * 60 * 60
 
     private static let snapshotKey = "latestBatteryWidgetSnapshot"
-    private static let allowableFutureSkew: TimeInterval = 60
 
     let defaults: UserDefaults?
 
@@ -75,7 +74,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
 
         let encodedPowerRateFields = Self.encodedPowerRateFields(in: data)
         let age = now.timeIntervalSince(snapshot.timestamp)
-        guard age >= -Self.allowableFutureSkew,
+        guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: snapshot.timestamp, now: now),
               age <= Self.defaultRetentionAge else {
             clear()
             return nil
