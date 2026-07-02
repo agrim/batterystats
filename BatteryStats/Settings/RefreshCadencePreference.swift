@@ -77,12 +77,10 @@ enum EnergyChangeSensitivity: String, CaseIterable, Identifiable {
 
 struct BatteryMonitoringDemand: Equatable, Sendable {
     var needsEnergyChangeAwareness = false
-    var needsLightningRefresh = false
 
     func combined(with other: BatteryMonitoringDemand) -> BatteryMonitoringDemand {
         BatteryMonitoringDemand(
-            needsEnergyChangeAwareness: needsEnergyChangeAwareness || other.needsEnergyChangeAwareness,
-            needsLightningRefresh: needsLightningRefresh || other.needsLightningRefresh
+            needsEnergyChangeAwareness: needsEnergyChangeAwareness || other.needsEnergyChangeAwareness
         )
     }
 }
@@ -97,10 +95,6 @@ struct BatteryRefreshPolicy: Equatable {
 
     var energyProbeInterval: TimeInterval {
         15
-    }
-
-    var lightningRefreshInterval: TimeInterval {
-        0.2
     }
 
     var usesEnergyChangeProbe: Bool {
@@ -119,14 +113,7 @@ struct BatteryRefreshPolicy: Equatable {
         return fixedInterval > energyProbeInterval
     }
 
-    func refreshInterval(
-        for snapshot: BatterySnapshot?,
-        demand: BatteryMonitoringDemand = BatteryMonitoringDemand()
-    ) -> TimeInterval {
-        if demand.needsLightningRefresh {
-            return lightningRefreshInterval
-        }
-
+    func refreshInterval(for snapshot: BatterySnapshot?) -> TimeInterval {
         if let fixedInterval = cadence.fixedInterval {
             return fixedInterval
         }

@@ -128,7 +128,6 @@ final class BatteryMonitor {
         }
 
         isLightningRefreshActive = isActive
-        refreshEffectiveMonitoringDemand()
 
         if isActive {
             refreshForVisibleSurface()
@@ -355,7 +354,7 @@ final class BatteryMonitor {
     private func shouldContinueLightningRefreshLoop(for generation: Int) -> Bool {
         Task.isCancelled == false
             && refreshGeneration == generation
-            && monitoringDemand.needsLightningRefresh
+            && isLightningRefreshActive
     }
 
     @discardableResult
@@ -538,7 +537,7 @@ final class BatteryMonitor {
             return
         }
 
-        let desiredRefreshInterval = refreshPolicy.refreshInterval(for: snapshot, demand: monitoringDemand)
+        let desiredRefreshInterval = refreshPolicy.refreshInterval(for: snapshot)
         if currentRefreshInterval != desiredRefreshInterval {
             refreshTimer?.invalidate()
             refreshTimer = Self.scheduledMonitoringTimer(withTimeInterval: desiredRefreshInterval) { [weak self] in
@@ -572,8 +571,7 @@ final class BatteryMonitor {
 
     private func refreshEffectiveMonitoringDemand() {
         let nextDemand = BatteryMonitoringDemand(
-            needsEnergyChangeAwareness: preferenceMonitoringDemand.needsEnergyChangeAwareness || visibleSurfaceDemandCount > 0,
-            needsLightningRefresh: isLightningRefreshActive
+            needsEnergyChangeAwareness: preferenceMonitoringDemand.needsEnergyChangeAwareness || visibleSurfaceDemandCount > 0
         )
         guard monitoringDemand != nextDemand else {
             return

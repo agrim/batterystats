@@ -786,7 +786,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.snapshot?.powerState, .onBattery)
     }
 
-    func testLightningRefreshOverridesTimerUntilDisabled() async {
+    func testLightningRefreshKeepsScheduledTimerAtUserCadence() async {
         let reader = StubBatteryReader(snapshots: [
             .previewDischarging,
             .previewCharging
@@ -801,7 +801,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
 
         monitor.setLightningRefreshActive(true)
-        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), policy.lightningRefreshInterval)
+        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
 
         monitor.setLightningRefreshActive(false)
         await monitor.waitForIdleForTesting()
@@ -825,7 +825,7 @@ final class BatteryMonitorTests: XCTestCase {
         await monitor.waitForIdleForTesting()
 
         monitor.setLightningRefreshActive(true)
-        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), policy.lightningRefreshInterval)
+        XCTAssertEqual(monitor.currentRefreshIntervalForTesting(), 300)
 
         monitor.stop()
         monitor.start()
