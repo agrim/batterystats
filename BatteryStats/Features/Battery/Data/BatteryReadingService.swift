@@ -411,15 +411,15 @@ struct BatteryReadingService: Sendable {
         adapterMaxWatts: Int? = nil,
         powerState: BatteryPowerState
     ) -> Double? {
-        guard let inputPowerWatts = BatteryCalculations.displayableInputPowerWatts(
-            inputPowerWatts,
-            evidence: evidence,
-            adapterMaxWatts: adapterMaxWatts
-        ) else {
+        guard powerState.isExternallyPowered else {
             return nil
         }
 
-        return powerState.isExternallyPowered ? inputPowerWatts : nil
+        return BatteryCalculations.displayableInputPowerWatts(
+            inputPowerWatts,
+            evidence: evidence,
+            adapterMaxWatts: adapterMaxWatts
+        )
     }
 
     static func displayablePowerRates(

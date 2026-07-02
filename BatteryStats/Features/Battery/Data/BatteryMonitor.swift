@@ -781,12 +781,9 @@ private struct EnergyProbePresentationSignature: Equatable {
     }
 
     private static func visibleCurrentMilliamps(_ snapshot: BatterySnapshot) -> Int? {
-        if snapshot.powerState.isBatteryDischarging {
-            return BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps)
-        }
-
-        guard snapshot.powerState == .charging,
-              BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) == nil else {
+        let shouldDisplayCurrent = snapshot.powerState.isBatteryDischarging
+            || (snapshot.powerState == .charging && BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) == nil)
+        guard shouldDisplayCurrent else {
             return nil
         }
 
