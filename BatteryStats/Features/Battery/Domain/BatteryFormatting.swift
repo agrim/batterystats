@@ -61,7 +61,7 @@ enum BatteryFormatting {
     }
 
     static func duration(minutes: Int?) -> String {
-        guard let minutes = displayableDurationMinutes(minutes) else {
+        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
             return "Unavailable"
         }
 
@@ -73,7 +73,7 @@ enum BatteryFormatting {
     }
 
     static func compactDuration(minutes: Int?) -> String {
-        guard let minutes = displayableDurationMinutes(minutes) else {
+        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
             return "—"
         }
 
@@ -92,7 +92,7 @@ enum BatteryFormatting {
     }
 
     static func compactWidgetDuration(minutes: Int?) -> String {
-        guard let minutes = displayableDurationMinutes(minutes) else {
+        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
             return "—"
         }
 
@@ -183,10 +183,6 @@ enum BatteryFormatting {
         case (nil, nil):
             return "Unavailable"
         }
-    }
-
-    private static func displayableDurationMinutes(_ value: Int?) -> Int? {
-        BatteryCalculations.plausibleDurationMinutes(value)
     }
 
     private static func formattedMilliamps(_ value: Int) -> String {

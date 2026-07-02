@@ -211,7 +211,7 @@ final class BatteryMonitorConfigurationObserver {
         }
 
         isStarted = true
-        applyConfiguration()
+        monitor.applyConfiguration(preferences: preferences, historyStore: historyStore)
         observePreferences()
     }
 
@@ -232,17 +232,10 @@ final class BatteryMonitorConfigurationObserver {
                     return
                 }
 
-                applyConfiguration()
+                monitor.applyConfiguration(preferences: preferences, historyStore: historyStore)
                 observePreferences()
             }
         }
-    }
-
-    private func applyConfiguration() {
-        monitor.updateRefreshPolicy(preferences.refreshPolicy)
-        monitor.updateHistory(store: historyStore, policy: preferences.historyPolicy)
-        monitor.updateAlerts(preferences.alertPolicy)
-        monitor.updateMonitoringDemand(preferences.monitoringDemand)
     }
 }
 
@@ -256,7 +249,7 @@ private struct MonitorConfigurationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                configureMonitor()
+                monitor.applyConfiguration(preferences: preferences, historyStore: historyStore)
                 if startsMonitor {
                     if isVisibleSurfaceMonitoringActive == false {
                         isVisibleSurfaceMonitoringActive = true
@@ -276,12 +269,14 @@ private struct MonitorConfigurationModifier: ViewModifier {
                 }
             }
     }
+}
 
-    private func configureMonitor() {
-        monitor.updateRefreshPolicy(preferences.refreshPolicy)
-        monitor.updateHistory(store: historyStore, policy: preferences.historyPolicy)
-        monitor.updateAlerts(preferences.alertPolicy)
-        monitor.updateMonitoringDemand(preferences.monitoringDemand)
+private extension BatteryMonitor {
+    func applyConfiguration(preferences: PreferencesStore, historyStore: BatteryHistoryStore) {
+        updateRefreshPolicy(preferences.refreshPolicy)
+        updateHistory(store: historyStore, policy: preferences.historyPolicy)
+        updateAlerts(preferences.alertPolicy)
+        updateMonitoringDemand(preferences.monitoringDemand)
     }
 }
 

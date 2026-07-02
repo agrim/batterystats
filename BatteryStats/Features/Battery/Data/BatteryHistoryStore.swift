@@ -353,7 +353,7 @@ final class BatteryHistoryStore {
         let formatter = Self.makeISOFormatter()
         let rows = entries.map { entry in
             [
-                Self.isoString(from: entry.timestamp, formatter: formatter),
+                formatter.string(from: entry.timestamp),
                 entry.powerState,
                 Self.csvValue(entry.healthPercent),
                 Self.csvValue(entry.stateOfChargePercent),
@@ -667,10 +667,6 @@ final class BatteryHistoryStore {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
-    }
-
-    private static func isoString(from date: Date, formatter: ISO8601DateFormatter) -> String {
-        return formatter.string(from: date)
     }
 }
 
