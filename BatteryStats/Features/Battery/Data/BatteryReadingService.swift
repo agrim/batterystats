@@ -511,10 +511,6 @@ struct BatteryReadingService: Sendable {
             return false
         }
 
-        if trustedCounterBackedInputPowerWatts(smartBattery: smartBattery) != nil {
-            return true
-        }
-
         if trustedInputPowerWatts(smartBattery: smartBattery) != nil {
             return true
         }
@@ -586,30 +582,18 @@ struct BatteryReadingService: Sendable {
         )
     }
 
-    private static func trustedCounterBackedInputPowerWatts(smartBattery: SmartBatteryDetails?) -> Double? {
-        guard smartBattery?.inputPowerEvidence == .counterBacked else {
-            return nil
-        }
-
-        return trustedInputPowerWatts(smartBattery: smartBattery)
-    }
-
     static func chargeRateWattsWithinAdapterContract(
         voltageMillivolts: Int?,
         signedCurrentMilliamps: Int?,
         adapterMaxWatts: Int?
     ) -> Double? {
-        displayableCurrentDerivedChargeRateWatts(
+        BatteryCalculations.displayableLiveMeasuredInputPowerWatts(
             BatteryCalculations.chargeRateWatts(
                 voltageMillivolts: voltageMillivolts,
                 signedCurrentMilliamps: signedCurrentMilliamps
             ),
             adapterMaxWatts: adapterMaxWatts
         )
-    }
-
-    static func displayableCurrentDerivedChargeRateWatts(_ watts: Double?, adapterMaxWatts: Int?) -> Double? {
-        BatteryCalculations.displayableLiveMeasuredInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts)
     }
 
     private static func displayableInputPowerWatts(

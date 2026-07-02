@@ -316,7 +316,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             return storedPowerRate
         }
 
-        return BatteryReadingService.displayableCurrentDerivedChargeRateWatts(
+        return BatteryCalculations.displayableLiveMeasuredInputPowerWatts(
             storedPowerRate,
             adapterMaxWatts: adapterMaxWatts
         )
