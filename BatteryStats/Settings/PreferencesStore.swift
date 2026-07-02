@@ -743,88 +743,62 @@ final class PreferencesStore {
     private func applyDefaultsChanges() {
         refreshMenuBarDisplayPreferencesFromDefaults()
 
-        let nextShowAdvancedValues = Self.boolPreference(
-            defaults: defaults,
-            key: Key.showAdvancedValues,
-            defaultValue: false
-        )
-        if showAdvancedValues != nextShowAdvancedValues {
-            showAdvancedValues = nextShowAdvancedValues
-        }
-
-        let nextRefreshCadencePreference = Self.enumPreference(
-            defaults: defaults,
-            key: Key.refreshCadencePreference,
+        applyDefaultBoolPreference(\.showAdvancedValues, forKey: Key.showAdvancedValues, defaultValue: false)
+        applyDefaultEnumPreference(
+            \.refreshCadencePreference,
+            forKey: Key.refreshCadencePreference,
             defaultValue: RefreshCadencePreference.dynamic
         )
-        if refreshCadencePreference != nextRefreshCadencePreference {
-            refreshCadencePreference = nextRefreshCadencePreference
-        }
-
-        let nextEnergyChangeSensitivity = Self.enumPreference(
-            defaults: defaults,
-            key: Key.energyChangeSensitivity,
+        applyDefaultEnumPreference(
+            \.energyChangeSensitivity,
+            forKey: Key.energyChangeSensitivity,
             defaultValue: EnergyChangeSensitivity.balanced
         )
-        if energyChangeSensitivity != nextEnergyChangeSensitivity {
-            energyChangeSensitivity = nextEnergyChangeSensitivity
-        }
-
-        let nextLowBatteryAlertEnabled = Self.boolPreference(
-            defaults: defaults,
-            key: Key.isLowBatteryAlertEnabled,
+        applyDefaultBoolPreference(\.isLowBatteryAlertEnabled, forKey: Key.isLowBatteryAlertEnabled, defaultValue: false)
+        applyDefaultBoolPreference(
+            \.isChargeCompleteAlertEnabled,
+            forKey: Key.isChargeCompleteAlertEnabled,
             defaultValue: false
         )
-        if isLowBatteryAlertEnabled != nextLowBatteryAlertEnabled {
-            isLowBatteryAlertEnabled = nextLowBatteryAlertEnabled
-        }
-
-        let nextChargeCompleteAlertEnabled = Self.boolPreference(
-            defaults: defaults,
-            key: Key.isChargeCompleteAlertEnabled,
+        applyDefaultBoolPreference(
+            \.isHighTemperatureAlertEnabled,
+            forKey: Key.isHighTemperatureAlertEnabled,
             defaultValue: false
         )
-        if isChargeCompleteAlertEnabled != nextChargeCompleteAlertEnabled {
-            isChargeCompleteAlertEnabled = nextChargeCompleteAlertEnabled
-        }
+        applyDefaultBoolPreference(\.isICloudSyncEnabled, forKey: Key.isICloudSyncEnabled, defaultValue: false)
+        applyDefaultBoolPreference(\.isHistoryEnabled, forKey: Key.isHistoryEnabled, defaultValue: false)
 
-        let nextHighTemperatureAlertEnabled = Self.boolPreference(
-            defaults: defaults,
-            key: Key.isHighTemperatureAlertEnabled,
+        if applyDefaultBoolPreference(
+            \.isHistoryICloudSyncEnabled,
+            forKey: Key.isHistoryICloudSyncEnabled,
             defaultValue: false
-        )
-        if isHighTemperatureAlertEnabled != nextHighTemperatureAlertEnabled {
-            isHighTemperatureAlertEnabled = nextHighTemperatureAlertEnabled
-        }
-
-        let nextICloudSyncEnabled = Self.boolPreference(
-            defaults: defaults,
-            key: Key.isICloudSyncEnabled,
-            defaultValue: false
-        )
-        if isICloudSyncEnabled != nextICloudSyncEnabled {
-            isICloudSyncEnabled = nextICloudSyncEnabled
-        }
-
-        let nextHistoryEnabled = Self.boolPreference(
-            defaults: defaults,
-            key: Key.isHistoryEnabled,
-            defaultValue: false
-        )
-        if isHistoryEnabled != nextHistoryEnabled {
-            isHistoryEnabled = nextHistoryEnabled
-        }
-
-        let nextHistoryICloudSyncEnabled = Self.boolPreference(
-            defaults: defaults,
-            key: Key.isHistoryICloudSyncEnabled,
-            defaultValue: false
-        )
-        if isHistoryICloudSyncEnabled != nextHistoryICloudSyncEnabled {
-            isHistoryICloudSyncEnabled = nextHistoryICloudSyncEnabled
-        } else {
+        ) == false {
             resolveHistoryICloudSyncState()
         }
+    }
+
+    @discardableResult
+    private func applyDefaultEnumPreference<Value>(
+        _ keyPath: ReferenceWritableKeyPath<PreferencesStore, Value>,
+        forKey key: String,
+        defaultValue: Value
+    ) -> Bool where Value: RawRepresentable & Equatable, Value.RawValue == String {
+        setPreference(
+            keyPath,
+            to: Self.enumPreference(defaults: defaults, key: key, defaultValue: defaultValue)
+        )
+    }
+
+    @discardableResult
+    private func applyDefaultBoolPreference(
+        _ keyPath: ReferenceWritableKeyPath<PreferencesStore, Bool>,
+        forKey key: String,
+        defaultValue: Bool
+    ) -> Bool {
+        setPreference(
+            keyPath,
+            to: Self.boolPreference(defaults: defaults, key: key, defaultValue: defaultValue)
+        )
     }
 
     private func handleLocaleChange() {
@@ -854,19 +828,25 @@ final class PreferencesStore {
     }
 
     private func applyMenuBarDisplayPreferences(_ nextPreferences: MenuBarDisplayPreferences) -> Bool {
-        var didChange = false
+        let didChangeDisplayMode = setPreference(\.menuBarDisplayMode, to: nextPreferences.displayMode)
+        let didChangeTemperatureUnit = setPreference(
+            \.temperatureUnitPreference,
+            to: nextPreferences.temperatureUnitPreference
+        )
+        return didChangeDisplayMode || didChangeTemperatureUnit
+    }
 
-        if menuBarDisplayMode != nextPreferences.displayMode {
-            menuBarDisplayMode = nextPreferences.displayMode
-            didChange = true
+    @discardableResult
+    private func setPreference<Value: Equatable>(
+        _ keyPath: ReferenceWritableKeyPath<PreferencesStore, Value>,
+        to nextValue: Value
+    ) -> Bool {
+        guard self[keyPath: keyPath] != nextValue else {
+            return false
         }
 
-        if temperatureUnitPreference != nextPreferences.temperatureUnitPreference {
-            temperatureUnitPreference = nextPreferences.temperatureUnitPreference
-            didChange = true
-        }
-
-        return didChange
+        self[keyPath: keyPath] = nextValue
+        return true
     }
 
     private func clearSyncedValues() {
