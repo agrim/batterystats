@@ -189,6 +189,15 @@ enum BatteryCalculations {
         return value
     }
 
+    static func positiveWattHours(_ value: Double?) -> Double? {
+        guard let value = plausibleWattHours(value),
+              value > 0 else {
+            return nil
+        }
+
+        return value
+    }
+
     static func plausibleWatts(_ value: Double?) -> Double? {
         guard let value,
               value.isFinite,

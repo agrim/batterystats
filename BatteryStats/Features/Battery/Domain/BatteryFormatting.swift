@@ -170,7 +170,7 @@ enum BatteryFormatting {
 
     static func compactWattHourPair(current: Double?, maximum: Double?) -> String {
         let current = BatteryCalculations.plausibleWattHours(current)
-        let maximum = positiveWattHours(maximum)
+        let maximum = BatteryCalculations.positiveWattHours(maximum)
         let displayCurrent = displayablePairCurrent(current: current, maximum: maximum)
 
         switch (displayCurrent, maximum) {
@@ -191,15 +191,6 @@ enum BatteryFormatting {
 
     private static func wattHourNumber(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(1)))
-    }
-
-    private static func positiveWattHours(_ value: Double?) -> Double? {
-        guard let value = BatteryCalculations.plausibleWattHours(value),
-              value > 0 else {
-            return nil
-        }
-
-        return value
     }
 
     private static func displayablePairCurrent(current: Int?, maximum: Int?) -> Int? {

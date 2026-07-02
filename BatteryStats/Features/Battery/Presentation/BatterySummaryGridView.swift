@@ -270,7 +270,7 @@ enum BatterySummaryDetailFormatting {
 
     static func energy(current: Double?, maximum: Double?) -> String? {
         let current = BatteryCalculations.plausibleWattHours(current)
-        let maximum = positiveWattHours(maximum)
+        let maximum = BatteryCalculations.positiveWattHours(maximum)
 
         guard current != nil || maximum != nil else {
             return nil
@@ -297,15 +297,6 @@ enum BatterySummaryDetailFormatting {
 
     static func age(for snapshot: BatterySnapshot) -> String? {
         age(snapshot.validatedBatteryAgeComponents)
-    }
-
-    private static func positiveWattHours(_ value: Double?) -> Double? {
-        guard let value = BatteryCalculations.plausibleWattHours(value),
-              value > 0 else {
-            return nil
-        }
-
-        return value
     }
 }
 
