@@ -326,6 +326,29 @@ enum BatteryCalculations {
         return minutes
     }
 
+    static func chargedCapacityEvidence(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?
+    ) -> Bool? {
+        guard let currentChargeMilliampHours = plausibleCapacityMilliampHours(currentChargeMilliampHours) else {
+            return nil
+        }
+
+        if currentChargeMilliampHours == 0 {
+            return nil
+        }
+
+        guard let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(
+            fullChargeCapacityMilliampHours,
+            allowsZero: false
+        ) else {
+            return nil
+        }
+
+        let threshold = max(8, Int(Double(fullChargeCapacityMilliampHours) * 0.01))
+        return currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold
+    }
+
     static func estimatedTimeToFullMinutes(
         currentChargeMilliampHours: Int?,
         fullChargeCapacityMilliampHours: Int?,
@@ -575,12 +598,11 @@ enum BatteryCalculations {
             return .fullOnAC
         }
 
-        if let currentChargeMilliampHours = plausibleCapacityMilliampHours(currentChargeMilliampHours),
-           let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(fullChargeCapacityMilliampHours, allowsZero: false) {
-            let threshold = max(8, Int(Double(fullChargeCapacityMilliampHours) * 0.01))
-            if currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold {
-                return .fullOnAC
-            }
+        if chargedCapacityEvidence(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        ) == true {
+            return .fullOnAC
         }
 
         return isExternalPowerConnected ? .connectedNotCharging : .unknown

@@ -489,7 +489,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             return stateOfChargePercent >= 99 && stateOfChargePercent <= 105
         }
 
-        return chargedCapacityEvidence(
+        return BatteryCalculations.chargedCapacityEvidence(
             currentChargeMilliampHours: currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
         ) == true
@@ -506,7 +506,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             return false
         }
 
-        if let capacityEvidence = chargedCapacityEvidence(
+        if let capacityEvidence = BatteryCalculations.chargedCapacityEvidence(
             currentChargeMilliampHours: snapshot.currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
         ) {
@@ -554,29 +554,6 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
         case .charging, .unknown:
             return value
         }
-    }
-
-    private static func chargedCapacityEvidence(
-        currentChargeMilliampHours: Int?,
-        fullChargeCapacityMilliampHours: Int?
-    ) -> Bool? {
-        guard let currentChargeMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(currentChargeMilliampHours) else {
-            return nil
-        }
-
-        if currentChargeMilliampHours == 0 {
-            return nil
-        }
-
-        guard let fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
-            fullChargeCapacityMilliampHours,
-            allowsZero: false
-        ) else {
-            return nil
-        }
-
-        let threshold = max(8, Int(Double(fullChargeCapacityMilliampHours) * 0.01))
-        return currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold
     }
 
 }
