@@ -696,16 +696,10 @@ private struct WidgetTimelineReloadSignature: Equatable {
         displayedTimeMinutes = snapshot?.displayedTimeMinutes
         timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).identityToken
         activePowerDeciwatts = Self.roundedInt(snapshot?.activePowerWatts, multiplier: 10)
-        usesInputPowerWatts = Self.usesInputPowerWatts(snapshot)
+        usesInputPowerWatts = snapshot?.visibleInputPowerWatts != nil
         statusSymbolName = statusDescriptor.symbolName
         statusRingTint = statusDescriptor.ringTintStyle.identityToken
         statusContentTint = statusDescriptor.contentTintStyle.identityToken
-    }
-
-    private static func usesInputPowerWatts(_ snapshot: BatterySnapshot?) -> Bool {
-        snapshot.map {
-            $0.powerState.isExternallyPowered && $0.visibleInputPowerWatts != nil
-        } ?? false
     }
 
     private static func minuteIdentifier(_ date: Date?) -> Int? {
