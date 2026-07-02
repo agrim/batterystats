@@ -154,21 +154,10 @@ private final class SettingsWindowController {
             historyStore: historyStore
         )
         self.window = window
-        configureWindowForCurrentSpace(window)
+        BatteryWindowSpaceBehavior.applyActiveSpacePresentation(to: window)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    private func configureWindowForCurrentSpace(_ window: NSWindow) {
-        var behavior = window.collectionBehavior
-        behavior.remove(.canJoinAllSpaces)
-        behavior.formUnion([
-            .canJoinAllApplications,
-            .fullScreenAuxiliary,
-            .moveToActiveSpace
-        ])
-        window.collectionBehavior = behavior
     }
 
     private func makeWindow(

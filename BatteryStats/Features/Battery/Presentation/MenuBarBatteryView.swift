@@ -222,13 +222,6 @@ final class MenuBarBatteryLabelModel {
 @MainActor
 final class MenuBarStatusItemController: NSObject {
     private static let panelGlobalDismissalGrace: TimeInterval = 1.25
-    private static let panelCollectionBehavior: NSWindow.CollectionBehavior = [
-        .canJoinAllApplications,
-        .fullScreenAuxiliary,
-        .moveToActiveSpace,
-        .transient,
-        .ignoresCycle
-    ]
 
     private let monitor: BatteryMonitor
     private let preferences: PreferencesStore
@@ -523,7 +516,7 @@ final class MenuBarStatusItemController: NSObject {
 
     private func preparePanelForActiveSpacePresentation(_ panel: NSPanel) {
         panel.parent?.removeChildWindow(panel)
-        panel.collectionBehavior = Self.panelCollectionBehavior
+        panel.collectionBehavior = BatteryWindowSpaceBehavior.menuBarPanelPresentation
         panel.level = .popUpMenu
     }
 
@@ -593,7 +586,7 @@ final class MenuBarStatusItemController: NSObject {
         panel.isMovable = false
         panel.worksWhenModal = true
         panel.level = .popUpMenu
-        panel.collectionBehavior = Self.panelCollectionBehavior
+        panel.collectionBehavior = BatteryWindowSpaceBehavior.menuBarPanelPresentation
         return panel
     }
 

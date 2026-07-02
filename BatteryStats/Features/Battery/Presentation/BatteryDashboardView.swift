@@ -97,7 +97,7 @@ private struct BatteryDashboardWindowObserver: NSViewRepresentable {
 
             windowLookupTask?.cancel()
             windowLookupTask = nil
-            Self.configure(window)
+            BatteryWindowSpaceBehavior.applyActiveSpacePresentation(to: window)
 
             guard observedWindow !== window else {
                 return
@@ -167,17 +167,6 @@ private struct BatteryDashboardWindowObserver: NSViewRepresentable {
         private func removeObservers() {
             observationTokens.forEach(NotificationCenter.default.removeObserver)
             observationTokens.removeAll()
-        }
-
-        private static func configure(_ window: NSWindow) {
-            var behavior = window.collectionBehavior
-            behavior.remove(.canJoinAllSpaces)
-            behavior.formUnion([
-                .canJoinAllApplications,
-                .fullScreenAuxiliary,
-                .moveToActiveSpace
-            ])
-            window.collectionBehavior = behavior
         }
     }
 }
