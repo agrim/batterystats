@@ -162,16 +162,8 @@ enum BatterySummaryDetailFormatting {
     }
 
     static func timeSummary(for snapshot: BatterySnapshot) -> String {
-        let timeText: String?
-        switch snapshot.powerState {
-        case .onBattery, .connectedDischarging, .charging:
-            if let displayedTimeMinutes = BatteryCalculations.plausibleDurationMinutes(snapshot.displayedTimeMinutes) {
-                timeText = BatteryFormatting.compactDuration(minutes: displayedTimeMinutes)
-            } else {
-                timeText = nil
-            }
-        case .connectedNotCharging, .fullOnAC, .unknown:
-            timeText = nil
+        let timeText = snapshot.displayedTimeMinutes.map {
+            BatteryFormatting.compactDuration(minutes: $0)
         }
 
         let rateText: String?
