@@ -125,13 +125,13 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
         let batteryAgeComponents = BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: ageReferenceDate)
         let fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.fullChargeCapacityMilliampHours, allowsZero: false)
         let designCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.designCapacityMilliampHours, allowsZero: false)
-        let storedHealthPercent = percent(snapshot.healthPercent, maximumAllowed: 120)
+        let storedHealthPercent = BatteryCalculations.presentationPercent(snapshot.healthPercent, maximumAllowed: 120)
         let derivedHealthPercent = BatteryCalculations.healthPercent(
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             designCapacityMilliampHours: designCapacityMilliampHours
         )
         let healthPercent = derivedHealthPercent ?? storedHealthPercent
-        let storedStateOfChargePercent = percent(snapshot.stateOfChargePercent, maximumAllowed: 105)
+        let storedStateOfChargePercent = BatteryCalculations.presentationPercent(snapshot.stateOfChargePercent, maximumAllowed: 105)
         let currentMilliampsSigned = signedCurrentMilliampsForStoredPowerState(
             snapshot.currentMilliampsSigned,
             powerState: snapshot.powerState
@@ -389,16 +389,6 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
         }
 
         return value
-    }
-
-    private static func percent(_ value: Double?, maximumAllowed: Double) -> Double? {
-        guard let value = finite(value),
-              value >= 0,
-              value <= maximumAllowed else {
-            return nil
-        }
-
-        return min(100, value)
     }
 
     private static func rateBasedTimeRemainingMinutes(

@@ -17,8 +17,8 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
         let powerState = Self.validPowerState(snapshot.powerState.rawValue)
         timestamp = snapshot.timestamp
         self.powerState = powerState
-        healthPercent = Self.percent(snapshot.healthPercent, maximumAllowed: 120)
-        stateOfChargePercent = Self.percent(snapshot.stateOfChargePercent, maximumAllowed: 105)
+        healthPercent = BatteryCalculations.presentationPercent(snapshot.healthPercent, maximumAllowed: 120)
+        stateOfChargePercent = BatteryCalculations.presentationPercent(snapshot.stateOfChargePercent, maximumAllowed: 105)
         displayedTimeMinutes = Self.displayedTimeMinutes(snapshot.displayedTimeMinutes, powerState: powerState)
         activePowerWatts = Self.activePowerWatts(snapshot.activePowerWatts, powerState: powerState)
         temperatureCelsius = BatteryCalculations.plausibleTemperatureCelsius(snapshot.temperatureCelsius)
@@ -50,31 +50,13 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
         return BatteryHistoryEntry(
             timestamp: timestamp,
             powerState: powerState,
-            healthPercent: Self.percent(healthPercent, maximumAllowed: 120),
-            stateOfChargePercent: Self.percent(stateOfChargePercent, maximumAllowed: 105),
+            healthPercent: BatteryCalculations.presentationPercent(healthPercent, maximumAllowed: 120),
+            stateOfChargePercent: BatteryCalculations.presentationPercent(stateOfChargePercent, maximumAllowed: 105),
             displayedTimeMinutes: Self.displayedTimeMinutes(displayedTimeMinutes, powerState: powerState),
             activePowerWatts: Self.activePowerWatts(activePowerWatts, powerState: powerState),
             temperatureCelsius: BatteryCalculations.plausibleTemperatureCelsius(temperatureCelsius),
             cycleCount: BatteryCalculations.plausibleCycleCount(cycleCount)
         )
-    }
-
-    private static func finite(_ value: Double?) -> Double? {
-        guard let value, value.isFinite else {
-            return nil
-        }
-
-        return value
-    }
-
-    private static func percent(_ value: Double?, maximumAllowed: Double) -> Double? {
-        guard let value = finite(value),
-              value >= 0,
-              value <= maximumAllowed else {
-            return nil
-        }
-
-        return min(100, value)
     }
 
     private static func validPowerState(_ value: String) -> String {

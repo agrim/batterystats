@@ -108,11 +108,11 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     var presentationHealthPercent: Double? {
-        Self.presentationPercent(healthPercent, maximumAllowed: 120)
+        BatteryCalculations.presentationPercent(healthPercent, maximumAllowed: 120)
     }
 
     var presentationStateOfChargePercent: Double? {
-        Self.presentationPercent(stateOfChargePercent, maximumAllowed: 105)
+        BatteryCalculations.presentationPercent(stateOfChargePercent, maximumAllowed: 105)
     }
 
     var presentationTemperatureCelsius: Double? {
@@ -369,17 +369,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         }
 
         return "\(value) W"
-    }
-
-    private static func presentationPercent(_ value: Double?, maximumAllowed: Double) -> Double? {
-        guard let value,
-              value.isFinite,
-              value >= 0,
-              value <= maximumAllowed else {
-            return nil
-        }
-
-        return min(100, value)
     }
 
     func updating(rateBasedTimeRemainingMinutes: Int?, timestamp: Date? = nil) -> BatterySnapshot {
