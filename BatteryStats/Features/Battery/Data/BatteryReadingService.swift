@@ -347,8 +347,7 @@ struct BatteryReadingService: Sendable {
             publicSnapshot: publicSnapshot,
             smartBattery: smartBattery,
             isCharging: isCharging,
-            isCharged: isCharged,
-            signedCurrentMilliamps: signedCurrentMilliamps
+            isCharged: isCharged
         )
 
         return BatteryCalculations.derivePowerState(
@@ -490,20 +489,10 @@ struct BatteryReadingService: Sendable {
         publicSnapshot: PublicPowerSourceSnapshot,
         smartBattery: SmartBatteryDetails?,
         isCharging: Bool,
-        isCharged: Bool,
-        signedCurrentMilliamps: Int?
+        isCharged: Bool
     ) -> Bool {
-        if isCharging {
+        if isCharging || isCharged {
             return true
-        }
-
-        if isCharged {
-            return true
-        }
-
-        if publicSnapshot.explicitlyReportsBatteryPower,
-           BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) != nil {
-            return false
         }
 
         if hasExplicitDisconnectEvidence(publicSnapshot: publicSnapshot, smartBattery: smartBattery) {
@@ -522,15 +511,11 @@ struct BatteryReadingService: Sendable {
             return true
         }
 
-        if publicSnapshot.explicitlyReportsBatteryPower {
-            return false
-        }
-
         if let smartExternalPowerConnected = smartBattery?.isExternalPowerConnected {
             return smartExternalPowerConnected
         }
 
-        return publicSnapshot.reportedExternalPowerConnected || isCharged
+        return false
     }
 
     private static func hasExplicitDisconnectEvidence(
