@@ -723,7 +723,7 @@ enum BatteryWidgetCompactDisplayPolicy {
     ) -> BatterySnapshot? {
         guard let snapshot,
               let updatedAt,
-              BatteryWidgetSnapshotFreshness.isLive(updatedAt: updatedAt, now: now) else {
+              BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: now) else {
             return nil
         }
 
@@ -737,12 +737,12 @@ enum BatteryWidgetUpdateFormatting {
             return "No update"
         }
 
-        guard BatteryWidgetSnapshotFreshness.isWithinFutureSkew(updatedAt: updatedAt, now: now) else {
+        guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: updatedAt, now: now) else {
             return "Waiting for update"
         }
 
-        let relativeText = relativeUpdateText(updatedAt: updatedAt, now: now)
-        guard BatteryWidgetSnapshotFreshness.isLive(updatedAt: updatedAt, now: now) else {
+        let relativeText = BatterySnapshotFreshnessPolicy.relativeUpdateText(updatedAt: updatedAt, now: now)
+        guard BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: now) else {
             return "Stale \(relativeText)"
         }
 
@@ -755,33 +755,33 @@ enum BatteryWidgetUpdateFormatting {
         }
 
         let futureOffset = updatedAt.timeIntervalSince(now)
-        if futureOffset > BatteryWidgetSnapshotFreshness.allowableFutureSkew {
-            return updatedAt.addingTimeInterval(-BatteryWidgetSnapshotFreshness.allowableFutureSkew)
+        if futureOffset > BatterySnapshotFreshnessPolicy.allowableFutureSkew {
+            return updatedAt.addingTimeInterval(-BatterySnapshotFreshnessPolicy.allowableFutureSkew)
         }
 
-        let elapsedSeconds = max(0, now.timeIntervalSince(updatedAt))
-        let nextRelativeDate: Date
-        if elapsedSeconds < 60 {
-            nextRelativeDate = updatedAt.addingTimeInterval(60)
-        } else if elapsedSeconds < 60 * 60 {
-            let elapsedMinute = floor(elapsedSeconds / 60)
-            nextRelativeDate = updatedAt.addingTimeInterval((elapsedMinute + 1) * 60)
-        } else if elapsedSeconds < 24 * 60 * 60 {
-            let elapsedHour = floor(elapsedSeconds / (60 * 60))
-            nextRelativeDate = updatedAt.addingTimeInterval((elapsedHour + 1) * 60 * 60)
-        } else {
-            let elapsedDay = floor(elapsedSeconds / (24 * 60 * 60))
-            nextRelativeDate = updatedAt.addingTimeInterval((elapsedDay + 1) * 24 * 60 * 60)
-        }
-
+        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateDate(updatedAt: updatedAt, now: now)
         let staleDate = updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultMaximumAge + 1)
         let retentionDate = updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultRetentionAge + 1)
         return [nextRelativeDate, staleDate, retentionDate]
             .filter { $0 > now }
             .min() ?? now.addingTimeInterval(300)
     }
+}
 
-    private static func relativeUpdateText(updatedAt: Date, now: Date) -> String {
+enum BatterySnapshotFreshnessPolicy {
+    static let allowableFutureSkew: TimeInterval = 60
+    static let maximumLiveAge: TimeInterval = BatteryWidgetSnapshotStore.defaultMaximumAge
+
+    static func isLive(updatedAt: Date, now: Date) -> Bool {
+        isWithinFutureSkew(updatedAt: updatedAt, now: now)
+            && now.timeIntervalSince(updatedAt) <= maximumLiveAge
+    }
+
+    static func isWithinFutureSkew(updatedAt: Date, now: Date) -> Bool {
+        updatedAt.timeIntervalSince(now) <= allowableFutureSkew
+    }
+
+    static func relativeUpdateText(updatedAt: Date, now: Date) -> String {
         let elapsedSeconds = max(0, Int(now.timeIntervalSince(updatedAt).rounded(.down)))
         if elapsedSeconds < 60 {
             return "just now"
@@ -800,17 +800,24 @@ enum BatteryWidgetUpdateFormatting {
         let elapsedDays = elapsedHours / 24
         return "\(elapsedDays)d ago"
     }
-}
 
-enum BatteryWidgetSnapshotFreshness {
-    static let allowableFutureSkew: TimeInterval = 60
+    static func nextRelativeUpdateDate(updatedAt: Date, now: Date) -> Date {
+        let elapsedSeconds = max(0, now.timeIntervalSince(updatedAt))
+        if elapsedSeconds < 60 {
+            return updatedAt.addingTimeInterval(60)
+        }
 
-    static func isLive(updatedAt: Date, now: Date) -> Bool {
-        isWithinFutureSkew(updatedAt: updatedAt, now: now)
-            && now.timeIntervalSince(updatedAt) <= BatteryWidgetSnapshotStore.defaultMaximumAge
-    }
+        if elapsedSeconds < 60 * 60 {
+            let elapsedMinute = floor(elapsedSeconds / 60)
+            return updatedAt.addingTimeInterval((elapsedMinute + 1) * 60)
+        }
 
-    static func isWithinFutureSkew(updatedAt: Date, now: Date) -> Bool {
-        updatedAt.timeIntervalSince(now) <= allowableFutureSkew
+        if elapsedSeconds < 24 * 60 * 60 {
+            let elapsedHour = floor(elapsedSeconds / (60 * 60))
+            return updatedAt.addingTimeInterval((elapsedHour + 1) * 60 * 60)
+        }
+
+        let elapsedDay = floor(elapsedSeconds / (24 * 60 * 60))
+        return updatedAt.addingTimeInterval((elapsedDay + 1) * 24 * 60 * 60)
     }
 }

@@ -1,8 +1,8 @@
 import Foundation
 
 enum BatteryFreshnessFormatting {
-    static let allowableFutureSkew: TimeInterval = 60
-    static let maximumLiveAge: TimeInterval = 10 * 60
+    static let allowableFutureSkew = BatterySnapshotFreshnessPolicy.allowableFutureSkew
+    static let maximumLiveAge = BatterySnapshotFreshnessPolicy.maximumLiveAge
 
     static func statusText(lastUpdated: Date?, now: Date, isRefreshing: Bool) -> String {
         if isRefreshing {
@@ -13,35 +13,16 @@ enum BatteryFreshnessFormatting {
             return "Waiting for battery change"
         }
 
+        guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: lastUpdated, now: now) else {
+            return "Waiting for battery change"
+        }
+
+        let relativeText = BatterySnapshotFreshnessPolicy.relativeUpdateText(updatedAt: lastUpdated, now: now)
         guard hasUsableUpdate(lastUpdated: lastUpdated, now: now) else {
-            if lastUpdated.timeIntervalSince(now) > allowableFutureSkew {
-                return "Waiting for battery change"
-            }
-
-            return "Stale - Updated \(relativeUpdateText(lastUpdated: lastUpdated, now: now))"
+            return "Stale - Updated \(relativeText)"
         }
 
-        return "Live - Updated \(relativeUpdateText(lastUpdated: lastUpdated, now: now))"
-    }
-
-    private static func relativeUpdateText(lastUpdated: Date, now: Date) -> String {
-        let elapsedSeconds = max(0, Int(now.timeIntervalSince(lastUpdated).rounded(.down)))
-        if elapsedSeconds < 60 {
-            return "just now"
-        }
-
-        let elapsedMinutes = elapsedSeconds / 60
-        if elapsedMinutes < 60 {
-            return "\(elapsedMinutes)m ago"
-        }
-
-        let elapsedHours = elapsedMinutes / 60
-        if elapsedHours < 24 {
-            return "\(elapsedHours)h ago"
-        }
-
-        let elapsedDays = elapsedHours / 24
-        return "\(elapsedDays)d ago"
+        return "Live - Updated \(relativeText)"
     }
 
     static func hasUsableUpdate(lastUpdated: Date?, now: Date) -> Bool {
@@ -49,8 +30,7 @@ enum BatteryFreshnessFormatting {
             return false
         }
 
-        return lastUpdated.timeIntervalSince(now) <= allowableFutureSkew
-            && now.timeIntervalSince(lastUpdated) <= maximumLiveAge
+        return BatterySnapshotFreshnessPolicy.isLive(updatedAt: lastUpdated, now: now)
     }
 
     static func nextStatusChangeDate(lastUpdated: Date?, now: Date, isRefreshing: Bool) -> Date {
@@ -64,20 +44,7 @@ enum BatteryFreshnessFormatting {
             return lastUpdated.addingTimeInterval(-allowableFutureSkew)
         }
 
-        let elapsedSeconds = max(0, now.timeIntervalSince(lastUpdated))
-        let nextRelativeDate: Date
-        if elapsedSeconds < 60 {
-            nextRelativeDate = lastUpdated.addingTimeInterval(60)
-        } else if elapsedSeconds < 60 * 60 {
-            let elapsedMinute = floor(elapsedSeconds / 60)
-            nextRelativeDate = lastUpdated.addingTimeInterval((elapsedMinute + 1) * 60)
-        } else if elapsedSeconds < 24 * 60 * 60 {
-            let elapsedHour = floor(elapsedSeconds / (60 * 60))
-            nextRelativeDate = lastUpdated.addingTimeInterval((elapsedHour + 1) * 60 * 60)
-        } else {
-            let elapsedDay = floor(elapsedSeconds / (24 * 60 * 60))
-            nextRelativeDate = lastUpdated.addingTimeInterval((elapsedDay + 1) * 24 * 60 * 60)
-        }
+        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateDate(updatedAt: lastUpdated, now: now)
 
         if hasUsableUpdate(lastUpdated: lastUpdated, now: now) {
             let staleDate = lastUpdated.addingTimeInterval(maximumLiveAge + 1)
