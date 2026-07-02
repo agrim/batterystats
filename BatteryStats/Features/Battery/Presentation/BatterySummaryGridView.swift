@@ -33,7 +33,10 @@ struct BatterySummaryGridView: View {
 
             GroupBox {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 0) {
-                    BatteryDetailRowView(title: timeTitle, value: timeSummary)
+                    BatteryDetailRowView(
+                        title: BatterySummaryDetailFormatting.timeTitle(for: snapshot),
+                        value: BatterySummaryDetailFormatting.timeSummary(for: snapshot)
+                    )
 
                     Divider()
                         .gridCellColumns(2)
@@ -71,14 +74,6 @@ struct BatterySummaryGridView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var timeTitle: String {
-        BatterySummaryDetailFormatting.timeTitle(for: snapshot)
-    }
-
-    private var timeSummary: String {
-        BatterySummaryDetailFormatting.timeSummary(for: snapshot)
     }
 
     @ViewBuilder
@@ -328,6 +323,8 @@ private struct BatteryCapacityBarSectionView: View {
     let tint: Color
 
     var body: some View {
+        let progressPresentation = BatteryCapacityProgressPresentation(progress: progress)
+
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: Self.valueSpacing) {
                 Text(title)
@@ -356,10 +353,6 @@ private struct BatteryCapacityBarSectionView: View {
                     .animation(valueAnimation, value: percentValue)
             }
         }
-    }
-
-    private var progressPresentation: BatteryCapacityProgressPresentation {
-        BatteryCapacityProgressPresentation(progress: progress)
     }
 
     private var valueAnimation: Animation? {
