@@ -831,17 +831,14 @@ enum MenuBarStatusItemRenderer {
         button.contentTintColor = nil
         button.setAccessibilityLabel(nil)
 
-        statusItem.length = content.length
         let renderedTitle = attributedStatusTitle(content.title, font: button.font)
         button.image = image
         button.title = content.title
         button.attributedTitle = renderedTitle
         button.imagePosition = content.imagePosition
         button.imageScaling = .scaleProportionallyDown
-        button.contentTintColor = nil
         button.toolTip = content.accessibilityLabel
         button.setAccessibilityLabel(content.accessibilityLabel)
-        button.imagePosition = content.imagePosition
         button.invalidateIntrinsicContentSize()
         button.needsLayout = true
         button.needsDisplay = true
