@@ -21,8 +21,7 @@ final class WidgetSourceTests: XCTestCase {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatterySummaryGridView.swift")
 
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.powerTitle(for: snapshot)"))
-        XCTAssertTrue(source.contains("return \"Input Power\""))
-        XCTAssertTrue(source.contains("return \"Charge Rate\""))
+        XCTAssertTrue(source.contains("BatteryPowerTitleFormatting.title(for: snapshot)"))
         XCTAssertTrue(source.contains("powerConnectionRows\n\n                    if showsAdvancedValues {"))
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts)"))
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"))

@@ -680,30 +680,36 @@ enum BatteryMediumWidgetFormatting {
     }
 
     static func powerTitle(for snapshot: BatterySnapshot?) -> String {
-        switch snapshot?.powerState {
-        case .charging:
-            if snapshot?.visibleInputPowerWatts != nil {
-                return "Input Power"
-            }
+        BatteryPowerTitleFormatting.title(for: snapshot)
+    }
+}
 
-            if BatteryCalculations.plausibleWatts(snapshot?.chargeRateWatts) != nil {
-                return "Charge Rate"
+enum BatteryPowerTitleFormatting {
+    static func title(for snapshot: BatterySnapshot?) -> String {
+        guard let snapshot else {
+            return "Power"
+        }
+
+        switch snapshot.powerState {
+        case .charging:
+            if snapshot.visibleInputPowerWatts != nil {
+                return "Input Power"
             }
 
             return "Charge Rate"
         case .connectedDischarging:
-            if snapshot?.visibleInputPowerWatts != nil {
+            if snapshot.visibleInputPowerWatts != nil {
                 return "Input Power"
             }
 
             return "Battery Drain"
         case .connectedNotCharging, .fullOnAC:
-            if snapshot?.visibleInputPowerWatts != nil {
+            if snapshot.visibleInputPowerWatts != nil {
                 return "Input Power"
             }
 
             return "Power"
-        case .onBattery, .unknown, nil:
+        case .onBattery, .unknown:
             return "Power"
         }
     }

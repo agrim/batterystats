@@ -264,34 +264,7 @@ enum BatterySummaryDetailFormatting {
     }
 
     static func powerTitle(for snapshot: BatterySnapshot) -> String {
-        switch snapshot.powerState {
-        case .charging:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Input Power"
-            }
-
-            if BatteryCalculations.plausibleWatts(snapshot.chargeRateWatts) != nil {
-                return "Charge Rate"
-            }
-
-            return "Charge Rate"
-        case .connectedDischarging:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Input Power"
-            }
-
-            return "Battery Drain"
-        case .onBattery:
-            return "Power"
-        case .connectedNotCharging, .fullOnAC:
-            if snapshot.visibleInputPowerWatts != nil {
-                return "Input Power"
-            }
-
-            return "Power"
-        case .unknown:
-            return "Power"
-        }
+        BatteryPowerTitleFormatting.title(for: snapshot)
     }
 
     static func voltage(_ value: Int?) -> String? {
