@@ -151,18 +151,11 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     private var validatedInputPowerWatts: Double? {
-        switch inputPowerEvidence {
-        case .counterBacked:
-            return BatteryCalculations.displayableCounterBackedInputPowerWatts(
-                inputPowerWatts,
-                adapterMaxWatts: adapterMaxWatts
-            )
-        case nil:
-            return BatteryCalculations.displayableInputPowerWatts(
-                inputPowerWatts,
-                adapterMaxWatts: adapterMaxWatts
-            )
-        }
+        BatteryCalculations.displayableInputPowerWatts(
+            inputPowerWatts,
+            evidence: inputPowerEvidence,
+            adapterMaxWatts: adapterMaxWatts
+        )
     }
 
     var activeCurrentMilliamps: Int? {

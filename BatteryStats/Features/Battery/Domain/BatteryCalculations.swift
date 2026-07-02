@@ -259,6 +259,19 @@ enum BatteryCalculations {
         return value
     }
 
+    static func displayableInputPowerWatts(
+        _ value: Double?,
+        evidence: BatteryInputPowerEvidence?,
+        adapterMaxWatts: Int?
+    ) -> Double? {
+        switch evidence {
+        case .counterBacked:
+            return displayableCounterBackedInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts)
+        case nil:
+            return displayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts)
+        }
+    }
+
     private static func baseDisplayableInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
         guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts) else {
             return nil

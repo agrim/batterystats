@@ -413,7 +413,7 @@ struct BatteryReadingService: Sendable {
         adapterMaxWatts: Int? = nil,
         powerState: BatteryPowerState
     ) -> Double? {
-        guard let inputPowerWatts = displayableInputPowerWatts(
+        guard let inputPowerWatts = BatteryCalculations.displayableInputPowerWatts(
             inputPowerWatts,
             evidence: evidence,
             adapterMaxWatts: adapterMaxWatts
@@ -547,7 +547,7 @@ struct BatteryReadingService: Sendable {
             return true
         }
 
-        if displayableInputPowerWatts(
+        if BatteryCalculations.displayableInputPowerWatts(
             inputPowerWatts,
             evidence: inputPowerEvidence,
             adapterMaxWatts: adapterMaxWatts
@@ -575,7 +575,7 @@ struct BatteryReadingService: Sendable {
     }
 
     private static func trustedInputPowerWatts(smartBattery: SmartBatteryDetails?) -> Double? {
-        displayableInputPowerWatts(
+        BatteryCalculations.displayableInputPowerWatts(
             smartBattery?.inputPowerWatts,
             evidence: smartBattery?.inputPowerEvidence,
             adapterMaxWatts: smartBattery?.adapterMaxWatts
@@ -594,25 +594,6 @@ struct BatteryReadingService: Sendable {
             ),
             adapterMaxWatts: adapterMaxWatts
         )
-    }
-
-    private static func displayableInputPowerWatts(
-        _ inputPowerWatts: Double?,
-        evidence: BatteryInputPowerEvidence? = nil,
-        adapterMaxWatts: Int?
-    ) -> Double? {
-        switch evidence {
-        case .counterBacked:
-            return BatteryCalculations.displayableCounterBackedInputPowerWatts(
-                inputPowerWatts,
-                adapterMaxWatts: adapterMaxWatts
-            )
-        case nil:
-            return BatteryCalculations.displayableInputPowerWatts(
-                inputPowerWatts,
-                adapterMaxWatts: adapterMaxWatts
-            )
-        }
     }
 
     private static func isEffectivelyFullForZeroTimeToFull(
