@@ -5,7 +5,7 @@ import XCTest
 final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     @MainActor
     func testLabelStateReadsCurrentSharedPreferences() {
-        let suiteName = "MenuBarBatteryLabelViewTests-\(UUID().uuidString)"
+        let suiteName = "MenuBarBatteryLabelStateTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
@@ -84,84 +84,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             ),
             "94°"
         )
-    }
-
-    @MainActor
-    func testLabelViewStateFollowsLiveSettingsChanges() async {
-        let suiteName = "MenuBarBatteryLabelLiveSettingsTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
-        let view = MenuBarBatteryLabelView(model: model)
-
-        XCTAssertEqual(view.state.value, "92%")
-
-        preferences.menuBarDisplayMode = .iconOnly
-        await Task.yield()
-
-        XCTAssertNil(view.state.value)
-
-        preferences.menuBarDisplayMode = .iconAndTemperature
-        preferences.temperatureUnitPreference = .fahrenheit
-        await Task.yield()
-
-        XCTAssertEqual(view.state.value, "94°")
-    }
-
-    @MainActor
-    func testLabelModelTracksDisplayPreferenceChangesWithoutPolling() async {
-        let suiteName = "MenuBarBatteryLabelModelTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
-
-        XCTAssertEqual(model.state.value, "92%")
-
-        preferences.menuBarDisplayMode = .iconOnly
-        await Task.yield()
-
-        XCTAssertNil(model.state.value)
-
-        preferences.menuBarDisplayMode = .iconAndPower
-        await Task.yield()
-
-        XCTAssertEqual(model.state.value, "13.9W")
-    }
-
-    @MainActor
-    func testLabelModelNotifiesStatusItemInvalidatorOnPreferenceChanges() async {
-        let suiteName = "MenuBarBatteryLabelInvalidatorTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
-
-        var observedIdentities: [String] = []
-        model.stateDidChange = { state in
-            observedIdentities.append(state.identity)
-        }
-
-        preferences.menuBarDisplayMode = .iconOnly
-        await Task.yield()
-
-        XCTAssertEqual(observedIdentities, [model.state.identity])
-        XCTAssertNil(model.state.value)
-
-        preferences.menuBarDisplayMode = .iconAndPower
-        await Task.yield()
-
-        XCTAssertEqual(observedIdentities.last, model.state.identity)
-        XCTAssertEqual(observedIdentities.count, 2)
-        XCTAssertEqual(model.state.value, "13.9W")
     }
 
     func testMenuPanelPresentationDoesNotScheduleDuplicateVisibleSurfaceRefresh() throws {
@@ -255,7 +177,8 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(menuBarSource.contains("let invalidation = MenuBarDisplayPreferencesInvalidation(notification: notification)"))
         XCTAssertTrue(menuBarSource.contains("preferences.shouldAcceptMenuBarDisplayPreferencesInvalidation(invalidation)"))
         XCTAssertTrue(menuBarSource.contains("preferences.refreshMenuBarDisplayPreferences(from: invalidation.displayPreferences)"))
-        XCTAssertTrue(menuBarSource.contains("labelModel.stateDidChange = { [weak self] _ in"))
+        XCTAssertFalse(menuBarSource.contains("MenuBarBatteryLabelModel"))
+        XCTAssertFalse(menuBarSource.contains("labelModel.stateDidChange"))
         XCTAssertTrue(menuBarSource.contains("applyCurrentStatusItemState()"))
         XCTAssertTrue(menuBarSource.contains("observeStatusItemInputs()"))
         XCTAssertTrue(menuBarSource.contains("observeDisplayPreferenceNotifications()"))
@@ -481,12 +404,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
         controller.showPanelForTesting()
@@ -523,12 +444,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
         controller.showPanelForTesting()
@@ -556,12 +475,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
         controller.showPanelForTesting()
@@ -675,12 +592,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -714,12 +629,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -750,12 +663,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -790,12 +701,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let settingsPreferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: runtimePreferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: runtimePreferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -829,12 +738,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -859,39 +766,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     }
 
     @MainActor
-    func testStatusItemControllerRendersFromItsOwnPreferencesWhenLabelModelIsStale() async {
-        let controllerSuiteName = "MenuBarStatusItemControllerCurrentPreferencesTests-\(UUID().uuidString)"
-        let staleSuiteName = "MenuBarStatusItemControllerStaleLabelTests-\(UUID().uuidString)"
-        let controllerDefaults = UserDefaults(suiteName: controllerSuiteName)!
-        let staleDefaults = UserDefaults(suiteName: staleSuiteName)!
-        controllerDefaults.removePersistentDomain(forName: controllerSuiteName)
-        staleDefaults.removePersistentDomain(forName: staleSuiteName)
-        let controllerPreferences = PreferencesStore(defaults: controllerDefaults, sync: NoopPreferencesSync())
-        let stalePreferences = PreferencesStore(defaults: staleDefaults, sync: NoopPreferencesSync())
-        stalePreferences.menuBarDisplayMode = .iconOnly
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-        let staleModel = MenuBarBatteryLabelModel(monitor: monitor, preferences: stalePreferences)
-        let controller = MenuBarStatusItemController(
-            monitor: monitor,
-            preferences: controllerPreferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: staleModel
-        )
-        controller.start()
-
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-
-        controllerPreferences.menuBarDisplayMode = .iconAndPower
-        await Self.drainObservationUpdates()
-
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "13.9W")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery power 13.9 W")
-    }
-
-    @MainActor
     func testDisplayPreferenceInvalidationForcesStatusItemRepaint() async {
         let suiteName = "MenuBarStatusItemForcedRepaintTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -899,12 +773,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -927,12 +799,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -956,12 +826,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
         controller.showPanelForTesting()
@@ -992,12 +860,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let settingsPreferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: runtimePreferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: runtimePreferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -1022,12 +888,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let settingsPreferences = PreferencesStore(defaults: settingsDefaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: runtimePreferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: runtimePreferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -1054,12 +918,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let unrelatedPreferences = PreferencesStore(defaults: unrelatedDefaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: runtimePreferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: runtimePreferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -1082,12 +944,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -1110,12 +970,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: BatteryHistoryStore(),
-            labelModel: model
+            historyStore: BatteryHistoryStore()
         )
         controller.start()
 
@@ -1132,8 +990,8 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     }
 
     @MainActor
-    func testLabelModelTracksTemperatureUnitPreferenceChanges() async {
-        let suiteName = "MenuBarBatteryLabelTemperatureUnitTests-\(UUID().uuidString)"
+    func testStatusItemControllerTracksTemperatureUnitPreferenceChanges() async {
+        let suiteName = "MenuBarStatusItemTemperatureUnitTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
@@ -1141,14 +999,19 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         monitor.snapshot = .previewDischarging
         preferences.menuBarDisplayMode = .iconAndTemperature
         preferences.temperatureUnitPreference = .celsius
-        let model = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
+        let controller = MenuBarStatusItemController(
+            monitor: monitor,
+            preferences: preferences,
+            historyStore: BatteryHistoryStore()
+        )
+        controller.start()
 
-        XCTAssertEqual(model.state.value, "34°")
+        XCTAssertEqual(controller.currentButtonSnapshot().title, "34°")
 
         preferences.temperatureUnitPreference = .fahrenheit
-        await Task.yield()
+        await Self.drainObservationUpdates()
 
-        XCTAssertEqual(model.state.value, "94°")
+        XCTAssertEqual(controller.currentButtonSnapshot().title, "94°")
     }
 
     func testAccessibilityLabelUsesSelectedTemperatureUnit() {

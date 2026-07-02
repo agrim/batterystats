@@ -95,130 +95,6 @@ struct MenuBarBatteryView: View {
     }
 }
 
-struct MenuBarBatteryLabelView: View {
-    @Bindable var model: MenuBarBatteryLabelModel
-
-    init(model: MenuBarBatteryLabelModel) {
-        self.model = model
-    }
-
-    var body: some View {
-        MenuBarBatteryLabelContentView(state: state)
-            .id(state.identity)
-    }
-
-    @MainActor
-    var state: MenuBarBatteryLabelState {
-        model.state
-    }
-}
-
-private struct MenuBarBatteryLabelContentView: View {
-    let state: MenuBarBatteryLabelState
-
-    var body: some View {
-        HStack(spacing: state.value == nil ? 0 : 3) {
-            Image(systemName: state.symbolName)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(state.symbolTint)
-
-            if let value = state.value {
-                Text(value)
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-        }
-        .monospacedDigit()
-        .accessibilityLabel(state.accessibilityLabel)
-    }
-}
-
-@MainActor
-@Observable
-final class MenuBarBatteryLabelModel {
-    private(set) var state: MenuBarBatteryLabelState
-
-    @ObservationIgnored var stateDidChange: ((MenuBarBatteryLabelState) -> Void)?
-    @ObservationIgnored private let monitor: BatteryMonitor
-    @ObservationIgnored private let preferences: PreferencesStore
-    @ObservationIgnored private var observationGeneration = 0
-    @ObservationIgnored private var displayPreferenceObserver: NSObjectProtocol?
-
-    init(monitor: BatteryMonitor, preferences: PreferencesStore) {
-        self.monitor = monitor
-        self.preferences = preferences
-        state = MenuBarBatteryLabelState(snapshot: monitor.snapshot, preferences: preferences)
-        observeDisplayPreferenceNotifications()
-        observeInputs()
-    }
-
-    isolated deinit {
-        if let displayPreferenceObserver {
-            NotificationCenter.default.removeObserver(displayPreferenceObserver)
-        }
-    }
-
-    func refreshNow() {
-        let nextState = MenuBarBatteryLabelState(snapshot: monitor.snapshot, preferences: preferences)
-        guard nextState.identity != state.identity else {
-            return
-        }
-
-        state = nextState
-        stateDidChange?(nextState)
-    }
-
-    private func observeInputs() {
-        observationGeneration += 1
-        let generation = observationGeneration
-
-        withObservationTracking {
-            _ = monitor.snapshot
-            _ = preferences.menuBarDisplayMode
-            _ = preferences.temperatureUnitPreference
-            _ = preferences.temperatureUnitResolutionToken
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self,
-                      observationGeneration == generation else {
-                    return
-                }
-
-                refreshNow()
-                observeInputs()
-            }
-        }
-    }
-
-    private func observeDisplayPreferenceNotifications() {
-        displayPreferenceObserver = NotificationCenter.default.addObserver(
-            forName: .menuBarDisplayPreferencesDidChange,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            let invalidation = MenuBarDisplayPreferencesInvalidation(notification: notification)
-            if Thread.isMainThread {
-                MainActor.assumeIsolated {
-                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
-                }
-            } else {
-                Task { @MainActor [weak self] in
-                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
-                }
-            }
-        }
-    }
-
-    private func refreshFromDisplayPreferenceInvalidation(_ invalidation: MenuBarDisplayPreferencesInvalidation) {
-        guard preferences.shouldAcceptMenuBarDisplayPreferencesInvalidation(invalidation) else {
-            return
-        }
-
-        preferences.refreshMenuBarDisplayPreferences(from: invalidation.displayPreferences)
-        refreshNow()
-    }
-}
-
 @MainActor
 final class MenuBarStatusItemController: NSObject {
     private static let panelGlobalDismissalGrace: TimeInterval = 1.25
@@ -226,7 +102,6 @@ final class MenuBarStatusItemController: NSObject {
     private let monitor: BatteryMonitor
     private let preferences: PreferencesStore
     private let historyStore: BatteryHistoryStore
-    private let labelModel: MenuBarBatteryLabelModel
     private let statusBar: NSStatusBar
     private var statusItem: NSStatusItem
     private var panel: NSPanel?
@@ -247,13 +122,11 @@ final class MenuBarStatusItemController: NSObject {
         monitor: BatteryMonitor,
         preferences: PreferencesStore,
         historyStore: BatteryHistoryStore,
-        labelModel: MenuBarBatteryLabelModel,
         statusBar: NSStatusBar = .system
     ) {
         self.monitor = monitor
         self.preferences = preferences
         self.historyStore = historyStore
-        self.labelModel = labelModel
         self.statusBar = statusBar
         statusItem = statusBar.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -285,9 +158,6 @@ final class MenuBarStatusItemController: NSObject {
         configureButton()
         installedDisplayPreferences = currentDisplayPreferences
         applyCurrentStatusItemState()
-        labelModel.stateDidChange = { [weak self] _ in
-            self?.applyCurrentStatusItemState()
-        }
         observeStatusItemInputs()
         observeDisplayPreferenceNotifications()
         observeActiveSpaceChanges()
@@ -464,7 +334,6 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     private func refreshStatusItemNow(force: Bool = false) {
-        labelModel.refreshNow()
         applyCurrentStatusItemState(force: force)
     }
 

@@ -63,8 +63,6 @@ private final class BatteryStatsAppRuntime {
     let preferences: PreferencesStore
     @ObservationIgnored
     let historyStore: BatteryHistoryStore
-    @ObservationIgnored
-    let menuBarLabelModel: MenuBarBatteryLabelModel
 
     @ObservationIgnored
     private let monitorConfigurationObserver: BatteryMonitorConfigurationObserver
@@ -81,7 +79,6 @@ private final class BatteryStatsAppRuntime {
         monitor = BatteryMonitor()
         preferences = PreferencesStore()
         historyStore = BatteryHistoryStore()
-        menuBarLabelModel = MenuBarBatteryLabelModel(monitor: monitor, preferences: preferences)
         monitorConfigurationObserver = BatteryMonitorConfigurationObserver(
             monitor: monitor,
             preferences: preferences,
@@ -130,8 +127,7 @@ private final class BatteryStatsAppRuntime {
         let controller = MenuBarStatusItemController(
             monitor: monitor,
             preferences: preferences,
-            historyStore: historyStore,
-            labelModel: menuBarLabelModel
+            historyStore: historyStore
         )
         menuBarStatusItemController = controller
         controller.start()
