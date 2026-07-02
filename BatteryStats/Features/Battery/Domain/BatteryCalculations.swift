@@ -264,6 +264,22 @@ enum BatteryCalculations {
         return value
     }
 
+    static func displayableLiveMeasuredInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts) else {
+            return nil
+        }
+
+        guard plausibleAdapterWatts(adapterMaxWatts) != nil || value < maximumUnverifiedInputPowerWatts else {
+            return nil
+        }
+
+        guard isDistinctFromExactAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
+            return nil
+        }
+
+        return value
+    }
+
     static func plausibleAdapterWatts(_ value: Int?) -> Int? {
         guard let value,
               value > 0,
@@ -753,5 +769,13 @@ enum BatteryCalculations {
             : counterBackedAdapterCapabilityEchoTolerance
         let toleranceWatts = max(0.1, adapterWatts * tolerance)
         return abs(watts - adapterWatts) > toleranceWatts
+    }
+
+    private static func isDistinctFromExactAdapterCapability(_ watts: Double, adapterMaxWatts: Int?) -> Bool {
+        guard let adapterMaxWatts = plausibleAdapterWatts(adapterMaxWatts) else {
+            return true
+        }
+
+        return abs(watts - Double(adapterMaxWatts)) > 0.1
     }
 }

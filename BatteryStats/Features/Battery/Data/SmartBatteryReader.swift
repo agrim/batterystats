@@ -576,34 +576,10 @@ final class SmartBatteryReader: @unchecked Sendable {
         adapterMaxWatts: Int?
     ) -> Double? {
         if liveSystemTelemetryCorroborates(milliwatts: milliwatts, in: properties) {
-            return displayableLiveCorroboratedCounterBackedInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts)
+            return BatteryCalculations.displayableLiveMeasuredInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts)
         }
 
         return BatteryCalculations.displayableCounterBackedInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts)
-    }
-
-    private func displayableLiveCorroboratedCounterBackedInputPowerWatts(_ watts: Double, adapterMaxWatts: Int?) -> Double? {
-        guard let watts = BatteryCalculations.plausibleInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        guard BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) != nil || watts < 90 else {
-            return nil
-        }
-
-        guard isDistinctFromExactAdapterCapabilityEcho(watts, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        return watts
-    }
-
-    private func isDistinctFromExactAdapterCapabilityEcho(_ watts: Double, adapterMaxWatts: Int?) -> Bool {
-        guard let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
-            return true
-        }
-
-        return abs(watts - Double(adapterMaxWatts)) > 0.1
     }
 
     private func counterBackedInputPowerCorroboratesNegotiatedPower(_ negotiatedWatts: Int, in properties: [String: Any]) -> Bool {

@@ -609,27 +609,7 @@ struct BatteryReadingService: Sendable {
     }
 
     static func displayableCurrentDerivedChargeRateWatts(_ watts: Double?, adapterMaxWatts: Int?) -> Double? {
-        guard let watts = BatteryCalculations.plausibleInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        guard BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) != nil || watts < 90 else {
-            return nil
-        }
-
-        guard isDistinctFromExactAdapterCapabilityEcho(watts, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        return watts
-    }
-
-    private static func isDistinctFromExactAdapterCapabilityEcho(_ watts: Double, adapterMaxWatts: Int?) -> Bool {
-        guard let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
-            return true
-        }
-
-        return abs(watts - Double(adapterMaxWatts)) > 0.1
+        BatteryCalculations.displayableLiveMeasuredInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts)
     }
 
     private static func displayableInputPowerWatts(
