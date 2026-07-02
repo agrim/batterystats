@@ -474,11 +474,8 @@ final class BatteryMonitor {
             }
 
             let rawSnapshotText = rawSnapshotCopyText(for: result)
-            let didPublish = publishDiagnosticsResultIfAvailable(
-                result,
-                readSequence: readSequence,
-                publicationDate: readDate
-            )
+            let didPublish = result.snapshot != nil
+                && apply(result, readSequence: readSequence, publicationDate: readDate)
 
             if didPublish, result.rawSnapshotText == nil {
                 latestRawSnapshotText = rawSnapshotText
@@ -492,18 +489,6 @@ final class BatteryMonitor {
 
             pasteboardCopy(rawSnapshotText)
         }
-    }
-
-    private func publishDiagnosticsResultIfAvailable(
-        _ result: BatteryReadResult,
-        readSequence: Int,
-        publicationDate: Date
-    ) -> Bool {
-        guard result.snapshot != nil else {
-            return false
-        }
-
-        return apply(result, readSequence: readSequence, publicationDate: publicationDate)
     }
 
     private func rawSnapshotCopyText(for result: BatteryReadResult) -> String {

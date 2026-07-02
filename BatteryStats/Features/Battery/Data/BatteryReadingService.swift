@@ -228,7 +228,6 @@ struct BatteryReadingService: Sendable {
             reportedExternalPowerConnected: smartBattery.isExternalPowerConnected,
             isCharging: isCharging,
             isCharged: isCharged,
-            isDischarging: isDischarging,
             inputPowerWatts: smartBattery.inputPowerWatts,
             inputPowerEvidence: smartBattery.inputPowerEvidence,
             adapterMaxWatts: smartBattery.adapterMaxWatts
@@ -511,7 +510,11 @@ struct BatteryReadingService: Sendable {
             return false
         }
 
-        if trustedInputPowerWatts(smartBattery: smartBattery) != nil {
+        if BatteryCalculations.displayableInputPowerWatts(
+            smartBattery?.inputPowerWatts,
+            evidence: smartBattery?.inputPowerEvidence,
+            adapterMaxWatts: smartBattery?.adapterMaxWatts
+        ) != nil {
             return true
         }
 
@@ -534,7 +537,6 @@ struct BatteryReadingService: Sendable {
         reportedExternalPowerConnected: Bool?,
         isCharging: Bool,
         isCharged: Bool,
-        isDischarging: Bool,
         inputPowerWatts: Double?,
         inputPowerEvidence: BatteryInputPowerEvidence?,
         adapterMaxWatts: Int?
@@ -555,15 +557,7 @@ struct BatteryReadingService: Sendable {
             return true
         }
 
-        if let reportedExternalPowerConnected {
-            return reportedExternalPowerConnected
-        }
-
-        if isDischarging {
-            return false
-        }
-
-        return false
+        return reportedExternalPowerConnected ?? false
     }
 
     private static func hasExplicitDisconnectEvidence(
@@ -572,14 +566,6 @@ struct BatteryReadingService: Sendable {
     ) -> Bool {
         publicSnapshot.explicitlyReportsBatteryPower
             || smartBattery?.isExternalPowerConnected == false
-    }
-
-    private static func trustedInputPowerWatts(smartBattery: SmartBatteryDetails?) -> Double? {
-        BatteryCalculations.displayableInputPowerWatts(
-            smartBattery?.inputPowerWatts,
-            evidence: smartBattery?.inputPowerEvidence,
-            adapterMaxWatts: smartBattery?.adapterMaxWatts
-        )
     }
 
     static func chargeRateWattsWithinAdapterContract(
