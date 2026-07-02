@@ -184,12 +184,6 @@ final class BatteryAlertCoordinator {
         }
     }
 
-    func waitForIdleForTesting() async {
-        while pendingDeliveries.isEmpty == false {
-            await Task.yield()
-        }
-    }
-
     private func clearAlertState(for kind: BatteryAlertType) {
         activeAlerts.remove(kind)
         pendingDeliveries.removeValue(forKey: kind)
@@ -204,6 +198,16 @@ final class BatteryAlertCoordinator {
         pendingDeliveryTasks.removeAll()
     }
 }
+
+#if DEBUG
+extension BatteryAlertCoordinator {
+    func waitForIdleForTesting() async {
+        while pendingDeliveries.isEmpty == false {
+            await Task.yield()
+        }
+    }
+}
+#endif
 
 @MainActor
 final class UserNotificationBatteryAlertDeliverer: BatteryAlertNotificationDelivering {

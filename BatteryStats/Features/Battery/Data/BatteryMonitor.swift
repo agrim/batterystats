@@ -649,6 +649,14 @@ final class BatteryMonitor {
         pendingRefreshNeedsDiagnostics = false
     }
 
+    private func nextReadSequence() -> Int {
+        readSequence &+= 1
+        return readSequence
+    }
+}
+
+#if DEBUG
+extension BatteryMonitor {
     func waitForIdleForTesting() async {
         while refreshTask != nil || energyProbeTask != nil || diagnosticsTask != nil {
             try? await Task.sleep(for: .milliseconds(10))
@@ -662,12 +670,8 @@ final class BatteryMonitor {
     func currentRefreshIntervalForTesting() -> TimeInterval? {
         currentRefreshInterval
     }
-
-    private func nextReadSequence() -> Int {
-        readSequence &+= 1
-        return readSequence
-    }
 }
+#endif
 
 private struct WidgetTimelineReloadSignature: Equatable {
     let powerState: BatteryPowerState?
