@@ -747,7 +747,10 @@ struct BatteryReadingService: Sendable {
         smartMinutes: Int?,
         zeroIsDisplayable: Bool
     ) -> Int? {
-        for reportedMinutes in [sanitized(publicMinutes), sanitized(smartMinutes)] {
+        for reportedMinutes in [
+            BatteryCalculations.plausibleDurationMinutes(publicMinutes),
+            BatteryCalculations.plausibleDurationMinutes(smartMinutes)
+        ] {
             guard let reportedMinutes else {
                 continue
             }
@@ -762,10 +765,6 @@ struct BatteryReadingService: Sendable {
         }
 
         return nil
-    }
-
-    private static func sanitized(_ minutes: Int?) -> Int? {
-        BatteryCalculations.plausibleDurationMinutes(minutes)
     }
 
     private func prettyRawSnapshot(publicSnapshot: PublicPowerSourceSnapshot?, smartBattery: SmartBatteryDetails?) -> String {

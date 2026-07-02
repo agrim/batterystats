@@ -798,7 +798,7 @@ private struct EnergyProbePresentationSignature: Equatable {
         )
         cycleCount = BatteryCalculations.plausibleCycleCount(snapshot.cycleCount)
         manufactureDateDay = Self.dayIdentifier(snapshot.validatedManufactureDate)
-        batteryAgeMonths = Self.monthIdentifier(snapshot.validatedBatteryAgeComponents)
+        batteryAgeMonths = BatteryCalculations.displayableBatteryAgeMonthCount(snapshot.validatedBatteryAgeComponents)
     }
 
     private static func visibleCurrentMilliamps(_ snapshot: BatterySnapshot) -> Int? {
@@ -824,9 +824,5 @@ private struct EnergyProbePresentationSignature: Equatable {
             multiplier: 1.0 / (24 * 60 * 60),
             roundingRule: .down
         )
-    }
-
-    private static func monthIdentifier(_ components: DateComponents?) -> Int? {
-        BatteryCalculations.displayableBatteryAgeMonthCount(components)
     }
 }

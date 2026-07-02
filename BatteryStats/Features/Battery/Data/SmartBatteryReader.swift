@@ -494,7 +494,7 @@ final class SmartBatteryReader: @unchecked Sendable {
             return InputPowerReading(watts: watts, evidence: .counterBacked)
         }
 
-        if let watts = inputWattsWithinAdapterCapability(
+        if let watts = BatteryCalculations.displayableInputPowerWatts(
             liveSystemTelemetryWatts(in: properties, adapterMaxWatts: adapterMaxWatts),
             adapterMaxWatts: adapterMaxWatts
         ) {
@@ -502,10 +502,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         return nil
-    }
-
-    private func inputWattsWithinAdapterCapability(_ watts: Double?, adapterMaxWatts: Int?) -> Double? {
-        BatteryCalculations.displayableInputPowerWatts(watts, adapterMaxWatts: adapterMaxWatts)
     }
 
     private func wattsFromCorroboratedSystemPowerIn(in properties: [String: Any], adapterMaxWatts: Int?) -> Double? {
@@ -663,10 +659,6 @@ final class SmartBatteryReader: @unchecked Sendable {
             in: properties,
             transform: { $0 > 0 ? $0 : nil }
         ) != nil
-    }
-
-    private func isDistinctFromNegotiatedInputPower(milliwatts: Int, in properties: [String: Any]) -> Bool {
-        isDistinctFromNegotiatedInputPower(milliwatts: Double(milliwatts), in: properties)
     }
 
     private func isDistinctFromNegotiatedInputPower(milliwatts: Double, in properties: [String: Any]) -> Bool {

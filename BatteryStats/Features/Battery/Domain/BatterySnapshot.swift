@@ -198,16 +198,13 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     var displayedTimeMinutes: Int? {
         if powerState.isBatteryDischarging {
-            return Self.displayableMinutes(rateBasedTimeRemainingMinutes) ?? Self.displayableMinutes(systemTimeRemainingMinutes)
+            return BatteryCalculations.plausibleDurationMinutes(rateBasedTimeRemainingMinutes)
+                ?? BatteryCalculations.plausibleDurationMinutes(systemTimeRemainingMinutes)
         } else if powerState == .charging {
-            return Self.displayableMinutes(timeToFullMinutes)
+            return BatteryCalculations.plausibleDurationMinutes(timeToFullMinutes)
         } else {
             return nil
         }
-    }
-
-    private static func displayableMinutes(_ minutes: Int?) -> Int? {
-        BatteryCalculations.plausibleDurationMinutes(minutes)
     }
 
     var statusDisplayTitle: String {
