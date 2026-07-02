@@ -702,12 +702,12 @@ private struct WidgetTimelineReloadSignature: Equatable {
     let statusRingTint: String
     let statusContentTint: String
 
-    init(snapshot: BatterySnapshot?) {
+    init(snapshot: BatterySnapshot?, updatedAt: Date? = nil) {
         let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
         powerState = snapshot?.powerState
         statusDisplayTitle = snapshot?.statusDisplayTitle
         batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
-        updatedMinute = Self.minuteIdentifier(snapshot?.timestamp)
+        updatedMinute = Self.minuteIdentifier(updatedAt ?? snapshot?.timestamp)
         chargePercent = Self.roundedInt(snapshot?.presentationStateOfChargePercent)
         chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).identityToken
         healthPercent = Self.roundedInt(snapshot?.presentationHealthPercent)
@@ -742,7 +742,7 @@ private struct WidgetTimelineReloadSignature: Equatable {
         return roundedInt(date.timeIntervalSince1970, multiplier: 1.0 / 60.0, roundingRule: .down)
     }
 
-    private static func roundedInt(
+    static func roundedInt(
         _ value: Double?,
         multiplier: Double = 1,
         roundingRule: FloatingPointRoundingRule = .toNearestOrAwayFromZero
@@ -763,22 +763,11 @@ private struct WidgetTimelineReloadSignature: Equatable {
 }
 
 private struct EnergyProbePresentationSignature: Equatable {
-    let powerState: BatteryPowerState
-    let statusDisplayTitle: String
-    let batterySymbolName: String
-    let updatedMinute: Int?
+    let widgetTimelineSignature: WidgetTimelineReloadSignature
     let currentChargeMilliampHours: Int?
     let fullChargeCapacityMilliampHours: Int?
     let designCapacityMilliampHours: Int?
-    let chargePercent: Int?
-    let chargeTint: String
-    let healthPercent: Int?
-    let healthTint: String
-    let displayedTimeMinutes: Int?
     let visibleCurrentMilliamps: Int?
-    let timeTint: String
-    let activePowerDeciwatts: Int?
-    let usesInputPowerWatts: Bool
     let voltageMillivolts: Int?
     let currentChargeDeciwattHours: Int?
     let fullChargeCapacityDeciwattHours: Int?
@@ -786,16 +775,9 @@ private struct EnergyProbePresentationSignature: Equatable {
     let cycleCount: Int?
     let manufactureDateDay: Int?
     let batteryAgeMonths: Int?
-    let statusSymbolName: String
-    let statusRingTint: String
-    let statusContentTint: String
 
     init(snapshot: BatterySnapshot, publicationDate: Date? = nil) {
-        let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
-        powerState = snapshot.powerState
-        statusDisplayTitle = snapshot.statusDisplayTitle
-        batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
-        updatedMinute = Self.minuteIdentifier(publicationDate ?? snapshot.timestamp)
+        widgetTimelineSignature = WidgetTimelineReloadSignature(snapshot: snapshot, updatedAt: publicationDate)
         currentChargeMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.currentChargeMilliampHours)
         fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(
             snapshot.fullChargeCapacityMilliampHours,
@@ -805,40 +787,23 @@ private struct EnergyProbePresentationSignature: Equatable {
             snapshot.designCapacityMilliampHours,
             allowsZero: false
         )
-        chargePercent = Self.roundedInt(snapshot.presentationStateOfChargePercent)
-        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).identityToken
-        healthPercent = Self.roundedInt(snapshot.presentationHealthPercent)
-        healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).identityToken
-        displayedTimeMinutes = snapshot.displayedTimeMinutes
         visibleCurrentMilliamps = Self.visibleCurrentMilliamps(snapshot)
-        timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).identityToken
-        activePowerDeciwatts = Self.roundedInt(snapshot.activePowerWatts, multiplier: 10)
-        usesInputPowerWatts = Self.usesInputPowerWatts(snapshot)
         voltageMillivolts = BatteryCalculations.plausibleVoltageMillivolts(snapshot.voltageMillivolts)
-        currentChargeDeciwattHours = Self.roundedInt(
+        currentChargeDeciwattHours = WidgetTimelineReloadSignature.roundedInt(
             BatteryCalculations.plausibleWattHours(snapshot.currentChargeWattHours),
             multiplier: 10
         )
-        fullChargeCapacityDeciwattHours = Self.roundedInt(
+        fullChargeCapacityDeciwattHours = WidgetTimelineReloadSignature.roundedInt(
             BatteryCalculations.plausibleWattHours(snapshot.fullChargeCapacityWattHours),
             multiplier: 10
         )
-        temperatureTenthsCelsius = Self.roundedInt(snapshot.presentationTemperatureCelsius, multiplier: 10)
+        temperatureTenthsCelsius = WidgetTimelineReloadSignature.roundedInt(
+            snapshot.presentationTemperatureCelsius,
+            multiplier: 10
+        )
         cycleCount = BatteryCalculations.plausibleCycleCount(snapshot.cycleCount)
         manufactureDateDay = Self.dayIdentifier(snapshot.validatedManufactureDate)
         batteryAgeMonths = Self.monthIdentifier(snapshot.validatedBatteryAgeComponents)
-        statusSymbolName = statusDescriptor.symbolName
-        statusRingTint = statusDescriptor.ringTintStyle.identityToken
-        statusContentTint = statusDescriptor.contentTintStyle.identityToken
-    }
-
-    private static func usesInputPowerWatts(_ snapshot: BatterySnapshot) -> Bool {
-        switch snapshot.powerState {
-        case .charging, .connectedDischarging, .connectedNotCharging, .fullOnAC:
-            return snapshot.visibleInputPowerWatts != nil
-        case .onBattery, .unknown:
-            return false
-        }
     }
 
     private static func visibleCurrentMilliamps(_ snapshot: BatterySnapshot) -> Int? {
@@ -856,54 +821,16 @@ private struct EnergyProbePresentationSignature: Equatable {
         }
     }
 
-    private static func roundedInt(_ value: Double?, multiplier: Double = 1) -> Int? {
-        guard let value, value.isFinite else {
-            return nil
-        }
-
-        let scaledValue = value * multiplier
-        guard scaledValue.isFinite,
-              scaledValue >= Double(Int.min),
-              scaledValue <= Double(Int.max) else {
-            return nil
-        }
-
-        return Int(scaledValue.rounded(.toNearestOrAwayFromZero))
-    }
-
-    private static func minuteIdentifier(_ date: Date?) -> Int? {
-        guard let date else {
-            return nil
-        }
-
-        return roundedInt(date.timeIntervalSince1970, multiplier: 1.0 / 60.0, roundingRule: .down)
-    }
-
     private static func dayIdentifier(_ date: Date?) -> Int? {
         guard let date else {
             return nil
         }
 
-        return roundedInt(date.timeIntervalSince1970, multiplier: 1.0 / (24 * 60 * 60), roundingRule: .down)
-    }
-
-    private static func roundedInt(
-        _ value: Double?,
-        multiplier: Double = 1,
-        roundingRule: FloatingPointRoundingRule
-    ) -> Int? {
-        guard let value, value.isFinite else {
-            return nil
-        }
-
-        let scaledValue = value * multiplier
-        guard scaledValue.isFinite,
-              scaledValue >= Double(Int.min),
-              scaledValue <= Double(Int.max) else {
-            return nil
-        }
-
-        return Int(scaledValue.rounded(roundingRule))
+        return WidgetTimelineReloadSignature.roundedInt(
+            date.timeIntervalSince1970,
+            multiplier: 1.0 / (24 * 60 * 60),
+            roundingRule: .down
+        )
     }
 
     private static func monthIdentifier(_ components: DateComponents?) -> Int? {
