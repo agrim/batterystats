@@ -97,9 +97,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
         isEnabled = enabled && isAvailable
         guard isEnabled,
               let store = resolveStore() else {
-            synchronizeGeneration &+= 1
-            synchronizeTask?.cancel()
-            synchronizeTask = nil
+            cancelScheduledSynchronize()
             return
         }
 
@@ -201,9 +199,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func flush() {
-        synchronizeGeneration &+= 1
-        synchronizeTask?.cancel()
-        synchronizeTask = nil
+        cancelScheduledSynchronize()
         guard isEnabled,
               let store = resolveStore() else {
             return
@@ -213,9 +209,8 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     private func scheduleSynchronize() {
-        synchronizeGeneration &+= 1
+        cancelScheduledSynchronize()
         let generation = synchronizeGeneration
-        synchronizeTask?.cancel()
         synchronizeTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
@@ -234,6 +229,12 @@ final class ICloudPreferencesSync: PreferencesSyncing {
                 synchronizeTask = nil
             }
         }
+    }
+
+    private func cancelScheduledSynchronize() {
+        synchronizeGeneration &+= 1
+        synchronizeTask?.cancel()
+        synchronizeTask = nil
     }
 
     static func strictBool(_ value: Any?) -> Bool? {
