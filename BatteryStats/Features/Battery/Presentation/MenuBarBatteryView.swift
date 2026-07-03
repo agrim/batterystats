@@ -337,15 +337,11 @@ final class MenuBarStatusItemController: NSObject {
             return
         }
 
-        if isPanelShown {
+        if panel?.isVisible == true {
             closePanel()
         } else {
             showPanel(relativeTo: button)
         }
-    }
-
-    private var isPanelShown: Bool {
-        panel?.isVisible == true
     }
 
     private func showPanel(relativeTo button: NSStatusBarButton) {
@@ -363,16 +359,12 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     private func presentPanel(_ panel: NSPanel) {
-        preparePanelForActiveSpacePresentation(panel)
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-        panel.displayIfNeeded()
-    }
-
-    private func preparePanelForActiveSpacePresentation(_ panel: NSPanel) {
         panel.parent?.removeChildWindow(panel)
         panel.collectionBehavior = BatteryWindowSpaceBehavior.menuBarPanelPresentation
         panel.level = .popUpMenu
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        panel.displayIfNeeded()
     }
 
     private func scheduleDeferredPanelPresentationRetries(for panel: NSPanel, relativeTo button: NSStatusBarButton) {
@@ -524,7 +516,7 @@ final class MenuBarStatusItemController: NSObject {
             }
 
             if event.type != .keyDown {
-                if self.isEventInsidePanel(event) || self.isEventInsideStatusButton(event) {
+                if event.window === self.panel || self.isEventInsideStatusButton(event) {
                     self.cancelDeferredPanelDismissal()
                     return event
                 }
@@ -552,15 +544,6 @@ final class MenuBarStatusItemController: NSObject {
             NSEvent.removeMonitor(globalEventMonitor)
             self.globalEventMonitor = nil
         }
-
-    }
-
-    private func isEventInsidePanel(_ event: NSEvent) -> Bool {
-        guard let panel else {
-            return false
-        }
-
-        return event.window === panel
     }
 
     private func isEventInsideStatusButton(_ event: NSEvent) -> Bool {
@@ -587,7 +570,7 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     private func repositionPanelForActiveSpaceChangeIfNeeded() {
-        guard isPanelShown else {
+        guard panel?.isVisible == true else {
             return
         }
 
@@ -602,7 +585,7 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     private func closePanelFromGlobalEventIfNeeded(now: Date = Date()) {
-        guard isPanelShown else {
+        guard panel?.isVisible == true else {
             return
         }
 
