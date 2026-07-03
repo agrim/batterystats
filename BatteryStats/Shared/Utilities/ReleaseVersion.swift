@@ -10,18 +10,8 @@ struct ReleaseVersion: Equatable {
 
     static func from(_ infoDictionary: [String: Any]?) -> ReleaseVersion? {
         guard
-            let rawMarketingVersion = metadataString(infoDictionary?["CFBundleShortVersionString"]),
-            let rawBuildNumber = metadataString(infoDictionary?["CFBundleVersion"])
-        else {
-            return nil
-        }
-
-        let marketingVersion = rawMarketingVersion.trimmingCharacters(in: .whitespacesAndNewlines)
-        let buildNumber = rawBuildNumber.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard
-            marketingVersion.isEmpty == false,
-            buildNumber.isEmpty == false
+            let marketingVersion = metadataString(infoDictionary?["CFBundleShortVersionString"]),
+            let buildNumber = metadataString(infoDictionary?["CFBundleVersion"])
         else {
             return nil
         }
@@ -30,15 +20,17 @@ struct ReleaseVersion: Equatable {
     }
 
     private static func metadataString(_ value: Any?) -> String? {
+        let rawString: String
         if let string = value as? String {
-            return string
+            rawString = string
+        } else if let number = value as? NSNumber,
+                  CFGetTypeID(number) != CFBooleanGetTypeID() {
+            rawString = number.stringValue
+        } else {
+            return nil
         }
 
-        if let number = value as? NSNumber,
-           CFGetTypeID(number) != CFBooleanGetTypeID() {
-            return number.stringValue
-        }
-
-        return nil
+        let trimmedString = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedString.isEmpty ? nil : trimmedString
     }
 }
