@@ -170,11 +170,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     var energyUseComparisonValue: Double? {
-        if let activePowerWatts {
-            return activePowerWatts
-        }
-
-        return activeCurrentMilliamps.map { Double($0) / 1_000 }
+        activePowerWatts ?? activeCurrentMilliamps.map { Double($0) / 1_000 }
     }
 
     var displayedTimeMinutes: Int? {
@@ -216,20 +212,17 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         case .onBattery:
             return "Using internal battery"
         case .connectedDischarging:
-            if let visibleInputPowerWatts {
-                return "Input power \(BatteryFormatting.watts(visibleInputPowerWatts)), battery discharging"
+            if let inputPowerSecondaryText {
+                return "\(inputPowerSecondaryText), battery discharging"
             }
             return activePowerWatts.map { "Discharging at \(BatteryFormatting.watts($0))" } ?? "External power connected"
         case .charging:
-            if let visibleInputPowerWatts {
-                return "Input power \(BatteryFormatting.watts(visibleInputPowerWatts))"
-            }
-
-            return BatteryCalculations.plausibleWatts(chargeRateWatts)
+            return inputPowerSecondaryText
+                ?? BatteryCalculations.plausibleWatts(chargeRateWatts)
                 .map { "Charging at \(BatteryFormatting.watts($0))" }
                 ?? "External power connected"
         case .connectedNotCharging, .fullOnAC:
-            return visibleInputPowerWatts.map { "Input power \(BatteryFormatting.watts($0))" } ?? "External power connected"
+            return inputPowerSecondaryText ?? "External power connected"
         case .unknown:
             return nil
         }
@@ -334,6 +327,10 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     private var debugTimeTitle: String {
         powerState.timeTitle(charging: "Time to full", discharging: "Time left")
+    }
+
+    private var inputPowerSecondaryText: String? {
+        visibleInputPowerWatts.map { "Input power \(BatteryFormatting.watts($0))" }
     }
 
     private static func debugAdapterMaxWatts(_ value: Int?) -> String {
