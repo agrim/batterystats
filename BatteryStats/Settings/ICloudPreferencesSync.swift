@@ -123,27 +123,15 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func hasValue(forKey key: String) -> Bool {
-        guard let store = enabledStore() else {
-            return false
-        }
-
-        return store.object(forKey: key) != nil
+        enabledStore()?.object(forKey: key) != nil
     }
 
     func bool(forKey key: String) -> Bool? {
-        guard let store = enabledStore() else {
-            return nil
-        }
-
-        return Self.strictBool(store.object(forKey: key))
+        enabledStore().flatMap { Self.strictBool($0.object(forKey: key)) }
     }
 
     func string(forKey key: String) -> String? {
-        guard let store = enabledStore() else {
-            return nil
-        }
-
-        return store.string(forKey: key)
+        enabledStore()?.string(forKey: key)
     }
 
     func set(_ value: Bool, forKey key: String) {
