@@ -129,8 +129,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func hasValue(forKey key: String) -> Bool {
-        guard isEnabled,
-              let store = resolveStore() else {
+        guard let store = enabledStore() else {
             return false
         }
 
@@ -138,8 +137,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func bool(forKey key: String) -> Bool? {
-        guard isEnabled,
-              let store = resolveStore() else {
+        guard let store = enabledStore() else {
             return nil
         }
 
@@ -147,8 +145,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func string(forKey key: String) -> String? {
-        guard isEnabled,
-              let store = resolveStore() else {
+        guard let store = enabledStore() else {
             return nil
         }
 
@@ -156,8 +153,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func set(_ value: Bool, forKey key: String) {
-        guard isEnabled,
-              let store = resolveStore() else {
+        guard let store = enabledStore() else {
             return
         }
 
@@ -170,8 +166,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func set(_ value: String, forKey key: String) {
-        guard isEnabled,
-              let store = resolveStore() else {
+        guard let store = enabledStore() else {
             return
         }
 
@@ -184,8 +179,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func removeValue(forKey key: String) {
-        guard isEnabled,
-              let store = resolveStore() else {
+        guard let store = enabledStore() else {
             return
         }
 
@@ -199,8 +193,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
 
     func flush() {
         cancelScheduledSynchronize()
-        guard isEnabled,
-              let store = resolveStore() else {
+        guard let store = enabledStore() else {
             return
         }
 
@@ -238,6 +231,10 @@ final class ICloudPreferencesSync: PreferencesSyncing {
         }
 
         return number.boolValue
+    }
+
+    private func enabledStore() -> (any ICloudPreferencesKeyValueStoring)? {
+        isEnabled ? resolveStore() : nil
     }
 
     private func resolveStore() -> (any ICloudPreferencesKeyValueStoring)? {
