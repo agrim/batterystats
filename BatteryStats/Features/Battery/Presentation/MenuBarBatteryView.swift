@@ -222,8 +222,7 @@ final class MenuBarStatusItemController: NSObject {
             return
         }
 
-        let content = MenuBarStatusItemContent(state: state)
-        if MenuBarStatusItemRenderer.apply(content, to: statusItem) {
+        if MenuBarStatusItemRenderer.apply(state, to: statusItem) {
             appliedIdentity = state.identity
         }
     }
@@ -771,37 +770,20 @@ enum MenuBarPanelLayout {
     }
 }
 
-struct MenuBarStatusItemContent: Equatable {
-    let symbolName: String
-    let title: String
-    let accessibilityLabel: String
-
-    var length: CGFloat {
-        title.isEmpty ? NSStatusItem.squareLength : NSStatusItem.variableLength
-    }
-
-    var imagePosition: NSControl.ImagePosition {
-        title.isEmpty ? .imageOnly : .imageLeft
-    }
-
-    init(state: MenuBarBatteryLabelState) {
-        symbolName = state.symbolName
-        title = state.statusItemTitle
-        accessibilityLabel = state.accessibilityLabel
-    }
-}
-
 @MainActor
 enum MenuBarStatusItemRenderer {
     @discardableResult
-    static func apply(_ content: MenuBarStatusItemContent, to statusItem: NSStatusItem) -> Bool {
-        statusItem.length = content.length
+    static func apply(_ state: MenuBarBatteryLabelState, to statusItem: NSStatusItem) -> Bool {
+        let title = state.statusItemTitle
+        let length = title.isEmpty ? NSStatusItem.squareLength : NSStatusItem.variableLength
+        let imagePosition: NSControl.ImagePosition = title.isEmpty ? .imageOnly : .imageLeft
+        statusItem.length = length
 
         guard let button = statusItem.button else {
             return false
         }
 
-        let image = statusImage(systemName: content.symbolName)
+        let image = statusImage(systemName: state.symbolName)
 
         button.image = nil
         button.alternateImage = nil
@@ -813,19 +795,19 @@ enum MenuBarStatusItemRenderer {
         button.contentTintColor = nil
         button.setAccessibilityLabel(nil)
 
-        let renderedTitle = attributedStatusTitle(content.title, font: button.font)
+        let renderedTitle = attributedStatusTitle(title, font: button.font)
         button.image = image
-        button.title = content.title
+        button.title = title
         button.attributedTitle = renderedTitle
-        button.imagePosition = content.imagePosition
+        button.imagePosition = imagePosition
         button.imageScaling = .scaleProportionallyDown
-        button.toolTip = content.accessibilityLabel
-        button.setAccessibilityLabel(content.accessibilityLabel)
+        button.toolTip = state.accessibilityLabel
+        button.setAccessibilityLabel(state.accessibilityLabel)
         button.invalidateIntrinsicContentSize()
         button.needsLayout = true
         button.needsDisplay = true
 
-        statusItem.length = content.length
+        statusItem.length = length
         return true
     }
 

@@ -150,12 +150,12 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertFalse(menuBarSource.contains("@Environment(\\.openSettings)"))
         XCTAssertFalse(menuBarSource.contains("openSettings()"))
         XCTAssertFalse(menuBarSource.contains("showSettingsWindow"))
-        XCTAssertTrue(menuBarSource.contains("let image = statusImage(systemName: content.symbolName)"))
+        XCTAssertTrue(menuBarSource.contains("let image = statusImage(systemName: state.symbolName)"))
         XCTAssertTrue(menuBarSource.contains("?? NSImage(systemSymbolName: \"questionmark\", accessibilityDescription: nil)"))
         XCTAssertFalse(menuBarSource.contains("?? NSImage(systemSymbolName: \"battery.100\", accessibilityDescription: nil)"))
         XCTAssertTrue(menuBarSource.contains("button.image = nil"))
         XCTAssertTrue(menuBarSource.contains("button.image = image"))
-        XCTAssertTrue(menuBarSource.contains("button.title = content.title"))
+        XCTAssertTrue(menuBarSource.contains("button.title = title"))
         XCTAssertTrue(menuBarSource.contains("button.invalidateIntrinsicContentSize()"))
         XCTAssertTrue(menuBarSource.contains("button.needsDisplay = true"))
         XCTAssertFalse(menuBarSource.contains("button.sizeToFit()"))
@@ -166,7 +166,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(menuBarSource.contains("guard isStarted == false else {\n            return\n        }\n\n        isStarted = true"))
         XCTAssertTrue(menuBarSource.contains("statusBar.removeStatusItem(statusItem)"))
         XCTAssertTrue(menuBarSource.contains("reinstallStatusItemForDisplayPreferenceChange()"))
-        XCTAssertTrue(menuBarSource.contains("if MenuBarStatusItemRenderer.apply(content, to: statusItem)"))
+        XCTAssertTrue(menuBarSource.contains("if MenuBarStatusItemRenderer.apply(state, to: statusItem)"))
         XCTAssertTrue(menuBarSource.contains("_ = preferences.menuBarDisplayMode"))
         XCTAssertTrue(menuBarSource.contains("_ = preferences.temperatureUnitPreference"))
         XCTAssertTrue(menuBarSource.contains("_ = preferences.temperatureUnitResolutionToken"))
@@ -180,7 +180,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(menuBarSource.contains("applyCurrentStatusItemState()"))
         XCTAssertTrue(menuBarSource.contains("observeStatusItemInputs()"))
         XCTAssertTrue(menuBarSource.contains("observeDisplayPreferenceNotifications()"))
-        XCTAssertTrue(menuBarSource.contains("MenuBarStatusItemRenderer.apply(content, to: statusItem)"))
+        XCTAssertTrue(menuBarSource.contains("MenuBarStatusItemRenderer.apply(state, to: statusItem)"))
         XCTAssertTrue(menuBarSource.contains("button.sendAction(on: [.leftMouseDown, .rightMouseDown])"))
         XCTAssertFalse(menuBarSource.contains("button.sendAction(on: [.leftMouseUp, .rightMouseUp])"))
         XCTAssertFalse(menuBarSource.contains("private let popover: NSPopover"))
@@ -469,11 +469,11 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
 
-        let percentage = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
+        let percentage = MenuBarBatteryLabelState(
             snapshot: .previewDischarging,
             displayMode: .iconAndPercentage,
             temperatureUnitPreference: .celsius
-        ))
+        )
         XCTAssertTrue(MenuBarStatusItemRenderer.apply(percentage, to: statusItem))
 
         XCTAssertEqual(statusItem.button?.title, "92%")
@@ -489,11 +489,11 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         statusItem.button?.attributedTitle = NSAttributedString(string: "stale attributed title")
         statusItem.button?.imagePosition = .imageRight
 
-        let iconOnly = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
+        let iconOnly = MenuBarBatteryLabelState(
             snapshot: .previewDischarging,
             displayMode: .iconOnly,
             temperatureUnitPreference: .celsius
-        ))
+        )
         XCTAssertTrue(MenuBarStatusItemRenderer.apply(iconOnly, to: statusItem))
 
         XCTAssertEqual(statusItem.button?.title, "")
@@ -504,11 +504,11 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(statusItem.button?.image?.isTemplate == true)
         XCTAssertNil(statusItem.button?.contentTintColor)
 
-        let power = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
+        let power = MenuBarBatteryLabelState(
             snapshot: .previewDischarging,
             displayMode: .iconAndPower,
             temperatureUnitPreference: .celsius
-        ))
+        )
         XCTAssertTrue(MenuBarStatusItemRenderer.apply(power, to: statusItem))
 
         XCTAssertEqual(statusItem.button?.title, "13.9W")
@@ -527,16 +527,16 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
 
-        let green = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
+        let green = MenuBarBatteryLabelState(
             snapshot: makeSnapshot(powerState: .onBattery, stateOfChargePercent: 40),
             displayMode: .iconOnly,
             temperatureUnitPreference: .celsius
-        ))
-        let yellow = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
+        )
+        let yellow = MenuBarBatteryLabelState(
             snapshot: makeSnapshot(powerState: .onBattery, stateOfChargePercent: 39),
             displayMode: .iconOnly,
             temperatureUnitPreference: .celsius
-        ))
+        )
 
         XCTAssertEqual(green.symbolName, yellow.symbolName)
 
@@ -961,34 +961,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertEqual(iconOnly.statusItemTitle, "")
         XCTAssertEqual(percentage.statusItemTitle, "92%")
         XCTAssertEqual(power.statusItemTitle, "13.9W")
-    }
-
-    func testStatusItemContentTracksSelectedDisplayMode() {
-        let iconOnly = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
-            snapshot: .previewDischarging,
-            displayMode: .iconOnly,
-            temperatureUnitPreference: .celsius
-        ))
-        let percentage = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
-            snapshot: .previewDischarging,
-            displayMode: .iconAndPercentage,
-            temperatureUnitPreference: .celsius
-        ))
-        let power = MenuBarStatusItemContent(state: MenuBarBatteryLabelState(
-            snapshot: .previewDischarging,
-            displayMode: .iconAndPower,
-            temperatureUnitPreference: .celsius
-        ))
-
-        XCTAssertEqual(iconOnly.title, "")
-        XCTAssertEqual(iconOnly.imagePosition, .imageOnly)
-        XCTAssertEqual(iconOnly.length, NSStatusItem.squareLength)
-        XCTAssertEqual(percentage.title, "92%")
-        XCTAssertEqual(percentage.imagePosition, .imageLeft)
-        XCTAssertEqual(percentage.length, NSStatusItem.variableLength)
-        XCTAssertEqual(power.title, "13.9W")
-        XCTAssertEqual(power.imagePosition, .imageLeft)
-        XCTAssertEqual(power.length, NSStatusItem.variableLength)
     }
 
     func testLabelStateIdentityChangesWithPowerStateEvenWhenTextMatches() {
