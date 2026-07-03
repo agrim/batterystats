@@ -773,7 +773,6 @@ enum MenuBarPanelLayout {
 
 struct MenuBarStatusItemContent: Equatable {
     let symbolName: String
-    let symbolTintStyle: BatteryPresentationTint
     let title: String
     let accessibilityLabel: String
 
@@ -787,7 +786,6 @@ struct MenuBarStatusItemContent: Equatable {
 
     init(state: MenuBarBatteryLabelState) {
         symbolName = state.symbolName
-        symbolTintStyle = state.symbolTintStyle
         title = state.statusItemTitle
         accessibilityLabel = state.accessibilityLabel
     }
@@ -870,8 +868,6 @@ struct MenuBarStatusItemButtonSnapshot: Equatable {
 
 struct MenuBarBatteryLabelState {
     let symbolName: String
-    let symbolTintStyle: BatteryPresentationTint
-    let symbolTint: Color
     let value: String?
     let accessibilityLabel: String
     let identity: String
@@ -896,8 +892,6 @@ struct MenuBarBatteryLabelState {
     ) {
         let symbolTintStyle = BatteryPresentationStyle.chargeTintStyle(for: snapshot)
         symbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
-        self.symbolTintStyle = symbolTintStyle
-        symbolTint = symbolTintStyle.color
         value = MenuBarBatteryLabelFormatting.displayValue(
             snapshot: snapshot,
             displayMode: displayMode,
