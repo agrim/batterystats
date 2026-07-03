@@ -38,9 +38,9 @@ final class WidgetSourceTests: XCTestCase {
 
         XCTAssertTrue(widgetSource.contains("title: powerTitle"))
         XCTAssertTrue(widgetSource.contains("BatteryPresentationStyle.batterySymbolName(for: snapshot)"))
-        XCTAssertTrue(widgetSource.contains("BatteryMediumWidgetFormatting.powerTitle(for: snapshot)"))
+        XCTAssertTrue(widgetSource.contains("BatteryPowerDisplayRole.role(for: snapshot).title"))
         XCTAssertTrue(monitorSource.contains("BatteryPresentationStyle.batterySymbolName(for: snapshot)"))
-        XCTAssertTrue(sharedSource.contains("static func powerTitle(for snapshot: BatterySnapshot?) -> String"))
+        XCTAssertFalse(sharedSource.contains("enum BatteryMediumWidgetFormatting"))
         XCTAssertTrue(sharedSource.contains("enum BatteryPowerDisplayRole"))
         XCTAssertTrue(sharedSource.contains("case inputPower"))
         XCTAssertTrue(sharedSource.contains("case chargeRate"))

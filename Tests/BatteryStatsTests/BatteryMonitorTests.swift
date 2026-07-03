@@ -1804,7 +1804,7 @@ final class BatteryMonitorTests: XCTestCase {
 
         XCTAssertEqual(firstSnapshot.activePowerWatts, secondSnapshot.activePowerWatts)
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: monitor.snapshot), "Input Power")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: monitor.snapshot).title, "Input Power")
         XCTAssertEqual(reloadCount, 2)
     }
 
@@ -1841,7 +1841,7 @@ final class BatteryMonitorTests: XCTestCase {
         await monitor.waitForIdleForTesting()
 
         XCTAssertEqual(secondSnapshot.activePowerWatts, 25.4)
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: secondSnapshot), "Charge Rate")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: secondSnapshot).title, "Charge Rate")
         XCTAssertEqual(reloadCount, 1)
     }
 
@@ -1880,7 +1880,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(firstSnapshot.activePowerWatts)
         XCTAssertEqual(secondSnapshot.activePowerWatts, 14.4)
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: monitor.snapshot), "Input Power")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: monitor.snapshot).title, "Input Power")
         XCTAssertEqual(reloadCount, 2)
     }
 
@@ -3382,7 +3382,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.inputPowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "39.8 W")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: loadedSnapshot), "Input Power")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Input Power")
     }
 
     func testWidgetSnapshotStoreRejectsInputPowerAboveAdapterCapability() throws {
@@ -3611,7 +3611,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.powerState, .charging)
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 18, accuracy: 0.001)
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: loadedSnapshot), "Charge Rate")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStoreTreatsLegacyInputPowerWithoutEvidenceAsUntrusted() throws {
@@ -3659,7 +3659,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 25.332, accuracy: 0.001)
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "25.3 W")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: loadedSnapshot), "Charge Rate")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStorePreservesCurrentDerivedChargeRateNearAdapterCapability() throws {
@@ -3702,7 +3702,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.chargeRateWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "69.4 W")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: loadedSnapshot), "Charge Rate")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStorePreservesCounterBackedInputPowerNearAdapterCapability() throws {
@@ -3745,7 +3745,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.inputPowerWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "69.4 W")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: loadedSnapshot), "Input Power")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Input Power")
     }
 
     func testWidgetSnapshotStoreRejectsCounterBackedInputPowerThatExactlyMirrorsAdapterCapability() throws {
@@ -3788,7 +3788,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 25.332, accuracy: 0.001)
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "25.3 W")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: loadedSnapshot), "Charge Rate")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStoreRejectsCounterBackedInputPowerThatNearlyMirrorsAdapterCapability() throws {
@@ -3831,7 +3831,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 25.332, accuracy: 0.001)
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "25.3 W")
-        XCTAssertEqual(BatteryMediumWidgetFormatting.powerTitle(for: loadedSnapshot), "Charge Rate")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStorePreservesExplicitMissingChargeRateMarkerWhenSanitizing() throws {

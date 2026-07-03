@@ -571,12 +571,6 @@ enum BatteryWidgetMetricFormatting {
     }
 }
 
-enum BatteryMediumWidgetFormatting {
-    static func powerTitle(for snapshot: BatterySnapshot?) -> String {
-        BatteryPowerDisplayRole.role(for: snapshot).title
-    }
-}
-
 enum BatteryPowerDisplayRole {
     case power
     case inputPower

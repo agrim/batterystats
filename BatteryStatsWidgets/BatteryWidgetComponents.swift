@@ -156,7 +156,7 @@ struct BatteryMediumWidgetView: View {
     }
 
     private var powerTitle: String {
-        BatteryMediumWidgetFormatting.powerTitle(for: snapshot)
+        BatteryPowerDisplayRole.role(for: snapshot).title
     }
 
     private var powerValue: String {
