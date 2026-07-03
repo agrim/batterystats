@@ -31,9 +31,7 @@ enum BatteryPowerState: String, Codable, Equatable, Sendable {
             return "battery.25"
         case .charging:
             return "battery.100.bolt"
-        case .connectedDischarging:
-            return "powerplug"
-        case .connectedNotCharging:
+        case .connectedDischarging, .connectedNotCharging:
             return "powerplug"
         case .fullOnAC:
             return "battery.100"
@@ -58,12 +56,7 @@ enum BatteryPowerState: String, Codable, Equatable, Sendable {
     }
 
     var isBatteryDischarging: Bool {
-        switch self {
-        case .onBattery, .connectedDischarging:
-            return true
-        case .charging, .connectedNotCharging, .fullOnAC, .unknown:
-            return false
-        }
+        self == .onBattery || self == .connectedDischarging
     }
 
     func timeTitle(charging: String, discharging: String, idle: String = "Time") -> String {
