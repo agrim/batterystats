@@ -964,7 +964,6 @@ private final class MenuBarDisplayPreferencesRecorder: @unchecked Sendable {
 private final class FakePreferencesSync: PreferencesSyncing {
     var isEnabled = false
     var isAvailable = true
-    var isICloudAccountAvailable = true
     var availabilityDescription = "iCloud is available for tests."
     private(set) var removedKeys: [String] = []
     private(set) var removeObserverCallCount = 0
@@ -1057,10 +1056,6 @@ private final class FakeICloudKeyValueStore: ICloudPreferencesKeyValueStoring {
 
     func object(forKey aKey: String) -> Any? {
         values[aKey]
-    }
-
-    func bool(forKey aKey: String) -> Bool {
-        (values[aKey] as? Bool) ?? false
     }
 
     func string(forKey aKey: String) -> String? {

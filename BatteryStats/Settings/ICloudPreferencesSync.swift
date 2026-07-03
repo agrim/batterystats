@@ -4,7 +4,6 @@ import Foundation
 protocol PreferencesSyncing: AnyObject {
     var isEnabled: Bool { get }
     var isAvailable: Bool { get }
-    var isICloudAccountAvailable: Bool { get }
     var availabilityDescription: String { get }
 
     func setEnabled(_ enabled: Bool)
@@ -22,7 +21,6 @@ protocol PreferencesSyncing: AnyObject {
 @MainActor
 protocol ICloudPreferencesKeyValueStoring: AnyObject {
     func object(forKey aKey: String) -> Any?
-    func bool(forKey aKey: String) -> Bool
     func string(forKey aKey: String) -> String?
     func set(_ value: Any?, forKey aKey: String)
     func removeObject(forKey aKey: String)

@@ -651,7 +651,6 @@ private final class MultiRequestBatteryAlertAuthorizer: BatteryAlertAuthorizing 
 private final class NoopAlertPreferencesSync: PreferencesSyncing {
     let isEnabled = false
     let isAvailable = true
-    let isICloudAccountAvailable = true
     let availabilityDescription = "iCloud sync is not used in these tests."
 
     func setEnabled(_ enabled: Bool) {}

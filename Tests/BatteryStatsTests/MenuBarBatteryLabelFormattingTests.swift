@@ -1313,7 +1313,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 private final class NoopPreferencesSync: PreferencesSyncing {
     var isEnabled = false
     var isAvailable = true
-    var isICloudAccountAvailable = true
     var availabilityDescription = "iCloud is available for tests."
 
     func setEnabled(_ enabled: Bool) {
