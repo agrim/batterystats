@@ -25,20 +25,17 @@ struct BatteryStatusWidgetView: View {
                     let healthMetric = BatteryWidgetMetric(
                         content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent)),
                         progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationHealthPercent),
-                        ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color,
-                        contentTint: .primary
+                        ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color
                     )
                     let chargeMetric = BatteryWidgetMetric(
                         content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)),
                         progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationStateOfChargePercent),
-                        ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color,
-                        contentTint: .primary
+                        ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color
                     )
                     let timeMetric = BatteryWidgetMetric(
                         content: .text(BatteryWidgetMetricFormatting.timeText(for: snapshot)),
                         progress: BatteryWidgetMetricFormatting.timeProgress(for: snapshot),
-                        ringTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color,
-                        contentTint: .primary
+                        ringTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color
                     )
                     let statusMetric = BatteryWidgetMetric(
                         content: .symbol(statusDescriptor.symbolName),
@@ -63,7 +60,8 @@ struct BatteryStatusWidgetView: View {
             }
         }
         .containerBackground(for: .widget) {
-            BatteryWidgetBackground()
+            ContainerRelativeShape()
+                .fill(.ultraThinMaterial)
         }
     }
 

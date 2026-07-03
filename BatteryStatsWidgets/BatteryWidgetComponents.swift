@@ -1,12 +1,5 @@
 import SwiftUI
 
-struct BatteryWidgetBackground: View {
-    var body: some View {
-        ContainerRelativeShape()
-            .fill(.ultraThinMaterial)
-    }
-}
-
 struct BatteryWidgetMetricTile: View {
     let metric: BatteryWidgetMetric
     let size: CGFloat
@@ -47,6 +40,13 @@ struct BatteryWidgetMetric {
     let progress: Double?
     let ringTint: Color
     let contentTint: Color
+
+    init(content: Content, progress: Double?, ringTint: Color, contentTint: Color = .primary) {
+        self.content = content
+        self.progress = progress
+        self.ringTint = ringTint
+        self.contentTint = contentTint
+    }
 }
 
 private struct BatteryWidgetMetricContent: View {
