@@ -6,11 +6,8 @@ enum BatteryFreshnessFormatting {
             return "Refreshing..."
         }
 
-        guard let lastUpdated else {
-            return "Waiting for battery change"
-        }
-
-        guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: lastUpdated, now: now) else {
+        guard let lastUpdated,
+              BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: lastUpdated, now: now) else {
             return "Waiting for battery change"
         }
 
