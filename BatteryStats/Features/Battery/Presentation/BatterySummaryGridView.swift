@@ -114,16 +114,15 @@ struct BatterySummaryGridView: View {
             BatteryDetailRowView(title: "Voltage", value: BatteryFormatting.millivolts(voltage))
         }
 
-        if let energy = BatterySummaryDetailFormatting.energy(
-            current: snapshot.currentChargeWattHours,
-            maximum: snapshot.fullChargeCapacityWattHours
-        ) {
+        let currentEnergy = BatteryCalculations.plausibleWattHours(snapshot.currentChargeWattHours)
+        let maximumEnergy = BatteryCalculations.positiveWattHours(snapshot.fullChargeCapacityWattHours)
+        if currentEnergy != nil || maximumEnergy != nil {
             Divider()
                 .gridCellColumns(2)
 
             BatteryDetailRowView(
                 title: "Energy",
-                value: energy
+                value: BatteryFormatting.compactWattHourPair(current: currentEnergy, maximum: maximumEnergy)
             )
         }
 
@@ -191,17 +190,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return BatteryFormatting.watts(value)
-    }
-
-    static func energy(current: Double?, maximum: Double?) -> String? {
-        let current = BatteryCalculations.plausibleWattHours(current)
-        let maximum = BatteryCalculations.positiveWattHours(maximum)
-
-        guard current != nil || maximum != nil else {
-            return nil
-        }
-
-        return BatteryFormatting.compactWattHourPair(current: current, maximum: maximum)
     }
 
 }

@@ -524,14 +524,12 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(150), "—")
         XCTAssertNil(BatterySummaryDetailFormatting.power(-4.2))
         XCTAssertNil(BatterySummaryDetailFormatting.power(.greatestFiniteMagnitude))
-        XCTAssertNil(BatterySummaryDetailFormatting.energy(current: nil, maximum: nil))
     }
 
     func testSummaryDetailFormattingShowsValidAndPartialValues() {
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(81.38), "81%")
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(100), "100%")
         XCTAssertEqual(BatterySummaryDetailFormatting.power(13.9), "13.9 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.energy(current: 40.2, maximum: nil), "40.2 Wh")
     }
 
     func testSummaryChargingSpeedUsesLiveInputPowerWhileCharging() throws {
