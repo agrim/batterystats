@@ -449,25 +449,14 @@ final class BatteryMonitor {
                 return
             }
 
-            let rawSnapshotText = rawSnapshotCopyText(for: result)
+            let rawSnapshotText = result.rawSnapshotText
+                ?? (result.snapshot == nil ? Self.unsupportedRawSnapshotText : Self.unavailableRawSnapshotText)
             if result.snapshot != nil {
                 _ = apply(result, readSequence: readSequence, publicationDate: readDate)
             }
 
             pasteboardCopy(rawSnapshotText)
         }
-    }
-
-    private func rawSnapshotCopyText(for result: BatteryReadResult) -> String {
-        if let rawSnapshotText = result.rawSnapshotText {
-            return rawSnapshotText
-        }
-
-        guard result.snapshot != nil else {
-            return Self.unsupportedRawSnapshotText
-        }
-
-        return Self.unavailableRawSnapshotText
     }
 
     func copyParsedSnapshot() {
