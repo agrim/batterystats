@@ -596,24 +596,17 @@ struct BatteryReadingService: Sendable {
         smartMinutes: Int?,
         zeroIsDisplayable: Bool
     ) -> Int? {
-        for reportedMinutes in [
-            BatteryCalculations.plausibleDurationMinutes(publicMinutes),
-            BatteryCalculations.plausibleDurationMinutes(smartMinutes)
-        ] {
-            guard let reportedMinutes else {
-                continue
-            }
+        displayableReportedMinutes(publicMinutes, zeroIsDisplayable: zeroIsDisplayable)
+            ?? displayableReportedMinutes(smartMinutes, zeroIsDisplayable: zeroIsDisplayable)
+    }
 
-            guard reportedMinutes == 0 else {
-                return reportedMinutes
-            }
-
-            if zeroIsDisplayable {
-                return 0
-            }
+    private static func displayableReportedMinutes(_ minutes: Int?, zeroIsDisplayable: Bool) -> Int? {
+        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes),
+              minutes != 0 || zeroIsDisplayable else {
+            return nil
         }
 
-        return nil
+        return minutes
     }
 
     private func prettyRawSnapshot(publicSnapshot: PublicPowerSourceSnapshot?, smartBattery: SmartBatteryDetails?) -> String {
