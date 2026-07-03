@@ -135,9 +135,11 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             snapshot.currentMilliampsSigned,
             powerState: snapshot.powerState
         )
+        let chargeRateMilliamps = BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned)
+        let dischargeCurrentMilliamps = BatteryCalculations.dischargeRateMilliamps(from: currentMilliampsSigned)
         let isStoredCharged = reconciledStoredChargedState(
             snapshot: snapshot,
-            signedCurrentMilliamps: currentMilliampsSigned,
+            hasDischargeCurrentEvidence: dischargeCurrentMilliamps != nil,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             storedStateOfChargePercent: storedStateOfChargePercent
         )
@@ -169,14 +171,13 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             isCharging: snapshot.isCharging,
             isStoredCharged: isStoredCharged,
             isExternalPowerConnected: storedExternalPowerConnected,
-            signedCurrentMilliamps: currentMilliampsSigned
+            hasCurrentEvidence: chargeRateMilliamps != nil || dischargeCurrentMilliamps != nil
         )
         let flags = BatteryCalculations.normalizedPowerFlags(for: powerState)
         let storedDischargeRateMilliamps = BatteryCalculations.plausibleDischargeRateMilliamps(snapshot.dischargeRateMilliamps)
         let dischargeRateMilliamps = powerState.isBatteryDischarging
             ? storedDischargeRateMilliamps
             : nil
-        let chargeRateMilliamps = BatteryCalculations.chargeRateMilliamps(from: currentMilliampsSigned)
         let adapterMaxWatts = BatteryReadingService.displayableAdapterMaxWatts(
             snapshot.adapterMaxWatts,
             powerState: powerState
@@ -204,7 +205,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
                 stored: snapshot.dischargeRateWatts,
                 computed: computedDischargeRateWatts,
                 encodedFieldWasPresent: encodedPowerRateFields?.dischargeRateWatts,
-                hasCurrentEvidence: BatteryCalculations.dischargeRateMilliamps(from: currentMilliampsSigned) != nil
+                hasCurrentEvidence: dischargeCurrentMilliamps != nil
             )
         )
         let inputPowerWatts = BatteryReadingService.displayableInputPowerWatts(
@@ -460,12 +461,12 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
 
     private static func reconciledStoredChargedState(
         snapshot: BatterySnapshot,
-        signedCurrentMilliamps: Int?,
+        hasDischargeCurrentEvidence: Bool,
         fullChargeCapacityMilliampHours: Int?,
         storedStateOfChargePercent: Double?
     ) -> Bool {
         guard snapshot.powerState == .fullOnAC,
-              BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) == nil else {
+              hasDischargeCurrentEvidence == false else {
             return false
         }
 
@@ -489,14 +490,13 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
         isCharging: Bool,
         isStoredCharged: Bool,
         isExternalPowerConnected: Bool,
-        signedCurrentMilliamps: Int?
+        hasCurrentEvidence: Bool
     ) -> BatteryPowerState {
         guard originalPowerState == .unknown,
               isCharging == false,
               isStoredCharged == false,
               isExternalPowerConnected == false,
-              BatteryCalculations.chargeRateMilliamps(from: signedCurrentMilliamps) == nil,
-              BatteryCalculations.dischargeRateMilliamps(from: signedCurrentMilliamps) == nil else {
+              hasCurrentEvidence == false else {
             return derivedPowerState
         }
 
