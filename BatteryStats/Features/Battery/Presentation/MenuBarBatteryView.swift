@@ -885,11 +885,11 @@ enum MenuBarBatteryLabelFormatting {
         case .iconOnly:
             return nil
         case .iconAndPercentage:
-            return abbreviatedPercent(snapshot?.presentationStateOfChargePercent)
+            return BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)
         case .iconAndTimeRemaining:
             return BatteryFormatting.compactWidgetDuration(minutes: snapshot?.displayedTimeMinutes)
         case .iconAndHealth:
-            return abbreviatedPercent(snapshot?.presentationHealthPercent)
+            return BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent)
         case .iconAndFullCharge:
             return abbreviatedCapacity(snapshot?.fullChargeCapacityMilliampHours)
         case .iconAndTemperature:
@@ -920,14 +920,6 @@ enum MenuBarBatteryLabelFormatting {
         case .iconAndPower:
             return powerAccessibilityLabel(for: snapshot)
         }
-    }
-
-    private static func abbreviatedPercent(_ value: Double?) -> String {
-        guard let value = BatteryCalculations.presentationPercent(value, maximumAllowed: 105) else {
-            return "—"
-        }
-
-        return "\(value.formatted(.number.precision(.fractionLength(0))))%"
     }
 
     private static func abbreviatedCapacity(_ milliampHours: Int?) -> String {
