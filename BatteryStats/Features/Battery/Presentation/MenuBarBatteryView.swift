@@ -973,21 +973,13 @@ enum MenuBarBatteryLabelFormatting {
         return "\(value.formatted(.number.precision(.fractionLength(0))))°"
     }
 
-    private static func abbreviatedPower(_ watts: Double?) -> String {
-        guard let watts = BatteryCalculations.plausibleWatts(watts) else {
+    private static func abbreviatedPower(for snapshot: BatterySnapshot?) -> String {
+        guard let snapshot,
+              let watts = BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) else {
             return "—"
         }
 
-        return "\(watts.formatted(.number.precision(.fractionLength(1))))W"
-    }
-
-    private static func abbreviatedPower(for snapshot: BatterySnapshot?) -> String {
-        let powerText = abbreviatedPower(snapshot?.activePowerWatts)
-        guard let snapshot,
-              powerText != "—" else {
-            return powerText
-        }
-
+        let powerText = "\(watts.formatted(.number.precision(.fractionLength(1))))W"
         return BatteryPowerDisplayRole.role(for: snapshot) == .inputPower ? "In \(powerText)" : powerText
     }
 
