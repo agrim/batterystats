@@ -6,6 +6,32 @@ enum BatteryLevelTone: String, Equatable, Sendable {
     case greenYellow
     case midGreen
     case green
+
+    static func forPercent(
+        _ percent: Double?,
+        greenAbove: Double,
+        midGreenMinimum: Double,
+        greenYellowMinimum: Double,
+        yellowMinimum: Double
+    ) -> BatteryLevelTone {
+        guard let percent else {
+            return .green
+        }
+
+        if percent > greenAbove {
+            return .green
+        }
+
+        if percent >= midGreenMinimum {
+            return .midGreen
+        }
+
+        if percent >= greenYellowMinimum {
+            return .greenYellow
+        }
+
+        return percent >= yellowMinimum ? .yellow : .red
+    }
 }
 
 enum BatteryInputPowerEvidence: String, Codable, Equatable, Sendable {
@@ -227,51 +253,23 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     var healthTone: BatteryLevelTone {
-        guard let healthPercent = presentationHealthPercent else {
-            return .green
-        }
-
-        if healthPercent > 95 {
-            return .green
-        }
-
-        if healthPercent >= 90 {
-            return .midGreen
-        }
-
-        if healthPercent >= 85 {
-            return .greenYellow
-        }
-
-        if healthPercent >= 80 {
-            return .yellow
-        }
-
-        return .red
+        BatteryLevelTone.forPercent(
+            presentationHealthPercent,
+            greenAbove: 95,
+            midGreenMinimum: 90,
+            greenYellowMinimum: 85,
+            yellowMinimum: 80
+        )
     }
 
     var chargeTone: BatteryLevelTone {
-        guard let stateOfChargePercent = presentationStateOfChargePercent else {
-            return .green
-        }
-
-        if stateOfChargePercent > 70 {
-            return .green
-        }
-
-        if stateOfChargePercent >= 40 {
-            return .midGreen
-        }
-
-        if stateOfChargePercent >= 20 {
-            return .greenYellow
-        }
-
-        if stateOfChargePercent >= 10 {
-            return .yellow
-        }
-
-        return .red
+        BatteryLevelTone.forPercent(
+            presentationStateOfChargePercent,
+            greenAbove: 70,
+            midGreenMinimum: 40,
+            greenYellowMinimum: 20,
+            yellowMinimum: 10
+        )
     }
 
     var batterySymbolName: String {
