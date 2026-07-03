@@ -71,27 +71,17 @@ final class PowerSourceReader: @unchecked Sendable {
     }
 
     static func snapshot(from descriptions: [[String: Any]]) -> PublicPowerSourceSnapshot? {
-        let classifiedDescriptions = descriptions.map { description in
-            (
-                description: description,
-                isInternalBattery: isInternalBatteryDescription(description),
-                isPresent: isPresentDescription(description)
-            )
-        }
-        let selectedDescription = classifiedDescriptions.first {
-            $0.isInternalBattery && $0.isPresent
-        } ?? classifiedDescriptions.first {
-            $0.isPresent
-        } ?? classifiedDescriptions.first {
-            $0.isInternalBattery
-        } ?? classifiedDescriptions.first
-
-        guard let selectedDescription else {
+        guard let powerSource = descriptions.first(where: {
+            isInternalBatteryDescription($0) && isPresentDescription($0)
+        }) ?? descriptions.first(where: {
+            isPresentDescription($0)
+        }) ?? descriptions.first(where: {
+            isInternalBatteryDescription($0)
+        }) ?? descriptions.first else {
             return nil
         }
 
-        let powerSource = selectedDescription.description
-        let isInternalBattery = selectedDescription.isInternalBattery
+        let isInternalBattery = isInternalBatteryDescription(powerSource)
 
         let currentCapacity = BatteryCalculations.plausibleCapacityMilliampHours(
             SignedIntegerNormalizer.normalize(powerSource[string(for: kIOPSCurrentCapacityKey)])
