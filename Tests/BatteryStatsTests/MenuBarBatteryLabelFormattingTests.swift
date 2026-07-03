@@ -250,7 +250,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(preferencesSource.contains("NSLocale.currentLocaleDidChangeNotification"))
         XCTAssertTrue(preferencesSource.contains("temperatureUnitResolutionToken &+="))
         XCTAssertTrue(preferencesSource.contains("func invalidateMenuBarDisplayPreferences()"))
-        XCTAssertTrue(preferencesSource.contains("func refreshMenuBarDisplayPreferencesFromDefaults() -> Bool"))
+        XCTAssertTrue(preferencesSource.contains("private func applyMenuBarDisplayDefaultsChanges() -> Bool"))
         XCTAssertTrue(settingsSource.contains("menuBarDisplayPreferenceBinding(\\.menuBarDisplayMode)"))
         XCTAssertTrue(settingsSource.contains("where Value: Equatable"))
         XCTAssertTrue(settingsSource.contains("guard preferences[keyPath: keyPath] != value else"))

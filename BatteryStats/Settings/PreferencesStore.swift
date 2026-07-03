@@ -369,14 +369,9 @@ final class PreferencesStore {
     }
 
     @discardableResult
-    func refreshMenuBarDisplayPreferencesFromDefaults() -> Bool {
-        applyMenuBarDisplayDefaultsChanges()
-    }
-
-    @discardableResult
     func refreshMenuBarDisplayPreferences(from nextPreferences: MenuBarDisplayPreferences?) -> Bool {
         guard let nextPreferences else {
-            return refreshMenuBarDisplayPreferencesFromDefaults()
+            return applyMenuBarDisplayDefaultsChanges()
         }
 
         isApplyingMenuBarDisplayPreferenceNotification = true
@@ -736,7 +731,7 @@ final class PreferencesStore {
     }
 
     private func applyDefaultsChanges() {
-        refreshMenuBarDisplayPreferencesFromDefaults()
+        _ = applyMenuBarDisplayDefaultsChanges()
 
         applyDefaultBoolPreference(\.showAdvancedValues, forKey: Key.showAdvancedValues, defaultValue: false)
         applyDefaultEnumPreference(
