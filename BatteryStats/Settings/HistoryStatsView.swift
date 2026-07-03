@@ -67,16 +67,12 @@ enum HistoryStatsFormatting {
 
 private extension HistoryStatsView {
     private func powerText(for stats: BatteryHistoryStats) -> String {
-        switch (stats.averagePowerWatts, stats.peakPowerWatts) {
-        case let (.some(average), .some(peak)):
-            return "Avg \(BatteryFormatting.watts(average)), Peak \(BatteryFormatting.watts(peak))"
-        case let (.some(average), .none):
-            return "Avg \(BatteryFormatting.watts(average))"
-        case let (.none, .some(peak)):
-            return "Peak \(BatteryFormatting.watts(peak))"
-        case (.none, .none):
-            return "Unavailable"
-        }
+        let values = [
+            stats.averagePowerWatts.map { "Avg \(BatteryFormatting.watts($0))" },
+            stats.peakPowerWatts.map { "Peak \(BatteryFormatting.watts($0))" }
+        ].compactMap { $0 }
+
+        return values.isEmpty ? "Unavailable" : values.joined(separator: ", ")
     }
 
     private func rangeText<Value>(
