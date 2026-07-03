@@ -395,12 +395,7 @@ struct BatteryReadingService: Sendable {
     }
 
     static func displayableAdapterMaxWatts(_ adapterMaxWatts: Int?, powerState: BatteryPowerState) -> Int? {
-        guard powerState.isExternallyPowered,
-              let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
-            return nil
-        }
-
-        return adapterMaxWatts
+        powerState.isExternallyPowered ? BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) : nil
     }
 
     static func displayableInputPowerWatts(
@@ -409,15 +404,11 @@ struct BatteryReadingService: Sendable {
         adapterMaxWatts: Int? = nil,
         powerState: BatteryPowerState
     ) -> Double? {
-        guard powerState.isExternallyPowered else {
-            return nil
-        }
-
-        return BatteryCalculations.displayableInputPowerWatts(
+        powerState.isExternallyPowered ? BatteryCalculations.displayableInputPowerWatts(
             inputPowerWatts,
             evidence: evidence,
             adapterMaxWatts: adapterMaxWatts
-        )
+        ) : nil
     }
 
     static func displayablePowerRates(
