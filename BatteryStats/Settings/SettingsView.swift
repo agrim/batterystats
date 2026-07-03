@@ -111,7 +111,7 @@ struct SettingsView: View {
                     .controlSize(.small)
             }
 
-            Text(alertSettings.statusDescription)
+            Text(alertSettings.authorizationStatus.statusDescription)
                 .font(.footnote)
                 .foregroundStyle(alertSettings.authorizationStatus == .denied ? Color.red : Color.secondary)
         }

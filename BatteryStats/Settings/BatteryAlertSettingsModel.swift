@@ -7,10 +7,6 @@ enum BatteryAlertAuthorizationStatus: Equatable {
     case authorized
     case denied
 
-    var canDeliverAlerts: Bool {
-        self == .authorized
-    }
-
     var statusDescription: String {
         switch self {
         case .notDetermined:
@@ -42,10 +38,6 @@ final class BatteryAlertSettingsModel {
 
     init(authorizer: any BatteryAlertAuthorizing = UserNotificationBatteryAlertAuthorizer()) {
         self.authorizer = authorizer
-    }
-
-    var statusDescription: String {
-        authorizationStatus.statusDescription
     }
 
     func cancelPendingAlertEnables() {
@@ -97,9 +89,9 @@ final class BatteryAlertSettingsModel {
         updateResolvingAuthorizationOperationCount(by: -1)
 
         let isCurrentPreferenceRequest = alertPreferenceGenerations[preferenceKey] == generation
-        apply(status, to: status.canDeliverAlerts ? nil : preferences)
+        apply(status, to: status == .authorized ? nil : preferences)
 
-        if status.canDeliverAlerts == false {
+        if status != .authorized {
             invalidatePendingAlertEnables()
             return
         }
