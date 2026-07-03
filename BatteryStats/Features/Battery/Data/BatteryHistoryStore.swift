@@ -191,7 +191,6 @@ final class BatteryHistoryStore {
         static let cloudEntries = "batteryHistoryEntries"
     }
 
-    private static let emptyEntriesString = "[]"
     private static let significantTemperatureChangeThresholdCelsius = 2.0
 
     var entries: [BatteryHistoryEntry] = []
@@ -281,7 +280,7 @@ final class BatteryHistoryStore {
             entries = []
         }
 
-        let encodedEntries = Self.emptyEntriesString
+        let encodedEntries = "[]"
         if defaults.string(forKey: Key.localEntries) != encodedEntries {
             defaults.set(encodedEntries, forKey: Key.localEntries)
         }
@@ -391,12 +390,12 @@ final class BatteryHistoryStore {
             return true
         }
 
-        if Self.availabilityChanged(previous: comparisonEntry.healthPercent, current: entry.healthPercent)
-            || Self.availabilityChanged(previous: comparisonEntry.stateOfChargePercent, current: entry.stateOfChargePercent)
-            || Self.availabilityChanged(previous: comparisonEntry.displayedTimeMinutes, current: entry.displayedTimeMinutes)
-            || Self.availabilityChanged(previous: comparisonEntry.activePowerWatts, current: entry.activePowerWatts)
-            || Self.availabilityChanged(previous: comparisonEntry.temperatureCelsius, current: entry.temperatureCelsius)
-            || Self.availabilityChanged(previous: comparisonEntry.cycleCount, current: entry.cycleCount) {
+        if (comparisonEntry.healthPercent == nil) != (entry.healthPercent == nil)
+            || (comparisonEntry.stateOfChargePercent == nil) != (entry.stateOfChargePercent == nil)
+            || (comparisonEntry.displayedTimeMinutes == nil) != (entry.displayedTimeMinutes == nil)
+            || (comparisonEntry.activePowerWatts == nil) != (entry.activePowerWatts == nil)
+            || (comparisonEntry.temperatureCelsius == nil) != (entry.temperatureCelsius == nil)
+            || (comparisonEntry.cycleCount == nil) != (entry.cycleCount == nil) {
             return true
         }
 
@@ -626,10 +625,6 @@ final class BatteryHistoryStore {
             .values
             .sorted { $0.timestamp < $1.timestamp }
             .suffix(288))
-    }
-
-    private static func availabilityChanged<T>(previous: T?, current: T?) -> Bool {
-        (previous == nil) != (current == nil)
     }
 
 }
