@@ -1,12 +1,6 @@
 import Foundation
 
-protocol BatteryWidgetSnapshotStoring {
-    func save(_ snapshot: BatterySnapshot)
-    func snapshot(now: Date, maximumAge: TimeInterval) -> BatterySnapshot?
-    func clear()
-}
-
-struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
+struct BatteryWidgetSnapshotStore {
     static let appGroupIdentifier = "group.io.github.agrim.batterystats"
     static let defaultMaximumAge: TimeInterval = 600
     static let defaultRetentionAge: TimeInterval = 6 * 60 * 60

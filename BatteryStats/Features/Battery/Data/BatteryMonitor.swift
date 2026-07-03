@@ -58,7 +58,7 @@ final class BatteryMonitor {
     @ObservationIgnored private var lastAppliedReadSequence = 0
     @ObservationIgnored private var pendingRefreshOptions: BatteryReadOptions?
     @ObservationIgnored private var isStarted = false
-    @ObservationIgnored private let widgetSnapshotStore: any BatteryWidgetSnapshotStoring
+    @ObservationIgnored private let widgetSnapshotStore: BatteryWidgetSnapshotStore
     @ObservationIgnored private let widgetTimelineReloader: @MainActor () -> Void
     @ObservationIgnored private let widgetTimelineReloadMinimumInterval: TimeInterval
     @ObservationIgnored private let now: @MainActor () -> Date
@@ -69,7 +69,7 @@ final class BatteryMonitor {
         reader: BatteryReadingClient = .live(),
         alertCoordinator: BatteryAlertCoordinator = BatteryAlertCoordinator(),
         pasteboardCopy: @escaping @MainActor (String) -> Void = PasteboardCopying.copy,
-        widgetSnapshotStore: any BatteryWidgetSnapshotStoring = BatteryWidgetSnapshotStore.shared,
+        widgetSnapshotStore: BatteryWidgetSnapshotStore = .shared,
         widgetTimelineReloader: @escaping @MainActor () -> Void = {
             WidgetCenter.shared.reloadTimelines(ofKind: BatteryWidgetTimeline.kind)
         },

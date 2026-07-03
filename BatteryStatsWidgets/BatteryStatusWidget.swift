@@ -15,7 +15,7 @@ struct BatteryStatusEntry: TimelineEntry {
 }
 
 struct BatteryStatusProvider: TimelineProvider {
-    private let snapshotStore: any BatteryWidgetSnapshotStoring = BatteryWidgetSnapshotStore.shared
+    private let snapshotStore: BatteryWidgetSnapshotStore = .shared
 
     func placeholder(in context: Context) -> BatteryStatusEntry {
         .placeholder
