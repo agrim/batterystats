@@ -501,7 +501,6 @@ final class BatteryHistoryStore {
 
     private func scheduleCloudSynchronize() {
         cancelCloudSynchronize()
-        cloudSynchronizeGeneration &+= 1
         let generation = cloudSynchronizeGeneration
         cloudSynchronizeTask = Task { @MainActor [weak self] in
             guard let self else {
