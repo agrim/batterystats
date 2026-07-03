@@ -132,7 +132,7 @@ struct BatterySummaryGridView: View {
             BatteryDetailRowView(title: "Made", value: manufactureDate)
         }
 
-        if let age = BatterySummaryDetailFormatting.age(for: snapshot) {
+        if let age = BatterySummaryDetailFormatting.age(snapshot.validatedBatteryAgeComponents) {
             Divider()
                 .gridCellColumns(2)
 
@@ -261,10 +261,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return BatteryFormatting.age(value)
-    }
-
-    static func age(for snapshot: BatterySnapshot) -> String? {
-        age(snapshot.validatedBatteryAgeComponents)
     }
 }
 

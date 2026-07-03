@@ -502,7 +502,7 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(snapshot.validatedBatteryAgeComponents?.year, 0)
         XCTAssertEqual(snapshot.validatedBatteryAgeComponents?.month, 2)
-        let formattedAge = try XCTUnwrap(BatterySummaryDetailFormatting.age(for: snapshot))
+        let formattedAge = try XCTUnwrap(BatterySummaryDetailFormatting.age(snapshot.validatedBatteryAgeComponents))
         XCTAssertTrue(formattedAge.contains("2"))
         XCTAssertFalse(formattedAge.contains("9"))
         XCTAssertFalse(snapshot.debugSummary.contains("Age since made"))
@@ -523,7 +523,7 @@ final class FormatterTests: XCTestCase {
         XCTAssertNil(snapshot.validatedManufactureDate)
         XCTAssertNil(snapshot.validatedBatteryAgeComponents)
         XCTAssertNil(BatterySummaryDetailFormatting.manufactureDate(snapshot.validatedManufactureDate))
-        XCTAssertNil(BatterySummaryDetailFormatting.age(for: snapshot))
+        XCTAssertNil(BatterySummaryDetailFormatting.age(snapshot.validatedBatteryAgeComponents))
         XCTAssertTrue(snapshot.debugSummary.contains("Manufacture date: Unavailable"))
         XCTAssertFalse(snapshot.debugSummary.contains("Age since made"))
     }
