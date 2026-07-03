@@ -138,18 +138,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         }
     }
 
-    private var displayableChargeRateWatts: Double? {
-        guard powerState == .charging else {
-            return nil
-        }
-
-        return BatteryCalculations.plausibleWatts(chargeRateWatts)
-    }
-
-    private var displayableDischargeRateWatts: Double? {
-        powerState.isBatteryDischarging ? BatteryCalculations.plausibleWatts(dischargeRateWatts) : nil
-    }
-
     private var validatedInputPowerWatts: Double? {
         BatteryCalculations.displayableInputPowerWatts(
             inputPowerWatts,
@@ -329,8 +317,8 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         lines.append("\(debugTimeTitle): \(BatteryFormatting.duration(minutes: displayedTimeMinutes))")
         lines.append("Active power: \(BatteryFormatting.watts(activePowerWatts))")
         lines.append("Input power: \(BatteryFormatting.watts(validatedInputPowerWatts))")
-        lines.append("Charge rate: \(BatteryFormatting.watts(displayableChargeRateWatts))")
-        lines.append("Discharge rate: \(BatteryFormatting.watts(displayableDischargeRateWatts))")
+        lines.append("Charge rate: \(BatteryFormatting.watts(powerState == .charging ? chargeRateWatts : nil))")
+        lines.append("Discharge rate: \(BatteryFormatting.watts(powerState.isBatteryDischarging ? dischargeRateWatts : nil))")
         lines.append("Adapter max power: \(Self.debugAdapterMaxWatts(adapterMaxWatts))")
         lines.append("Temperature: \(BatteryFormatting.temperature(presentationTemperatureCelsius, unitPreference: .celsius))")
         lines.append("Cycle count: \(BatteryCalculations.plausibleCycleCount(cycleCount).map(String.init) ?? "Unavailable")")
