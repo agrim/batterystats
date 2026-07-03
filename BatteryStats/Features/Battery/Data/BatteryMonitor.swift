@@ -659,16 +659,16 @@ private struct WidgetTimelineReloadSignature: Equatable {
         batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
         updatedMinute = Self.minuteIdentifier(updatedAt ?? snapshot?.timestamp)
         chargePercent = Self.roundedInt(snapshot?.presentationStateOfChargePercent)
-        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).identityToken
+        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).rawValue
         healthPercent = Self.roundedInt(snapshot?.presentationHealthPercent)
-        healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).identityToken
+        healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).rawValue
         displayedTimeMinutes = snapshot?.displayedTimeMinutes
-        timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).identityToken
+        timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).rawValue
         activePowerDeciwatts = Self.roundedInt(snapshot?.activePowerWatts, multiplier: 10)
         usesInputPowerWatts = snapshot?.visibleInputPowerWatts != nil
         statusSymbolName = statusDescriptor.symbolName
-        statusRingTint = statusDescriptor.ringTintStyle.identityToken
-        statusContentTint = statusDescriptor.contentTintStyle.identityToken
+        statusRingTint = statusDescriptor.ringTintStyle.rawValue
+        statusContentTint = statusDescriptor.contentTintStyle.rawValue
     }
 
     private static func minuteIdentifier(_ date: Date?) -> Int? {

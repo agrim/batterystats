@@ -863,7 +863,7 @@ struct MenuBarBatteryLabelState {
             temperatureUnitPreference.rawValue,
             snapshot?.powerState.rawValue ?? "missingPowerState",
             symbolName,
-            symbolTintStyle.identityToken,
+            symbolTintStyle.rawValue,
             value ?? "iconOnly",
             accessibilityLabel
         ].joined(separator: "|")

@@ -135,8 +135,4 @@ enum BatteryPresentationTint: String, Equatable {
             return .red
         }
     }
-
-    var identityToken: String {
-        rawValue
-    }
 }

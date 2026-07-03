@@ -297,6 +297,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     var debugSummary: String {
         var lines: [String] = []
+        let timeTitle = powerState.timeTitle(charging: "Time to full", discharging: "Time left")
         lines.append("Timestamp: \(timestamp.formatted(date: .numeric, time: .standard))")
         lines.append("Power state: \(powerState.displayTitle)")
         lines.append("State of charge: \(BatteryFormatting.percent(presentationStateOfChargePercent))")
@@ -307,7 +308,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         lines.append("Energy: \(BatteryFormatting.compactWattHourPair(current: currentChargeWattHours, maximum: fullChargeCapacityWattHours))")
         lines.append("Voltage: \(BatteryFormatting.millivolts(voltageMillivolts))")
         lines.append("Signed current: \(BatteryFormatting.signedMilliamps(currentMilliampsSigned))")
-        lines.append("\(debugTimeTitle): \(BatteryFormatting.duration(minutes: displayedTimeMinutes))")
+        lines.append("\(timeTitle): \(BatteryFormatting.duration(minutes: displayedTimeMinutes))")
         lines.append("Active power: \(BatteryFormatting.watts(activePowerWatts))")
         lines.append("Input power: \(BatteryFormatting.watts(validatedInputPowerWatts))")
         lines.append("Charge rate: \(BatteryFormatting.watts(powerState == .charging ? chargeRateWatts : nil))")
@@ -323,10 +324,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         }
 
         return lines.joined(separator: "\n")
-    }
-
-    private var debugTimeTitle: String {
-        powerState.timeTitle(charging: "Time to full", discharging: "Time left")
     }
 
     private var inputPowerSecondaryText: String? {
