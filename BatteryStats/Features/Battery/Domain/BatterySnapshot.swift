@@ -115,6 +115,10 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         BatteryCalculations.presentationPercent(stateOfChargePercent, maximumAllowed: 105)
     }
 
+    var isLowCharge: Bool {
+        presentationStateOfChargePercent.map { $0 <= 20 } ?? false
+    }
+
     var presentationTemperatureCelsius: Double? {
         BatteryCalculations.plausibleTemperatureCelsius(temperatureCelsius)
     }
@@ -325,10 +329,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     private var inputPowerSecondaryText: String? {
         visibleInputPowerWatts.map { "Input power \(BatteryFormatting.watts($0))" }
-    }
-
-    private var isLowCharge: Bool {
-        presentationStateOfChargePercent.map { $0 <= 20 } ?? false
     }
 
     private static func debugAdapterMaxWatts(_ value: Int?) -> String {

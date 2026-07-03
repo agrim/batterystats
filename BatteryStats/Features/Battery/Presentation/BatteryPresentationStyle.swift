@@ -69,7 +69,7 @@ enum BatteryPresentationStyle {
 
         switch snapshot.powerState {
         case .charging, .connectedNotCharging, .fullOnAC:
-            if isLowCharge(snapshot) {
+            if snapshot.isLowCharge {
                 return .yellow
             }
 
@@ -79,7 +79,7 @@ enum BatteryPresentationStyle {
                 return .secondary
             }
 
-            return isLowCharge(snapshot) ? .red : .yellow
+            return snapshot.isLowCharge ? .red : .yellow
         case .unknown:
             return .secondary
         }
@@ -98,7 +98,7 @@ enum BatteryPresentationStyle {
                 return BatteryStatusDescriptor(symbolName: "questionmark", ringTintStyle: .secondary, contentTintStyle: .secondary)
             }
 
-            if isLowCharge(snapshot) {
+            if snapshot.isLowCharge {
                 return BatteryStatusDescriptor(symbolName: snapshot.batterySymbolName, ringTintStyle: .yellow, contentTintStyle: .yellow)
             }
 
@@ -108,18 +108,10 @@ enum BatteryPresentationStyle {
                 return BatteryStatusDescriptor(symbolName: "powerplug", ringTintStyle: .secondary, contentTintStyle: .secondary)
             }
 
-            return BatteryStatusDescriptor(symbolName: "powerplug", ringTintStyle: isLowCharge(snapshot) ? .red : .yellow, contentTintStyle: .primary)
+            return BatteryStatusDescriptor(symbolName: "powerplug", ringTintStyle: snapshot.isLowCharge ? .red : .yellow, contentTintStyle: .primary)
         case .unknown:
             return BatteryStatusDescriptor(symbolName: "questionmark", ringTintStyle: .secondary, contentTintStyle: .secondary)
         }
-    }
-
-    private static func isLowCharge(_ snapshot: BatterySnapshot) -> Bool {
-        guard let stateOfChargePercent = snapshot.presentationStateOfChargePercent else {
-            return false
-        }
-
-        return stateOfChargePercent <= 20
     }
 
     private static func hasUsableCharge(_ snapshot: BatterySnapshot) -> Bool {
