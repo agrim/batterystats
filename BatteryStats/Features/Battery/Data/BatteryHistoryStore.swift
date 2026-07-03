@@ -216,7 +216,7 @@ final class BatteryHistoryStore {
         self.cloudSynchronizeDelay = cloudSynchronizeDelay
 
         let storedEntries = defaults.string(forKey: Key.localEntries)
-        entries = Self.decodeEntries(from: storedEntries) ?? []
+        entries = Self.decodeHistoryEntries(from: storedEntries)?.entries ?? []
         rewriteNormalizedLocalEntriesIfNeeded(previouslyStoredEntries: storedEntries)
     }
 
@@ -573,10 +573,6 @@ final class BatteryHistoryStore {
         return store
     }
 
-    private static func decodeEntries(from string: String?) -> [BatteryHistoryEntry]? {
-        decodeHistoryEntries(from: string)?.entries
-    }
-
     private struct DecodedHistoryEntries {
         let entries: [BatteryHistoryEntry]
         let rawEntryCount: Int
@@ -612,7 +608,7 @@ final class BatteryHistoryStore {
     }
 
     private static func normalizedEntries(_ entries: [BatteryHistoryEntry], now: Date = Date()) -> [BatteryHistoryEntry] {
-        return Array(entries
+        Array(entries
             .reduce(into: [Date: BatteryHistoryEntry]()) { partialResult, entry in
                 let normalizedEntry = entry.normalized()
                 guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: normalizedEntry.timestamp, now: now) else {
