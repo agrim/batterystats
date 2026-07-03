@@ -66,3 +66,21 @@ enum SignedIntegerNormalizer {
         return Int(value)
     }
 }
+
+enum BooleanFlagNormalizer {
+    static func normalize(_ value: Any?) -> Bool? {
+        if let number = value as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                return number.boolValue
+            }
+
+            if number.doubleValue == 0 || number.doubleValue == 1 {
+                return number.doubleValue == 1
+            }
+
+            return nil
+        }
+
+        return value as? Bool
+    }
+}

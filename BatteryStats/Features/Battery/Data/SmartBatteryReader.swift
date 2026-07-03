@@ -671,7 +671,7 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func boolean(for candidates: [PropertyCandidate], in properties: [String: Any]) -> Bool? {
-        firstValue(for: candidates, in: properties, transform: Self.booleanValue)
+        firstValue(for: candidates, in: properties, transform: BooleanFlagNormalizer.normalize)
     }
 
     private func physicalCapacityInteger(
@@ -842,22 +842,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         return swiftDictionary
-    }
-
-    private static func booleanValue(from value: Any?) -> Bool? {
-        if let number = value as? NSNumber {
-            if CFGetTypeID(number) == CFBooleanGetTypeID() {
-                return number.boolValue
-            }
-
-            if number.doubleValue == 0 || number.doubleValue == 1 {
-                return number.doubleValue == 1
-            }
-
-            return nil
-        }
-
-        return value as? Bool
     }
 
     private func arrayDictionaries(from value: Any?) -> [[String: Any]] {

@@ -100,8 +100,8 @@ final class PowerSourceReader: @unchecked Sendable {
             return min(100, percent)
         }()
 
-        let isCharging = strictBool(powerSource[string(for: kIOPSIsChargingKey)]) ?? false
-        let isCharged = strictBool(powerSource[string(for: kIOPSIsChargedKey)]) ?? false
+        let isCharging = BooleanFlagNormalizer.normalize(powerSource[string(for: kIOPSIsChargingKey)]) ?? false
+        let isCharged = BooleanFlagNormalizer.normalize(powerSource[string(for: kIOPSIsChargedKey)]) ?? false
         let powerSourceState = powerSource[string(for: kIOPSPowerSourceStateKey)] as? String
         let isExplicitlyOnBattery = matchesPowerSourceState(powerSourceState, string(for: kIOPSBatteryPowerValue))
         let isExternalPowerConnected = isExplicitlyOnBattery
@@ -109,7 +109,7 @@ final class PowerSourceReader: @unchecked Sendable {
             : matchesPowerSourceState(powerSourceState, string(for: kIOPSACPowerValue)) || isCharging || isCharged
 
         return PublicPowerSourceSnapshot(
-            isPresent: strictBool(powerSource[string(for: kIOPSIsPresentKey)]) ?? true,
+            isPresent: BooleanFlagNormalizer.normalize(powerSource[string(for: kIOPSIsPresentKey)]) ?? true,
             isCharging: isCharging,
             isCharged: isCharged,
             isExternalPowerConnected: isExternalPowerConnected,
@@ -143,7 +143,7 @@ final class PowerSourceReader: @unchecked Sendable {
     }
 
     private static func isPresentDescription(_ description: [String: Any]) -> Bool {
-        strictBool(description[string(for: kIOPSIsPresentKey)]) ?? true
+        BooleanFlagNormalizer.normalize(description[string(for: kIOPSIsPresentKey)]) ?? true
     }
 
     private static func normalizedIdentifier(_ value: String?) -> String? {
@@ -162,19 +162,4 @@ final class PowerSourceReader: @unchecked Sendable {
         BatteryCalculations.plausibleDurationMinutes(SignedIntegerNormalizer.normalize(value))
     }
 
-    private static func strictBool(_ value: Any?) -> Bool? {
-        if let number = value as? NSNumber {
-            if CFGetTypeID(number) == CFBooleanGetTypeID() {
-                return number.boolValue
-            }
-
-            if number.doubleValue == 0 || number.doubleValue == 1 {
-                return number.doubleValue == 1
-            }
-
-            return nil
-        }
-
-        return value as? Bool
-    }
 }
