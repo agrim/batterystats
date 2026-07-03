@@ -150,7 +150,11 @@ final class BatteryAlertCoordinator {
         return "Battery charge is \(BatteryFormatting.percent(stateOfChargePercent))."
     }
 
-    private func evaluate(kind: BatteryAlertType, isActive: Bool, notification: BatteryAlertNotification) {
+    private func evaluate(
+        kind: BatteryAlertType,
+        isActive: Bool,
+        notification: @autoclosure () -> BatteryAlertNotification
+    ) {
         if isActive {
             guard activeAlerts.contains(kind) == false,
                   pendingDeliveries[kind] == nil else {
@@ -159,6 +163,7 @@ final class BatteryAlertCoordinator {
 
             deliveryGeneration &+= 1
             let generation = deliveryGeneration
+            let notification = notification()
             pendingDeliveries[kind] = generation
 
             let deliveryTask = Task { @MainActor [weak self] in
