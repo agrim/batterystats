@@ -81,19 +81,14 @@ struct BatteryFreshnessView: View {
     }
 
     private func schedulePulse() {
-        pulseUpdateTask?.cancel()
-        pulseUpdateTask = Task { @MainActor in
-            await Task.yield()
-            guard Task.isCancelled == false else {
-                return
-            }
-
-            pulseUpdateTask = nil
-            triggerPulse()
-        }
+        schedulePulseUpdate { triggerPulse() }
     }
 
     private func schedulePulseCancellation() {
+        schedulePulseUpdate { cancelPulse() }
+    }
+
+    private func schedulePulseUpdate(_ update: @escaping @MainActor () -> Void) {
         pulseUpdateTask?.cancel()
         pulseUpdateTask = Task { @MainActor in
             await Task.yield()
@@ -102,7 +97,7 @@ struct BatteryFreshnessView: View {
             }
 
             pulseUpdateTask = nil
-            cancelPulse()
+            update()
         }
     }
 
