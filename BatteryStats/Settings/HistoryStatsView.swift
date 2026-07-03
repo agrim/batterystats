@@ -16,16 +16,18 @@ struct HistoryStatsView: View {
                     HistoryStatRow(title: "Power", value: powerText(for: stats))
                     HistoryStatRow(
                         title: "Charge",
-                        value: percentRangeText(
+                        value: rangeText(
                             minimum: stats.minimumChargePercent,
-                            maximum: stats.maximumChargePercent
+                            maximum: stats.maximumChargePercent,
+                            formatter: { BatteryFormatting.percent($0) }
                         )
                     )
                     HistoryStatRow(
                         title: "Temperature",
-                        value: temperatureRangeText(
+                        value: rangeText(
                             minimum: stats.minimumTemperatureCelsius,
-                            maximum: stats.maximumTemperatureCelsius
+                            maximum: stats.maximumTemperatureCelsius,
+                            formatter: { BatteryFormatting.temperature($0, unitPreference: unitPreference) }
                         )
                     )
                     .id(unitResolutionToken)
@@ -77,27 +79,17 @@ private extension HistoryStatsView {
         }
     }
 
-    private func percentRangeText(minimum: Double?, maximum: Double?) -> String {
+    private func rangeText<Value>(
+        minimum: Value?,
+        maximum: Value?,
+        formatter: (Value) -> String
+    ) -> String {
         guard let minimum, let maximum else {
             return "Unavailable"
         }
 
-        let minimumText = BatteryFormatting.percent(minimum)
-        let maximumText = BatteryFormatting.percent(maximum)
-        guard minimumText != maximumText else {
-            return minimumText
-        }
-
-        return "\(minimumText) - \(maximumText)"
-    }
-
-    private func temperatureRangeText(minimum: Double?, maximum: Double?) -> String {
-        guard let minimum, let maximum else {
-            return "Unavailable"
-        }
-
-        let minimumText = BatteryFormatting.temperature(minimum, unitPreference: unitPreference)
-        let maximumText = BatteryFormatting.temperature(maximum, unitPreference: unitPreference)
+        let minimumText = formatter(minimum)
+        let maximumText = formatter(maximum)
         guard minimumText != maximumText else {
             return minimumText
         }
