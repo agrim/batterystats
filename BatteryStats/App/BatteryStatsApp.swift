@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct BatteryStatsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    @State private var runtime = BatteryStatsAppRuntime.shared
+    private let runtime = BatteryStatsAppRuntime.shared
 
     var body: some Scene {
         WindowGroup("BatteryStats", id: "main") {
@@ -53,26 +53,17 @@ struct BatteryStatsApp: App {
 }
 
 @MainActor
-@Observable
 private final class BatteryStatsAppRuntime {
     static let shared = BatteryStatsAppRuntime()
 
-    @ObservationIgnored
     let monitor: BatteryMonitor
-    @ObservationIgnored
     let preferences: PreferencesStore
-    @ObservationIgnored
     let historyStore: BatteryHistoryStore
 
-    @ObservationIgnored
     private let monitorConfigurationObserver: BatteryMonitorConfigurationObserver
-    @ObservationIgnored
     private let alertAuthorizationObserver: BatteryAlertAuthorizationObserver
-    @ObservationIgnored
     private var menuBarStatusItemController: MenuBarStatusItemController?
-    @ObservationIgnored
     private let settingsWindowController = SettingsWindowController()
-    @ObservationIgnored
     private var showSettingsObserver: NSObjectProtocol?
 
     private init() {

@@ -95,7 +95,11 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let settingsSource = try Self.loadSource(relativePath: "BatteryStats/Settings/SettingsView.swift")
         let windowSpaceBehaviorSource = try Self.loadSource(relativePath: "BatteryStats/Shared/Utilities/BatteryWindowSpaceBehavior.swift")
 
-        XCTAssertTrue(appSource.contains("@Observable\nprivate final class BatteryStatsAppRuntime"))
+        XCTAssertTrue(appSource.contains("private let runtime = BatteryStatsAppRuntime.shared"))
+        XCTAssertTrue(appSource.contains("private final class BatteryStatsAppRuntime"))
+        XCTAssertFalse(appSource.contains("@State private var runtime = BatteryStatsAppRuntime.shared"))
+        XCTAssertFalse(appSource.contains("@Observable\nprivate final class BatteryStatsAppRuntime"))
+        XCTAssertFalse(appSource.contains("@ObservationIgnored"))
         XCTAssertTrue(appSource.contains("WindowGroup(\"BatteryStats\", id: \"main\")"))
         XCTAssertTrue(appSource.contains(".defaultLaunchBehavior(.presented)"))
         XCTAssertFalse(appSource.contains("private let mainWindowController = MainBatteryWindowController()"))
