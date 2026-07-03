@@ -96,11 +96,8 @@ struct BatteryWidgetSnapshotStore {
     }
 
     func clear() {
-        guard let defaults else {
-            return
-        }
-
-        guard defaults.object(forKey: Self.snapshotKey) != nil else {
+        guard let defaults,
+              defaults.object(forKey: Self.snapshotKey) != nil else {
             return
         }
 
