@@ -105,7 +105,6 @@ final class MenuBarStatusItemController: NSObject {
     private let statusBar: NSStatusBar
     private var statusItem: NSStatusItem
     private var panel: NSPanel?
-    private var statusItemObservationGeneration = 0
     private var appliedIdentity: String?
     private var installedDisplayPreferences: MenuBarDisplayPreferences?
     private var displayPreferenceObserver: NSObjectProtocol?
@@ -226,9 +225,6 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     private func observeStatusItemInputs() {
-        statusItemObservationGeneration += 1
-        let generation = statusItemObservationGeneration
-
         withObservationTracking {
             _ = monitor.snapshot
             _ = preferences.menuBarDisplayMode
@@ -236,8 +232,7 @@ final class MenuBarStatusItemController: NSObject {
             _ = preferences.temperatureUnitResolutionToken
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
-                guard let self,
-                      statusItemObservationGeneration == generation else {
+                guard let self else {
                     return
                 }
 
