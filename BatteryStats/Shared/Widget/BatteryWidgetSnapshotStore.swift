@@ -611,11 +611,8 @@ enum BatteryWidgetUpdateFormatting {
         }
 
         let relativeText = BatterySnapshotFreshnessPolicy.relativeUpdateText(updatedAt: updatedAt, now: now)
-        guard now.timeIntervalSince(updatedAt) <= BatterySnapshotFreshnessPolicy.maximumLiveAge else {
-            return "Stale \(relativeText)"
-        }
-
-        return "Updated \(relativeText)"
+        let prefix = BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: now) ? "Updated" : "Stale"
+        return "\(prefix) \(relativeText)"
     }
 
     static func nextStatusChangeDate(updatedAt: Date?, now: Date) -> Date {
@@ -623,11 +620,17 @@ enum BatteryWidgetUpdateFormatting {
             return now.addingTimeInterval(300)
         }
 
-        return BatterySnapshotFreshnessPolicy.nextStatusChangeDate(
-            updatedAt: updatedAt,
-            now: now,
-            additionalDates: [updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultRetentionAge + 1)]
-        )
+        let statusDate = BatterySnapshotFreshnessPolicy.nextStatusChangeDate(updatedAt: updatedAt, now: now)
+        let retentionDate = updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultRetentionAge + 1)
+        guard retentionDate > now else {
+            return statusDate
+        }
+
+        guard statusDate > now else {
+            return retentionDate
+        }
+
+        return min(statusDate, retentionDate)
     }
 }
 
@@ -652,15 +655,19 @@ enum BatterySnapshotFreshnessPolicy {
         return nextRelativeUpdateDate(updatedAt: updatedAt, now: now)
     }
 
-    static func nextStatusChangeDate(
-        updatedAt: Date,
-        now: Date,
-        additionalDates: [Date] = []
-    ) -> Date {
+    static func nextStatusChangeDate(updatedAt: Date, now: Date) -> Date {
         let nextRelativeDate = nextRelativeUpdateBoundary(updatedAt: updatedAt, now: now)
-        return ([nextRelativeDate, updatedAt.addingTimeInterval(maximumLiveAge + 1)] + additionalDates)
-            .filter { $0 > now }
-            .min() ?? nextRelativeDate
+        let liveExpiryDate = updatedAt.addingTimeInterval(maximumLiveAge + 1)
+
+        guard nextRelativeDate > now else {
+            return liveExpiryDate > now ? liveExpiryDate : nextRelativeDate
+        }
+
+        guard liveExpiryDate > now else {
+            return nextRelativeDate
+        }
+
+        return min(nextRelativeDate, liveExpiryDate)
     }
 
     static func relativeUpdateText(updatedAt: Date, now: Date) -> String {

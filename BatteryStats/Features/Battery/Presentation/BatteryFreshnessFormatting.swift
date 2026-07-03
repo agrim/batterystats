@@ -15,11 +15,8 @@ enum BatteryFreshnessFormatting {
         }
 
         let relativeText = BatterySnapshotFreshnessPolicy.relativeUpdateText(updatedAt: lastUpdated, now: now)
-        guard now.timeIntervalSince(lastUpdated) <= BatterySnapshotFreshnessPolicy.maximumLiveAge else {
-            return "Stale - Updated \(relativeText)"
-        }
-
-        return "Live - Updated \(relativeText)"
+        let prefix = BatterySnapshotFreshnessPolicy.isLive(updatedAt: lastUpdated, now: now) ? "Live" : "Stale"
+        return "\(prefix) - Updated \(relativeText)"
     }
 
     static func hasUsableUpdate(lastUpdated: Date?, now: Date) -> Bool {
