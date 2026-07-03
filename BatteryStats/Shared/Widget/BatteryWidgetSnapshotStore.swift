@@ -30,7 +30,7 @@ struct BatteryWidgetSnapshotStore {
     private func saveSanitized(
         _ sanitizedSnapshot: BatterySnapshot,
         preservingInvalidPowerRateMarkersFrom sourceSnapshot: BatterySnapshot,
-        encodedPowerRateFields: EncodedPowerRateFields?
+        encodedPowerRateFields: (chargeRateWatts: Bool, dischargeRateWatts: Bool)?
     ) {
         guard let defaults else {
             return
@@ -111,7 +111,7 @@ struct BatteryWidgetSnapshotStore {
     private static func sanitized(
         _ snapshot: BatterySnapshot,
         now: Date? = nil,
-        encodedPowerRateFields: EncodedPowerRateFields? = nil
+        encodedPowerRateFields: (chargeRateWatts: Bool, dischargeRateWatts: Bool)? = nil
     ) -> BatterySnapshot {
         let timestamp = now.map { min(snapshot.timestamp, $0) } ?? snapshot.timestamp
         let ageReferenceDate = now ?? timestamp
@@ -312,7 +312,7 @@ struct BatteryWidgetSnapshotStore {
     private static func encodedSnapshotData(
         _ snapshot: BatterySnapshot,
         preservingInvalidPowerRateMarkersFrom sourceSnapshot: BatterySnapshot,
-        encodedPowerRateFields: EncodedPowerRateFields?
+        encodedPowerRateFields: (chargeRateWatts: Bool, dischargeRateWatts: Bool)?
     ) throws -> Data {
         let encodedData = try JSONEncoder().encode(snapshot)
         let shouldPreserveChargeMarker = snapshot.chargeRateWatts == nil
@@ -338,20 +338,15 @@ struct BatteryWidgetSnapshotStore {
         return try JSONSerialization.data(withJSONObject: dictionary)
     }
 
-    private static func encodedPowerRateFields(in data: Data) -> EncodedPowerRateFields? {
+    private static func encodedPowerRateFields(in data: Data) -> (chargeRateWatts: Bool, dischargeRateWatts: Bool)? {
         guard let dictionary = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }
 
-        return EncodedPowerRateFields(
+        return (
             chargeRateWatts: dictionary.keys.contains("chargeRateWatts"),
             dischargeRateWatts: dictionary.keys.contains("dischargeRateWatts")
         )
-    }
-
-    private struct EncodedPowerRateFields {
-        let chargeRateWatts: Bool
-        let dischargeRateWatts: Bool
     }
 
     private static func derivedWattHours(
