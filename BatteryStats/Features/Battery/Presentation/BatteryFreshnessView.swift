@@ -29,23 +29,23 @@ struct BatteryFreshnessView: View {
             .accessibilityElement(children: .combine)
         }
         .onAppear {
-            schedulePulse()
+            schedulePulseUpdate { triggerPulse() }
         }
         .onChange(of: lastUpdated) { _, _ in
-            schedulePulse()
+            schedulePulseUpdate { triggerPulse() }
         }
         .onChange(of: isRefreshing) { _, isRefreshing in
             if isRefreshing {
-                schedulePulseCancellation()
+                schedulePulseUpdate { cancelPulse() }
             } else {
-                schedulePulse()
+                schedulePulseUpdate { triggerPulse() }
             }
         }
         .onChange(of: reduceMotion) { _, reduceMotion in
             if reduceMotion {
-                schedulePulseCancellation()
+                schedulePulseUpdate { cancelPulse() }
             } else {
-                schedulePulse()
+                schedulePulseUpdate { triggerPulse() }
             }
         }
         .onDisappear {
@@ -78,14 +78,6 @@ struct BatteryFreshnessView: View {
 
     private var pulseAnimation: Animation? {
         reduceMotion ? nil : .smooth(duration: 0.28)
-    }
-
-    private func schedulePulse() {
-        schedulePulseUpdate { triggerPulse() }
-    }
-
-    private func schedulePulseCancellation() {
-        schedulePulseUpdate { cancelPulse() }
     }
 
     private func schedulePulseUpdate(_ update: @escaping @MainActor () -> Void) {
