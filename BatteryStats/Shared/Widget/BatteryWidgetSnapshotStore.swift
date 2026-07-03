@@ -603,11 +603,7 @@ enum BatteryWidgetUpdateFormatting {
             return statusDate
         }
 
-        guard statusDate > now else {
-            return retentionDate
-        }
-
-        return min(statusDate, retentionDate)
+        return statusDate > now ? min(statusDate, retentionDate) : retentionDate
     }
 }
 
