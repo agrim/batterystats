@@ -1993,16 +1993,6 @@ final class BatteryReadingServiceTests: XCTestCase {
         XCTAssertTrue(rendered.contains("Integer: 42"))
     }
 
-    private static func loadSource(relativePath: String) throws -> String {
-        let testFile = URL(fileURLWithPath: #filePath)
-        let testsDirectory = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let root = testsDirectory.deletingLastPathComponent()
-        let sourceURL = root.appendingPathComponent(relativePath)
-        return try String(contentsOf: sourceURL, encoding: .utf8)
-    }
-
     private func makeSmartBatteryDetails(
         currentChargeMilliampHours: Int?,
         fullChargeCapacityMilliampHours: Int?,

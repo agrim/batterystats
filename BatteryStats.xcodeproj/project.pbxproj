@@ -67,6 +67,7 @@
 		AAF31B89EF09911769F0B484 /* TemperatureUnitPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C157C20F6C0DC0985E67EA0 /* TemperatureUnitPreference.swift */; };
 		AD6D2C6B965AF158D32F6B12 /* Logger+BatteryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9272316AC90D03FCE4F4BDE /* Logger+BatteryStats.swift */; };
 		AD7195AF112F10EFD13C4F80 /* PasteboardCopying.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA38365A13FDB275C8A83D7 /* PasteboardCopying.swift */; };
+		ADDBBE15B883B9D8792E9C3D /* SourceLoading.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB4CE38E6D3D1C980948337 /* SourceLoading.swift */; };
 		AE346B16299076014B14A872 /* HistoryStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0CE981CAF4FB88529CA656 /* HistoryStatsView.swift */; };
 		B1F85B69E586519BD0B14484 /* BatteryFreshnessFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C8F48F7F7E8D83F5B700B8B /* BatteryFreshnessFormattingTests.swift */; };
 		B305626DE5A76DF965A6CA32 /* ReleaseVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7D59BE036C7EC660821A28 /* ReleaseVersionTests.swift */; };
@@ -177,6 +178,7 @@
 		B24783EE23C82B72CE36985A /* LaunchAtLoginSettingsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginSettingsModelTests.swift; sourceTree = "<group>"; };
 		B933CFDDD15AD8786E085DB5 /* BatteryReadingServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryReadingServiceTests.swift; sourceTree = "<group>"; };
 		BF4BB36764261AC446DC9DEF /* BatterySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySnapshot.swift; sourceTree = "<group>"; };
+		BFB4CE38E6D3D1C980948337 /* SourceLoading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceLoading.swift; sourceTree = "<group>"; };
 		C140D2191F110315A06F4868 /* BatteryPowerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerState.swift; sourceTree = "<group>"; };
 		C6C5A88E7E2CB6C99D0FAD94 /* NSNumber+SignedConversions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSNumber+SignedConversions.swift"; sourceTree = "<group>"; };
 		C702ED14962BF23C8CD2EFB1 /* MenuBarBatteryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBatteryView.swift; sourceTree = "<group>"; };
@@ -319,6 +321,7 @@
 				1B7CBFCA74BB91B16F9BC10D /* RefreshPolicyTests.swift */,
 				6C7D59BE036C7EC660821A28 /* ReleaseVersionTests.swift */,
 				799E0D1E3866EE2E966A215F /* SmartBatteryParsingTests.swift */,
+				BFB4CE38E6D3D1C980948337 /* SourceLoading.swift */,
 				07A5514847429E9116E33F60 /* WidgetSourceTests.swift */,
 			);
 			name = BatteryStatsTests;
@@ -622,6 +625,7 @@
 				E1B00581CEB3D21FCD77A6F3 /* RefreshPolicyTests.swift in Sources */,
 				B305626DE5A76DF965A6CA32 /* ReleaseVersionTests.swift in Sources */,
 				D92635DA471851E9B53FCF28 /* SmartBatteryParsingTests.swift in Sources */,
+				ADDBBE15B883B9D8792E9C3D /* SourceLoading.swift in Sources */,
 				27D0EE45C726B8B9C8D470AD /* WidgetSourceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

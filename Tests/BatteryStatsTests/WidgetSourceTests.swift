@@ -56,13 +56,4 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertFalse(monitorSource.contains("guard readSequence >= lastAppliedReadSequence else"))
     }
 
-    private static func loadSource(relativePath: String) throws -> String {
-        let testFile = URL(fileURLWithPath: #filePath)
-        let root = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let sourceURL = root.appendingPathComponent(relativePath)
-        return try String(contentsOf: sourceURL, encoding: .utf8)
-    }
 }
