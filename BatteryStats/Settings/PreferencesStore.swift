@@ -374,11 +374,6 @@ final class PreferencesStore {
     }
 
     @discardableResult
-    func refreshMenuBarDisplayPreferences(from notification: Notification) -> Bool {
-        refreshMenuBarDisplayPreferences(from: MenuBarDisplayPreferences(notification: notification))
-    }
-
-    @discardableResult
     func refreshMenuBarDisplayPreferences(from nextPreferences: MenuBarDisplayPreferences?) -> Bool {
         guard let nextPreferences else {
             return refreshMenuBarDisplayPreferencesFromDefaults()
