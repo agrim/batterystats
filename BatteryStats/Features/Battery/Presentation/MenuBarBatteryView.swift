@@ -713,19 +713,13 @@ enum MenuBarPanelLayout {
     static let margin: CGFloat = 6
 
     static func frame(size: NSSize, anchoredTo anchorRect: NSRect, screenFrame: NSRect) -> NSRect {
-        let originX = clampedHorizontalOrigin(
-            preferredMidX: anchorRect.midX,
-            width: size.width,
+        panelFrame(
+            size: size,
+            midX: anchorRect.midX,
+            belowY: anchorRect.minY - size.height - margin,
+            aboveY: anchorRect.maxY + margin,
             screenFrame: screenFrame
         )
-        let originY = verticalOrigin(
-            preferredBelowY: anchorRect.minY - size.height - margin,
-            fallbackAboveY: anchorRect.maxY + margin,
-            height: size.height,
-            screenFrame: screenFrame
-        )
-
-        return NSRect(origin: NSPoint(x: originX, y: originY), size: size)
     }
 
     @MainActor
@@ -736,19 +730,23 @@ enum MenuBarPanelLayout {
     }
 
     static func fallbackFrame(size: NSSize, near point: NSPoint, screenFrame: NSRect) -> NSRect {
-        let originX = clampedHorizontalOrigin(
-            preferredMidX: point.x,
-            width: size.width,
+        panelFrame(
+            size: size,
+            midX: point.x,
+            belowY: point.y - size.height - margin,
+            aboveY: point.y + margin,
             screenFrame: screenFrame
         )
-        let originY = verticalOrigin(
-            preferredBelowY: point.y - size.height - margin,
-            fallbackAboveY: point.y + margin,
-            height: size.height,
-            screenFrame: screenFrame
-        )
+    }
 
-        return NSRect(origin: NSPoint(x: originX, y: originY), size: size)
+    private static func panelFrame(size: NSSize, midX: CGFloat, belowY: CGFloat, aboveY: CGFloat, screenFrame: NSRect) -> NSRect {
+        NSRect(
+            origin: NSPoint(
+                x: clampedHorizontalOrigin(preferredMidX: midX, width: size.width, screenFrame: screenFrame),
+                y: verticalOrigin(preferredBelowY: belowY, fallbackAboveY: aboveY, height: size.height, screenFrame: screenFrame)
+            ),
+            size: size
+        )
     }
 
     private static func clampedHorizontalOrigin(
