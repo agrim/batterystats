@@ -20,7 +20,6 @@ final class WidgetSourceTests: XCTestCase {
     func testMainSummarySeparatesAdapterCapabilityFromChargingSpeed() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatterySummaryGridView.swift")
 
-        XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.powerTitle(for: snapshot)"))
         XCTAssertTrue(source.contains("BatteryPowerDisplayRole.role(for: snapshot).title"))
         XCTAssertTrue(source.contains("let chargingSpeed = BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"))
         XCTAssertTrue(source.contains("powerConnectionRows(chargingSpeed: chargingSpeed)\n\n                    if showsAdvancedValues {"))

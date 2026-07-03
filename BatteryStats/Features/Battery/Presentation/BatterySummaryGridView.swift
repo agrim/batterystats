@@ -102,7 +102,7 @@ struct BatterySummaryGridView: View {
             Divider()
                 .gridCellColumns(2)
 
-            BatteryDetailRowView(title: BatterySummaryDetailFormatting.powerTitle(for: snapshot), value: power)
+            BatteryDetailRowView(title: BatteryPowerDisplayRole.role(for: snapshot).title, value: power)
         }
 
         if let voltage = BatterySummaryDetailFormatting.voltage(snapshot.voltageMillivolts) {
@@ -226,10 +226,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return activePower
-    }
-
-    static func powerTitle(for snapshot: BatterySnapshot) -> String {
-        BatteryPowerDisplayRole.role(for: snapshot).title
     }
 
     static func voltage(_ value: Int?) -> String? {

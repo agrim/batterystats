@@ -1108,7 +1108,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(firstSnapshot.activePowerWatts, secondSnapshot.activePowerWatts)
         XCTAssertEqual(reader.requests, [.standard, .standard])
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: try XCTUnwrap(monitor.snapshot)), "Input Power")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: try XCTUnwrap(monitor.snapshot)).title, "Input Power")
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
         XCTAssertEqual(reloadCount, 2)
     }
@@ -1154,7 +1154,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(firstSnapshot.activePowerWatts, secondSnapshot.activePowerWatts)
         XCTAssertEqual(reader.requests, [.standard, .standard])
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: try XCTUnwrap(monitor.snapshot)), "Input Power")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: try XCTUnwrap(monitor.snapshot)).title, "Input Power")
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
         XCTAssertEqual(reloadCount, 2)
     }

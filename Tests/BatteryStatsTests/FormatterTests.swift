@@ -591,59 +591,59 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatterySummaryDetailFormatting.chargingSpeed(for: snapshot), "25.4 W")
     }
 
-    func testSummaryPowerTitleReflectsChargingPowerSource() {
+    func testPowerDisplayRoleReflectsChargingPowerSource() {
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(stateOfChargePercent: 55, powerState: .charging)),
+            BatteryPowerDisplayRole.role(for: makeSnapshot(stateOfChargePercent: 55, powerState: .charging)).title,
             "Charge Rate"
         )
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(
+            BatteryPowerDisplayRole.role(for: makeSnapshot(
                 stateOfChargePercent: 55,
                 powerState: .charging,
                 chargeRateWatts: 25.4,
                 inputPowerWatts: 39.8
-            )),
+            )).title,
             "Input Power"
         )
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(
+            BatteryPowerDisplayRole.role(for: makeSnapshot(
                 stateOfChargePercent: 55,
                 powerState: .charging,
                 chargeRateWatts: 0.04,
                 inputPowerWatts: 39.8
-            )),
+            )).title,
             "Input Power"
         )
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(
+            BatteryPowerDisplayRole.role(for: makeSnapshot(
                 stateOfChargePercent: 55,
                 powerState: .connectedDischarging,
                 inputPowerWatts: 39.8
-            )),
+            )).title,
             "Input Power"
         )
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(
+            BatteryPowerDisplayRole.role(for: makeSnapshot(
                 stateOfChargePercent: 85,
                 powerState: .connectedNotCharging,
                 inputPowerWatts: 39.8
-            )),
+            )).title,
             "Input Power"
         )
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(
+            BatteryPowerDisplayRole.role(for: makeSnapshot(
                 stateOfChargePercent: 100,
                 powerState: .fullOnAC,
                 inputPowerWatts: 27.4
-            )),
+            )).title,
             "Input Power"
         )
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(stateOfChargePercent: 55, powerState: .onBattery)),
+            BatteryPowerDisplayRole.role(for: makeSnapshot(stateOfChargePercent: 55, powerState: .onBattery)).title,
             "Power"
         )
         XCTAssertEqual(
-            BatterySummaryDetailFormatting.powerTitle(for: makeSnapshot(stateOfChargePercent: 55, powerState: .connectedDischarging)),
+            BatteryPowerDisplayRole.role(for: makeSnapshot(stateOfChargePercent: 55, powerState: .connectedDischarging)).title,
             "Battery Drain"
         )
     }
@@ -1073,7 +1073,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(snapshot.statusSecondaryText, "Input power 39.8 W")
         XCTAssertEqual(snapshot.energyUseComparisonValue ?? 0, 39.8, accuracy: 0.001)
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: snapshot), "Input Power")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: snapshot), "39.8 W")
         XCTAssertEqual(
@@ -1098,7 +1097,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(snapshot.statusSecondaryText, "Input power 39.8 W")
         XCTAssertEqual(snapshot.energyUseComparisonValue ?? 0, 39.8, accuracy: 0.001)
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: snapshot), "Input Power")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: snapshot), "39.8 W")
         XCTAssertEqual(
@@ -1122,7 +1120,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(chargingSnapshot.activePowerWatts, 25.4)
         XCTAssertEqual(chargingSnapshot.statusSecondaryText, "Charging at 25.4 W")
         XCTAssertEqual(chargingSnapshot.energyUseComparisonValue ?? 0, 25.4, accuracy: 0.001)
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: chargingSnapshot), "Charge Rate")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: chargingSnapshot), "25.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: chargingSnapshot).title, "Charge Rate")
         XCTAssertTrue(chargingSnapshot.debugSummary.contains("Input power: Unavailable"))
@@ -1152,7 +1149,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertNil(idleSnapshot.activePowerWatts)
         XCTAssertEqual(idleSnapshot.statusSecondaryText, "External power connected")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: idleSnapshot), "Power")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: idleSnapshot), "—")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: idleSnapshot).title, "Power")
     }
@@ -1168,7 +1164,7 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertNil(chargingSnapshot.activePowerWatts)
         XCTAssertEqual(chargingSnapshot.statusSecondaryText, "External power connected")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: chargingSnapshot), "Charge Rate")
+        XCTAssertEqual(BatteryPowerDisplayRole.role(for: chargingSnapshot).title, "Charge Rate")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: chargingSnapshot), "—")
         XCTAssertTrue(chargingSnapshot.debugSummary.contains("Input power: Unavailable"))
         XCTAssertFalse(chargingSnapshot.debugSummary.contains("Input power: 100.0 W"))
@@ -1185,7 +1181,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(chargingSnapshot.activePowerWatts, 25.4)
         XCTAssertEqual(chargingSnapshot.statusSecondaryText, "Charging at 25.4 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: chargingSnapshot), "Charge Rate")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: chargingSnapshot), "25.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: chargingSnapshot).title, "Charge Rate")
         XCTAssertTrue(chargingSnapshot.debugSummary.contains("Input power: Unavailable"))
@@ -1213,7 +1208,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(snapshot.visibleInputPowerWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(snapshot.statusSecondaryText, "Input power 69.4 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: snapshot), "Input Power")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: snapshot), "69.4 W")
         XCTAssertTrue(snapshot.debugSummary.contains("Input power: 69.4 W"))
@@ -1229,7 +1223,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(snapshot.statusSecondaryText, "Input power 39.8 W, battery discharging")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: snapshot), "Input Power")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: snapshot), "39.8 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(
@@ -1259,7 +1252,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 14, accuracy: 0.001)
         XCTAssertEqual(snapshot.statusSecondaryText, "Discharging at 14.0 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: snapshot), "Battery Drain")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: snapshot), "14.0 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Battery Drain")
         XCTAssertEqual(
@@ -1341,7 +1333,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(try XCTUnwrap(connectedNotCharging.activePowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(connectedNotCharging.statusSecondaryText, "Input power 39.8 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: connectedNotCharging), "Input Power")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: connectedNotCharging), "39.8 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: connectedNotCharging).title, "Input Power")
         XCTAssertEqual(
@@ -1355,7 +1346,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(try XCTUnwrap(fullOnAC.activePowerWatts), 27.4, accuracy: 0.001)
         XCTAssertEqual(fullOnAC.statusSecondaryText, "Input power 27.4 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.powerTitle(for: fullOnAC), "Input Power")
         XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: fullOnAC), "27.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: fullOnAC).title, "Input Power")
     }
