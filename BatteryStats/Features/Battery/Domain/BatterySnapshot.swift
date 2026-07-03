@@ -187,17 +187,11 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     var statusDisplayTitle: String {
         switch powerState {
         case .onBattery:
-            if let stateOfChargePercent = presentationStateOfChargePercent, stateOfChargePercent <= 20 {
-                return "On Battery Low Power"
-            }
-            return "On Battery"
+            return isLowCharge ? "On Battery Low Power" : "On Battery"
         case .charging:
             return "Charging"
         case .connectedDischarging:
-            if let stateOfChargePercent = presentationStateOfChargePercent, stateOfChargePercent <= 20 {
-                return "Connected, Discharging Low Power"
-            }
-            return "Connected, Discharging"
+            return isLowCharge ? "Connected, Discharging Low Power" : "Connected, Discharging"
         case .connectedNotCharging:
             return "Connected, Not Charging"
         case .fullOnAC:
@@ -331,6 +325,10 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     private var inputPowerSecondaryText: String? {
         visibleInputPowerWatts.map { "Input power \(BatteryFormatting.watts($0))" }
+    }
+
+    private var isLowCharge: Bool {
+        presentationStateOfChargePercent.map { $0 <= 20 } ?? false
     }
 
     private static func debugAdapterMaxWatts(_ value: Int?) -> String {
