@@ -515,11 +515,10 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
 
 enum BatteryWidgetMetricFormatting {
     static func percentText(_ value: Double?) -> String {
-        guard let progress = clampedProgress(value) else {
+        guard let percent = BatteryCalculations.presentationPercent(value, maximumAllowed: 105) else {
             return "—"
         }
 
-        let percent = progress * 100
         return "\(percent.formatted(.number.precision(.fractionLength(0))))%"
     }
 

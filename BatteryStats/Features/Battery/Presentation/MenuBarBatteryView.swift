@@ -923,12 +923,11 @@ enum MenuBarBatteryLabelFormatting {
     }
 
     private static func abbreviatedPercent(_ value: Double?) -> String {
-        guard let value, value.isFinite else {
+        guard let value = BatteryCalculations.presentationPercent(value, maximumAllowed: 105) else {
             return "—"
         }
 
-        let clamped = max(0, min(100, value))
-        return "\(clamped.formatted(.number.precision(.fractionLength(0))))%"
+        return "\(value.formatted(.number.precision(.fractionLength(0))))%"
     }
 
     private static func abbreviatedCapacity(_ milliampHours: Int?) -> String {
