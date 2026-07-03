@@ -1,21 +1,15 @@
 import Foundation
 
 extension DateComponentsFormatter {
-    static let batteryStatsDuration: DateComponentsFormatter = {
-        let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = [.hour, .minute]
-        formatter.unitsStyle = .abbreviated
-        formatter.zeroFormattingBehavior = .dropAll
-        formatter.maximumUnitCount = 2
-        return formatter
-    }()
+    static let batteryStatsDuration = batteryStatsFormatter(allowedUnits: [.hour, .minute])
+    static let batteryStatsAge = batteryStatsFormatter(allowedUnits: [.year, .month])
 
-    static let batteryStatsAge: DateComponentsFormatter = {
+    private static func batteryStatsFormatter(allowedUnits: NSCalendar.Unit) -> DateComponentsFormatter {
         let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = [.year, .month]
+        formatter.allowedUnits = allowedUnits
         formatter.unitsStyle = .abbreviated
         formatter.zeroFormattingBehavior = .dropAll
         formatter.maximumUnitCount = 2
         return formatter
-    }()
+    }
 }
