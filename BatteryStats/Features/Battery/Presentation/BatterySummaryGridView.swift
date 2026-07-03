@@ -42,21 +42,18 @@ struct BatterySummaryGridView: View {
                         value: BatterySummaryDetailFormatting.timeSummary(for: snapshot)
                     )
 
-                    Divider()
-                        .gridCellColumns(2)
+                    rowDivider
 
                     BatteryDetailRowView(title: "Status", value: snapshot.statusDisplayTitle)
 
                     if let cycleCount = BatteryCalculations.plausibleCycleCount(snapshot.cycleCount) {
-                        Divider()
-                            .gridCellColumns(2)
+                        rowDivider
 
                         BatteryDetailRowView(title: "Charge Cycles", value: String(cycleCount))
                     }
 
                     if let temperature = BatteryCalculations.plausibleTemperatureCelsius(snapshot.presentationTemperatureCelsius) {
-                        Divider()
-                            .gridCellColumns(2)
+                        rowDivider
 
                         BatteryDetailRowView(
                             title: "Temperature",
@@ -80,8 +77,7 @@ struct BatterySummaryGridView: View {
     @ViewBuilder
     private func powerConnectionRows(chargingSpeed: String?) -> some View {
         if let adapter = BatteryCalculations.plausibleAdapterWatts(snapshot.adapterMaxWatts) {
-            Divider()
-                .gridCellColumns(2)
+            rowDivider
 
             BatteryDetailRowView(
                 title: "Adapter Rating",
@@ -90,8 +86,7 @@ struct BatterySummaryGridView: View {
         }
 
         if let chargingSpeed {
-            Divider()
-                .gridCellColumns(2)
+            rowDivider
 
             BatteryDetailRowView(title: "Charging Speed", value: chargingSpeed)
         }
@@ -101,15 +96,13 @@ struct BatterySummaryGridView: View {
     private func advancedRows(chargingSpeed: String?) -> some View {
         if chargingSpeed == nil,
            let power = BatterySummaryDetailFormatting.power(snapshot.activePowerWatts) {
-            Divider()
-                .gridCellColumns(2)
+            rowDivider
 
             BatteryDetailRowView(title: BatteryPowerDisplayRole.role(for: snapshot).title, value: power)
         }
 
         if let voltage = BatteryCalculations.plausibleVoltageMillivolts(snapshot.voltageMillivolts) {
-            Divider()
-                .gridCellColumns(2)
+            rowDivider
 
             BatteryDetailRowView(title: "Voltage", value: BatteryFormatting.millivolts(voltage))
         }
@@ -117,8 +110,7 @@ struct BatterySummaryGridView: View {
         let currentEnergy = BatteryCalculations.plausibleWattHours(snapshot.currentChargeWattHours)
         let maximumEnergy = BatteryCalculations.positiveWattHours(snapshot.fullChargeCapacityWattHours)
         if currentEnergy != nil || maximumEnergy != nil {
-            Divider()
-                .gridCellColumns(2)
+            rowDivider
 
             BatteryDetailRowView(
                 title: "Energy",
@@ -127,18 +119,21 @@ struct BatterySummaryGridView: View {
         }
 
         if let manufactureDate = snapshot.validatedManufactureDate {
-            Divider()
-                .gridCellColumns(2)
+            rowDivider
 
             BatteryDetailRowView(title: "Made", value: BatteryFormatting.date(manufactureDate))
         }
 
         if let age = snapshot.validatedBatteryAgeComponents {
-            Divider()
-                .gridCellColumns(2)
+            rowDivider
 
             BatteryDetailRowView(title: "Age", value: BatteryFormatting.age(age))
         }
+    }
+
+    private var rowDivider: some View {
+        Divider()
+            .gridCellColumns(2)
     }
 }
 
