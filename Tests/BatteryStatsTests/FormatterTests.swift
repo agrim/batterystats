@@ -28,6 +28,12 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatteryFormatting.watts(0.1), "0.1 W")
     }
 
+    func testFormatsAdapterWatts() {
+        XCTAssertEqual(BatteryFormatting.adapterWatts(70), "70 W")
+        XCTAssertNil(BatteryFormatting.adapterWatts(-70))
+        XCTAssertNil(BatteryFormatting.adapterWatts(Int.max))
+    }
+
     func testFormatsCompactCapacityPair() {
         XCTAssertEqual(
             BatteryFormatting.compactCapacityPair(current: 4_912, maximum: 5_338),

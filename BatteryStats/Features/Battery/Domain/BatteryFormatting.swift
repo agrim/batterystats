@@ -33,6 +33,12 @@ enum BatteryFormatting {
         return "\(value.formatted(.number.precision(.fractionLength(1)))) W"
     }
 
+    static func adapterWatts(_ value: Int?) -> String? {
+        BatteryCalculations.plausibleAdapterWatts(value).map {
+            "\($0.formatted(.number.grouping(.automatic))) W"
+        }
+    }
+
     static func percent(_ value: Double?, decimals: Int = 0) -> String {
         guard let value,
               value.isFinite,

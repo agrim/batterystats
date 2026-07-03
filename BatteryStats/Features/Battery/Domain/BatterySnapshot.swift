@@ -312,7 +312,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         lines.append("Input power: \(BatteryFormatting.watts(validatedInputPowerWatts))")
         lines.append("Charge rate: \(BatteryFormatting.watts(powerState == .charging ? chargeRateWatts : nil))")
         lines.append("Discharge rate: \(BatteryFormatting.watts(powerState.isBatteryDischarging ? dischargeRateWatts : nil))")
-        lines.append("Adapter max power: \(Self.debugAdapterMaxWatts(adapterMaxWatts))")
+        lines.append("Adapter max power: \(BatteryFormatting.adapterWatts(adapterMaxWatts) ?? "Unavailable")")
         lines.append("Temperature: \(BatteryFormatting.temperature(presentationTemperatureCelsius, unitPreference: .celsius))")
         lines.append("Cycle count: \(BatteryCalculations.plausibleCycleCount(cycleCount).map(String.init) ?? "Unavailable")")
         lines.append("Manufacture date: \(BatteryFormatting.date(validatedManufactureDate))")
@@ -331,14 +331,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     private var inputPowerSecondaryText: String? {
         visibleInputPowerWatts.map { "Input power \(BatteryFormatting.watts($0))" }
-    }
-
-    private static func debugAdapterMaxWatts(_ value: Int?) -> String {
-        guard let value = BatteryCalculations.plausibleAdapterWatts(value) else {
-            return "Unavailable"
-        }
-
-        return "\(value) W"
     }
 
     func updating(rateBasedTimeRemainingMinutes: Int?, timestamp: Date? = nil) -> BatterySnapshot {

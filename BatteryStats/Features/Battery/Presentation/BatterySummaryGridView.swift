@@ -76,12 +76,12 @@ struct BatterySummaryGridView: View {
 
     @ViewBuilder
     private func powerConnectionRows(chargingSpeed: String?) -> some View {
-        if let adapter = BatteryCalculations.plausibleAdapterWatts(snapshot.adapterMaxWatts) {
+        if let adapter = BatteryFormatting.adapterWatts(snapshot.adapterMaxWatts) {
             rowDivider
 
             BatteryDetailRowView(
                 title: "Adapter Rating",
-                value: "\(adapter.formatted(.number.grouping(.automatic))) W"
+                value: adapter
             )
         }
 

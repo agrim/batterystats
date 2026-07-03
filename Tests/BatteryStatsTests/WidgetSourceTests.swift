@@ -32,9 +32,9 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertFalse(source.contains("BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"))
         XCTAssertTrue(source.contains("powerConnectionRows(chargingSpeed: chargingSpeed)\n\n                    if showsAdvancedValues {"))
         XCTAssertTrue(source.contains("advancedRows(chargingSpeed: chargingSpeed)"))
-        XCTAssertTrue(source.contains("BatteryCalculations.plausibleAdapterWatts(snapshot.adapterMaxWatts)"))
+        XCTAssertTrue(source.contains("BatteryFormatting.adapterWatts(snapshot.adapterMaxWatts)"))
         XCTAssertTrue(source.contains("title: \"Adapter Rating\""))
-        XCTAssertTrue(source.contains("value: \"\\(adapter.formatted(.number.grouping(.automatic))) W\""))
+        XCTAssertTrue(source.contains("value: adapter"))
         XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Charging Speed\", value: chargingSpeed)"))
         XCTAssertTrue(source.contains("if chargingSpeed == nil,"))
     }
