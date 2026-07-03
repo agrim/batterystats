@@ -1,13 +1,16 @@
 import XCTest
 
 extension XCTestCase {
-    static func loadSource(relativePath: String) throws -> String {
+    static func sourceURL(relativePath: String) -> URL {
         let testFile = URL(fileURLWithPath: #filePath)
         let root = testFile
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let sourceURL = root.appendingPathComponent(relativePath)
-        return try String(contentsOf: sourceURL, encoding: .utf8)
+        return root.appendingPathComponent(relativePath)
+    }
+
+    static func loadSource(relativePath: String) throws -> String {
+        try String(contentsOf: sourceURL(relativePath: relativePath), encoding: .utf8)
     }
 }
