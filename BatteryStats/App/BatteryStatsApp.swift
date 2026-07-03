@@ -183,7 +183,6 @@ final class BatteryMonitorConfigurationObserver {
     private let monitor: BatteryMonitor
     private let preferences: PreferencesStore
     private let historyStore: BatteryHistoryStore
-    private var observationGeneration = 0
     private var isStarted = false
 
     init(
@@ -207,9 +206,6 @@ final class BatteryMonitorConfigurationObserver {
     }
 
     private func observePreferences() {
-        observationGeneration += 1
-        let generation = observationGeneration
-
         withObservationTracking {
             _ = preferences.refreshPolicy
             _ = preferences.historyPolicy
@@ -217,9 +213,7 @@ final class BatteryMonitorConfigurationObserver {
             _ = preferences.monitoringDemand
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
-                guard let self,
-                      isStarted,
-                      observationGeneration == generation else {
+                guard let self, isStarted else {
                     return
                 }
 
