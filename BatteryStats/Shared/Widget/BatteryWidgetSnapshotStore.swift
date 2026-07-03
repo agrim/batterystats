@@ -118,7 +118,7 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
         now: Date? = nil,
         encodedPowerRateFields: EncodedPowerRateFields? = nil
     ) -> BatterySnapshot {
-        let timestamp = clampedTimestamp(snapshot.timestamp, now: now)
+        let timestamp = now.map { min(snapshot.timestamp, $0) } ?? snapshot.timestamp
         let ageReferenceDate = now ?? timestamp
         let manufactureDate = BatteryCalculations.plausibleManufactureDate(snapshot.manufactureDate, now: ageReferenceDate)
         let batteryAgeComponents = BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: ageReferenceDate)
@@ -278,14 +278,6 @@ struct BatteryWidgetSnapshotStore: BatteryWidgetSnapshotStoring {
             adapterMaxWatts: adapterMaxWatts,
             notes: snapshot.notes
         )
-    }
-
-    private static func clampedTimestamp(_ timestamp: Date, now: Date?) -> Date {
-        guard let now, timestamp > now else {
-            return timestamp
-        }
-
-        return now
     }
 
     private static func correctedStoredPowerRate(
