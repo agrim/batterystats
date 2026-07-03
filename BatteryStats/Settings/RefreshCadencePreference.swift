@@ -129,8 +129,8 @@ struct BatteryRefreshPolicy: Equatable {
     }
 
     static func isSignificantEnergyChange(previous: Double?, current: Double?, thresholdPercent: Double) -> Bool {
-        let previous = normalizedEnergyUse(previous)
-        let current = normalizedEnergyUse(current)
+        let previous = previous.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        let current = current.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
 
         switch (previous, current) {
         case (nil, nil):
@@ -142,13 +142,5 @@ struct BatteryRefreshPolicy: Equatable {
             let percentChange = abs(current - previous) / previous * 100
             return percentChange >= thresholdPercent
         }
-    }
-
-    private static func normalizedEnergyUse(_ value: Double?) -> Double? {
-        guard let value, value.isFinite, value > 0 else {
-            return nil
-        }
-
-        return value
     }
 }

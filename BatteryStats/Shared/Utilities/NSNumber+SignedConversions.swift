@@ -8,7 +8,8 @@ enum SignedIntegerNormalizer {
                 return nil
             }
 
-            if isFloatingPointNumber(value) {
+            let numericType = String(cString: value.objCType)
+            if numericType == "f" || numericType == "d" {
                 return normalizeFloatingPoint(value.doubleValue)
             }
 
@@ -63,10 +64,5 @@ enum SignedIntegerNormalizer {
         }
 
         return Int(value)
-    }
-
-    private static func isFloatingPointNumber(_ value: NSNumber) -> Bool {
-        let type = String(cString: value.objCType)
-        return type == "f" || type == "d"
     }
 }
