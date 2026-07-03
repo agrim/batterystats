@@ -441,13 +441,22 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func derivedAdapterWatts(from adapterDetails: [String: Any]) -> Int? {
-        guard let voltageMillivolts = firstPlausibleVoltageMillivolts(
-            for: ["Voltage", "AdapterVoltage"],
-            in: adapterDetails
+        guard let voltageMillivolts = plausibleInteger(
+            for: [.root("Voltage"), .root("AdapterVoltage")],
+            in: adapterDetails,
+            transform: BatteryCalculations.plausibleVoltageMillivolts
         ),
-              let currentMilliamps = firstPlausibleInputCurrentMilliamps(
-                  for: ["Current", "AdapterCurrent"],
-                  in: adapterDetails
+              let currentMilliamps = plausibleInteger(
+                  for: [.root("Current"), .root("AdapterCurrent")],
+                  in: adapterDetails,
+                  transform: {
+                      guard let current = Self.plausibleInputCurrentMagnitudeMilliamps($0),
+                            current > 0 else {
+                          return nil
+                      }
+
+                      return current
+                  }
               ) else {
             return nil
         }
@@ -460,33 +469,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         return BatteryCalculations.plausibleAdapterWatts(Int(watts.rounded(.toNearestOrAwayFromZero)))
-    }
-
-    private func firstPlausibleVoltageMillivolts(for keys: [String], in dictionary: [String: Any]) -> Int? {
-        for key in keys {
-            guard let parsed = SignedIntegerNormalizer.normalize(dictionary[key]),
-                  let voltage = BatteryCalculations.plausibleVoltageMillivolts(parsed) else {
-                continue
-            }
-
-            return voltage
-        }
-
-        return nil
-    }
-
-    private func firstPlausibleInputCurrentMilliamps(for keys: [String], in dictionary: [String: Any]) -> Int? {
-        for key in keys {
-            guard let parsed = SignedIntegerNormalizer.normalize(dictionary[key]),
-                  let current = Self.plausibleInputCurrentMagnitudeMilliamps(parsed),
-                  current > 0 else {
-                continue
-            }
-
-            return current
-        }
-
-        return nil
     }
 
     private func inputPower(in properties: [String: Any], adapterMaxWatts: Int?) -> InputPowerReading? {

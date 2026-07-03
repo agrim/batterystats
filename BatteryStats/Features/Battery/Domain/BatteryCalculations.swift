@@ -233,26 +233,48 @@ enum BatteryCalculations {
     }
 
     static func displayableInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
-        guard let value = baseDisplayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
-              isDistinctFromAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        return value
+        displayableInputPowerWatts(
+            value,
+            adapterMaxWatts: adapterMaxWatts,
+            relativeAdapterCapabilityTolerance: adapterCapabilityEchoTolerance,
+            minimumAdapterCapabilityToleranceWatts: 0.001
+        )
     }
 
     static func displayableCounterBackedInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
-        guard let value = baseDisplayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
-              isDistinctFromCounterBackedAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        return value
+        let tolerance = (plausibleAdapterWatts(adapterMaxWatts) ?? 0) >= 90
+            ? highWattageCounterBackedAdapterCapabilityEchoTolerance
+            : counterBackedAdapterCapabilityEchoTolerance
+        return displayableInputPowerWatts(
+            value,
+            adapterMaxWatts: adapterMaxWatts,
+            relativeAdapterCapabilityTolerance: tolerance,
+            minimumAdapterCapabilityToleranceWatts: 0.1
+        )
     }
 
     static func displayableLiveMeasuredInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        displayableInputPowerWatts(
+            value,
+            adapterMaxWatts: adapterMaxWatts,
+            relativeAdapterCapabilityTolerance: 0,
+            minimumAdapterCapabilityToleranceWatts: 0.1
+        )
+    }
+
+    private static func displayableInputPowerWatts(
+        _ value: Double?,
+        adapterMaxWatts: Int?,
+        relativeAdapterCapabilityTolerance: Double,
+        minimumAdapterCapabilityToleranceWatts: Double
+    ) -> Double? {
         guard let value = baseDisplayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
-              isDistinctFromExactAdapterCapability(value, adapterMaxWatts: adapterMaxWatts) else {
+              isDistinctFromAdapterCapability(
+                  value,
+                  adapterMaxWatts: adapterMaxWatts,
+                  relativeTolerance: relativeAdapterCapabilityTolerance,
+                  minimumToleranceWatts: minimumAdapterCapabilityToleranceWatts
+              ) else {
             return nil
         }
 
@@ -752,34 +774,18 @@ enum BatteryCalculations {
         return -value
     }
 
-    private static func isDistinctFromAdapterCapability(_ watts: Double, adapterMaxWatts: Int?) -> Bool {
+    private static func isDistinctFromAdapterCapability(
+        _ watts: Double,
+        adapterMaxWatts: Int?,
+        relativeTolerance: Double,
+        minimumToleranceWatts: Double
+    ) -> Bool {
         guard let adapterMaxWatts = plausibleAdapterWatts(adapterMaxWatts) else {
             return true
         }
 
         let adapterWatts = Double(adapterMaxWatts)
-        let toleranceWatts = max(0.001, adapterWatts * adapterCapabilityEchoTolerance)
+        let toleranceWatts = max(minimumToleranceWatts, adapterWatts * relativeTolerance)
         return abs(watts - adapterWatts) > toleranceWatts
-    }
-
-    private static func isDistinctFromCounterBackedAdapterCapability(_ watts: Double, adapterMaxWatts: Int?) -> Bool {
-        guard let adapterMaxWatts = plausibleAdapterWatts(adapterMaxWatts) else {
-            return true
-        }
-
-        let adapterWatts = Double(adapterMaxWatts)
-        let tolerance = adapterMaxWatts >= 90
-            ? highWattageCounterBackedAdapterCapabilityEchoTolerance
-            : counterBackedAdapterCapabilityEchoTolerance
-        let toleranceWatts = max(0.1, adapterWatts * tolerance)
-        return abs(watts - adapterWatts) > toleranceWatts
-    }
-
-    private static func isDistinctFromExactAdapterCapability(_ watts: Double, adapterMaxWatts: Int?) -> Bool {
-        guard let adapterMaxWatts = plausibleAdapterWatts(adapterMaxWatts) else {
-            return true
-        }
-
-        return abs(watts - Double(adapterMaxWatts)) > 0.1
     }
 }
