@@ -16,9 +16,9 @@ struct BatteryStatusWidgetView: View {
                     snapshot: snapshot,
                     updatedAt: entry.updatedAt,
                     now: entry.date,
-                    healthTint: BatteryPresentationStyle.healthTint(for: snapshot),
-                    chargeTint: BatteryPresentationStyle.chargeTint(for: snapshot),
-                    timeTint: BatteryPresentationStyle.timeTint(for: snapshot),
+                    healthTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color,
+                    chargeTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color,
+                    timeTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color,
                     statusDescriptor: BatteryPresentationStyle.statusDescriptor(for: snapshot)
                 )
             default:
@@ -50,7 +50,7 @@ struct BatteryStatusWidgetView: View {
         BatteryWidgetMetric(
             content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent)),
             progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationHealthPercent),
-            ringTint: BatteryPresentationStyle.healthTint(for: snapshot),
+            ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color,
             contentTint: .primary
         )
     }
@@ -59,7 +59,7 @@ struct BatteryStatusWidgetView: View {
         BatteryWidgetMetric(
             content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)),
             progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationStateOfChargePercent),
-            ringTint: BatteryPresentationStyle.chargeTint(for: snapshot),
+            ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color,
             contentTint: .primary
         )
     }
@@ -68,7 +68,7 @@ struct BatteryStatusWidgetView: View {
         BatteryWidgetMetric(
             content: .text(BatteryWidgetMetricFormatting.timeText(for: snapshot)),
             progress: BatteryWidgetMetricFormatting.timeProgress(for: snapshot),
-            ringTint: BatteryPresentationStyle.timeTint(for: snapshot),
+            ringTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color,
             contentTint: .primary
         )
     }

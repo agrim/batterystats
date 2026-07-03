@@ -16,10 +16,6 @@ enum BatteryPresentationStyle {
         }
     }
 
-    static func healthTint(for snapshot: BatterySnapshot?) -> Color {
-        healthTintStyle(for: snapshot).color
-    }
-
     static func healthTintStyle(for snapshot: BatterySnapshot?) -> BatteryPresentationTint {
         guard let snapshot,
               snapshot.presentationHealthPercent != nil else {
@@ -27,10 +23,6 @@ enum BatteryPresentationStyle {
         }
 
         return tintStyle(for: snapshot.healthTone)
-    }
-
-    static func chargeTint(for snapshot: BatterySnapshot?) -> Color {
-        chargeTintStyle(for: snapshot).color
     }
 
     static func chargeTintStyle(for snapshot: BatterySnapshot?) -> BatteryPresentationTint {
@@ -52,10 +44,6 @@ enum BatteryPresentationStyle {
         }
 
         return snapshot.powerState.isExternallyPowered ? snapshot.powerState.symbolName : "questionmark"
-    }
-
-    static func timeTint(for snapshot: BatterySnapshot?) -> Color {
-        timeTintStyle(for: snapshot).color
     }
 
     static func timeTintStyle(for snapshot: BatterySnapshot?) -> BatteryPresentationTint {

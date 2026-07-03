@@ -11,9 +11,9 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertTrue(source.contains("updatedAt: entry.updatedAt"))
         XCTAssertFalse(source.contains("private var displayUpdatedAt: Date?"))
         XCTAssertFalse(source.contains("displaySnapshot?.timestamp"))
-        XCTAssertTrue(source.contains("healthTint: BatteryPresentationStyle.healthTint(for: snapshot)"))
-        XCTAssertTrue(source.contains("chargeTint: BatteryPresentationStyle.chargeTint(for: snapshot)"))
-        XCTAssertTrue(source.contains("timeTint: BatteryPresentationStyle.timeTint(for: snapshot)"))
+        XCTAssertTrue(source.contains("healthTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color"))
+        XCTAssertTrue(source.contains("chargeTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color"))
+        XCTAssertTrue(source.contains("timeTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color"))
         XCTAssertTrue(source.contains("statusDescriptor: BatteryPresentationStyle.statusDescriptor(for: snapshot)"))
         XCTAssertFalse(source.contains("BatteryMediumWidgetView(\n                    snapshot: entry.snapshot"))
     }

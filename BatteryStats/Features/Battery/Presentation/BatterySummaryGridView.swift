@@ -19,7 +19,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatterySummaryDetailFormatting.compactPercent(snapshot.presentationHealthPercent),
                 progress: snapshot.presentationHealthPercent,
-                tint: BatteryPresentationStyle.healthTint(for: snapshot)
+                tint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color
             )
 
             BatteryCapacityBarSectionView(
@@ -30,7 +30,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatterySummaryDetailFormatting.compactPercent(snapshot.presentationStateOfChargePercent),
                 progress: snapshot.presentationStateOfChargePercent,
-                tint: BatteryPresentationStyle.chargeTint(for: snapshot)
+                tint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color
             )
 
             GroupBox {
