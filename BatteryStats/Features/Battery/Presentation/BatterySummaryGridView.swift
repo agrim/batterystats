@@ -127,18 +127,18 @@ struct BatterySummaryGridView: View {
             )
         }
 
-        if let manufactureDate = BatterySummaryDetailFormatting.manufactureDate(snapshot.validatedManufactureDate) {
+        if let manufactureDate = snapshot.validatedManufactureDate {
             Divider()
                 .gridCellColumns(2)
 
-            BatteryDetailRowView(title: "Made", value: manufactureDate)
+            BatteryDetailRowView(title: "Made", value: BatteryFormatting.date(manufactureDate))
         }
 
-        if let age = BatterySummaryDetailFormatting.age(snapshot.validatedBatteryAgeComponents) {
+        if let age = snapshot.validatedBatteryAgeComponents {
             Divider()
                 .gridCellColumns(2)
 
-            BatteryDetailRowView(title: "Age", value: age)
+            BatteryDetailRowView(title: "Age", value: BatteryFormatting.age(age))
         }
     }
 }
@@ -236,21 +236,6 @@ enum BatterySummaryDetailFormatting {
         return BatteryFormatting.compactWattHourPair(current: current, maximum: maximum)
     }
 
-    static func manufactureDate(_ value: Date?) -> String? {
-        guard let value else {
-            return nil
-        }
-
-        return BatteryFormatting.date(value)
-    }
-
-    static func age(_ value: DateComponents?) -> String? {
-        guard BatteryCalculations.displayableBatteryAgeComponents(value) != nil else {
-            return nil
-        }
-
-        return BatteryFormatting.age(value)
-    }
 }
 
 private struct BatteryCapacityBarSectionView: View {

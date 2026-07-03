@@ -302,8 +302,8 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     func testAdvancedBatteryAgeLabelClarifiesManufactureAge() throws {
         let dashboardSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatterySummaryGridView.swift")
 
-        XCTAssertTrue(dashboardSource.contains("BatteryDetailRowView(title: \"Made\", value: manufactureDate)"))
-        XCTAssertTrue(dashboardSource.contains("BatteryDetailRowView(title: \"Age\", value: age)"))
+        XCTAssertTrue(dashboardSource.contains("BatteryDetailRowView(title: \"Made\", value: BatteryFormatting.date(manufactureDate))"))
+        XCTAssertTrue(dashboardSource.contains("BatteryDetailRowView(title: \"Age\", value: BatteryFormatting.age(age))"))
         XCTAssertFalse(dashboardSource.contains("BatteryDetailRowView(title: \"Since Made\", value: age)"))
     }
 

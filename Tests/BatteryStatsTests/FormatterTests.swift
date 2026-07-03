@@ -477,8 +477,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatteryFormatting.age(DateComponents(year: 1, month: -2)), "Unavailable")
         XCTAssertEqual(BatteryFormatting.age(DateComponents(year: 1, month: 12)), "Unavailable")
         XCTAssertEqual(BatteryFormatting.age(DateComponents(year: 1, month: 2, day: -1)), "Unavailable")
-        XCTAssertNil(BatterySummaryDetailFormatting.age(DateComponents(year: -1, month: 2)))
-        XCTAssertNil(BatterySummaryDetailFormatting.age(DateComponents(year: 1, month: 12)))
     }
 
     func testSummaryAgeRecomputesFromManufactureDateInsteadOfTrustingStoredAge() throws {
@@ -495,7 +493,7 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(snapshot.validatedBatteryAgeComponents?.year, 0)
         XCTAssertEqual(snapshot.validatedBatteryAgeComponents?.month, 2)
-        let formattedAge = try XCTUnwrap(BatterySummaryDetailFormatting.age(snapshot.validatedBatteryAgeComponents))
+        let formattedAge = BatteryFormatting.age(snapshot.validatedBatteryAgeComponents)
         XCTAssertTrue(formattedAge.contains("2"))
         XCTAssertFalse(formattedAge.contains("9"))
         XCTAssertFalse(snapshot.debugSummary.contains("Age since made"))
@@ -515,8 +513,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertNil(snapshot.validatedManufactureDate)
         XCTAssertNil(snapshot.validatedBatteryAgeComponents)
-        XCTAssertNil(BatterySummaryDetailFormatting.manufactureDate(snapshot.validatedManufactureDate))
-        XCTAssertNil(BatterySummaryDetailFormatting.age(snapshot.validatedBatteryAgeComponents))
         XCTAssertTrue(snapshot.debugSummary.contains("Manufacture date: Unavailable"))
         XCTAssertFalse(snapshot.debugSummary.contains("Age since made"))
     }
@@ -537,8 +533,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertNil(BatterySummaryDetailFormatting.voltage(-12_000))
         XCTAssertNil(BatterySummaryDetailFormatting.voltage(Int.max))
         XCTAssertNil(BatterySummaryDetailFormatting.energy(current: nil, maximum: nil))
-        XCTAssertNil(BatterySummaryDetailFormatting.manufactureDate(nil))
-        XCTAssertNil(BatterySummaryDetailFormatting.age(nil))
     }
 
     func testSummaryDetailFormattingShowsValidAndPartialValues() {
