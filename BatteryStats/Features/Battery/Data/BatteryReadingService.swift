@@ -117,10 +117,10 @@ struct BatteryReadingService: Sendable {
         )
         let powerRates = Self.displayablePowerRates(
             powerState: powerState,
-            chargeRateWatts: Self.dynamicChargeRateWatts(
-                smartBattery: smartBattery,
+            chargeRateWatts: Self.chargeRateWattsWithinAdapterContract(
                 voltageMillivolts: voltageMillivolts,
-                signedCurrentMilliamps: signedCurrentMilliamps
+                signedCurrentMilliamps: signedCurrentMilliamps,
+                adapterMaxWatts: adapterMaxWatts
             ),
             dischargeRateWatts: BatteryCalculations.dischargeRateWatts(
                 voltageMillivolts: voltageMillivolts,
@@ -438,18 +438,6 @@ struct BatteryReadingService: Sendable {
         } else {
             return (nil, nil)
         }
-    }
-
-    static func dynamicChargeRateWatts(
-        smartBattery: SmartBatteryDetails?,
-        voltageMillivolts: Int?,
-        signedCurrentMilliamps: Int?
-    ) -> Double? {
-        chargeRateWattsWithinAdapterContract(
-            voltageMillivolts: voltageMillivolts,
-            signedCurrentMilliamps: signedCurrentMilliamps,
-            adapterMaxWatts: smartBattery?.adapterMaxWatts
-        )
     }
 
     static func displayableTiming(

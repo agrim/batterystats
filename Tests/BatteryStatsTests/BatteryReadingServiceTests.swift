@@ -1669,13 +1669,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_044,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertEqual(try XCTUnwrap(dynamicRate), 25.424884, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(chargeRate), 25.424884, accuracy: 0.001)
     }
 
     func testChargingPowerUsesBatteryCurrentWhenInputPowerIsUnavailable() throws {
@@ -1689,13 +1689,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_044,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertEqual(try XCTUnwrap(dynamicRate), 25.424884, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(chargeRate), 25.424884, accuracy: 0.001)
     }
 
     func testChargingPowerFallsBackToBatteryCurrentWhenInputPowerMirrorsAdapterCapability() throws {
@@ -1710,13 +1710,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_044,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertEqual(try XCTUnwrap(dynamicRate), 25.424884, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(chargeRate), 25.424884, accuracy: 0.001)
     }
 
     func testChargingPowerDoesNotUseBatteryCurrentWattsAboveAdapterContract() {
@@ -1730,13 +1730,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_000,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertNil(dynamicRate)
+        XCTAssertNil(chargeRate)
     }
 
     func testChargingPowerUsesCurrentDerivedRateNearAdapterCapability() throws {
@@ -1750,13 +1750,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_000,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertEqual(try XCTUnwrap(dynamicRate), 69.42, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(chargeRate), 69.42, accuracy: 0.001)
     }
 
     func testChargingPowerDoesNotUseBatteryCurrentThatMirrorsStaleAdapterCapability() {
@@ -1770,13 +1770,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_000,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertNil(dynamicRate)
+        XCTAssertNil(chargeRate)
     }
 
     func testChargingPowerDoesNotUseUnverifiedHundredWattBatteryCurrentWithoutAdapterContract() {
@@ -1790,13 +1790,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_000,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertNil(dynamicRate)
+        XCTAssertNil(chargeRate)
     }
 
     func testChargingRateStaysBatteryCurrentWhenCounterBackedInputPowerIsNearAdapterCapability() throws {
@@ -1812,13 +1812,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_044,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertEqual(try XCTUnwrap(dynamicRate), 25.424884, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(chargeRate), 25.424884, accuracy: 0.001)
     }
 
     func testChargingRateDoesNotUseLiveInputPowerWhenBatteryCurrentIsUnavailable() {
@@ -1833,13 +1833,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_044,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertNil(dynamicRate)
+        XCTAssertNil(chargeRate)
     }
 
     func testChargingPowerDoesNotFallBackToUnverifiedHundredWattInputPower() {
@@ -1854,13 +1854,13 @@ final class BatteryReadingServiceTests: XCTestCase {
             isFullyCharged: false
         )
 
-        let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-            smartBattery: smartBattery,
+        let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
             voltageMillivolts: 12_044,
-            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+            signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+            adapterMaxWatts: smartBattery.adapterMaxWatts
         )
 
-        XCTAssertNil(dynamicRate)
+        XCTAssertNil(chargeRate)
     }
 
     func testChargingPowerFallsBackToBatteryCurrentWhenInputPowerIsInvalid() throws {
@@ -1876,20 +1876,22 @@ final class BatteryReadingServiceTests: XCTestCase {
                 isFullyCharged: false
             )
 
-            let dynamicRate = BatteryReadingService.dynamicChargeRateWatts(
-                smartBattery: smartBattery,
+            let chargeRate = BatteryReadingService.chargeRateWattsWithinAdapterContract(
                 voltageMillivolts: 12_044,
-                signedCurrentMilliamps: smartBattery.signedCurrentMilliamps
+                signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
+                adapterMaxWatts: smartBattery.adapterMaxWatts
             )
 
-            XCTAssertEqual(try XCTUnwrap(dynamicRate), 25.424884, accuracy: 0.001)
+            XCTAssertEqual(try XCTUnwrap(chargeRate), 25.424884, accuracy: 0.001)
         }
     }
 
     func testReadPathUsesDynamicChargingPowerForSnapshotChargeRate() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryReadingService.swift")
 
-        XCTAssertTrue(source.contains("chargeRateWatts: Self.dynamicChargeRateWatts(\n                smartBattery: smartBattery,"))
+        XCTAssertTrue(source.contains("chargeRateWatts: Self.chargeRateWattsWithinAdapterContract(\n                voltageMillivolts: voltageMillivolts,"))
+        XCTAssertTrue(source.contains("adapterMaxWatts: adapterMaxWatts"))
+        XCTAssertFalse(source.contains("Self.dynamicChargeRateWatts("))
         XCTAssertFalse(source.contains("chargeRateWatts: BatteryCalculations.chargeRateWatts(\n                voltageMillivolts: voltageMillivolts,\n                signedCurrentMilliamps: signedCurrentMilliamps"))
     }
 
