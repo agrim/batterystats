@@ -526,8 +526,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertNil(BatterySummaryDetailFormatting.temperature(180, unitPreference: .celsius))
         XCTAssertNil(BatterySummaryDetailFormatting.power(-4.2))
         XCTAssertNil(BatterySummaryDetailFormatting.power(.greatestFiniteMagnitude))
-        XCTAssertNil(BatterySummaryDetailFormatting.adapter(-70))
-        XCTAssertNil(BatterySummaryDetailFormatting.adapter(Int.max))
         XCTAssertNil(BatterySummaryDetailFormatting.energy(current: nil, maximum: nil))
     }
 
@@ -536,7 +534,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(100), "100%")
         XCTAssertEqual(BatterySummaryDetailFormatting.temperature(34.2, unitPreference: .fahrenheit), "93.6 °F")
         XCTAssertEqual(BatterySummaryDetailFormatting.power(13.9), "13.9 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.adapter(140), "140 W")
         XCTAssertEqual(BatterySummaryDetailFormatting.energy(current: 40.2, maximum: nil), "40.2 Wh")
     }
 
@@ -549,8 +546,6 @@ final class FormatterTests: XCTestCase {
             inputPowerEvidence: .counterBacked,
             adapterMaxWatts: 70
         )
-
-        XCTAssertEqual(BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts), "70 W")
         XCTAssertEqual(BatterySummaryDetailFormatting.power(snapshot.activePowerWatts), "69.4 W")
     }
 

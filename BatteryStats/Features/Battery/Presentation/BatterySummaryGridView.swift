@@ -82,11 +82,14 @@ struct BatterySummaryGridView: View {
 
     @ViewBuilder
     private func powerConnectionRows(chargingSpeed: String?) -> some View {
-        if let adapter = BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts) {
+        if let adapter = BatteryCalculations.plausibleAdapterWatts(snapshot.adapterMaxWatts) {
             Divider()
                 .gridCellColumns(2)
 
-            BatteryDetailRowView(title: "Adapter Rating", value: adapter)
+            BatteryDetailRowView(
+                title: "Adapter Rating",
+                value: "\(adapter.formatted(.number.grouping(.automatic))) W"
+            )
         }
 
         if let chargingSpeed {
@@ -199,14 +202,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return BatteryFormatting.watts(value)
-    }
-
-    static func adapter(_ value: Int?) -> String? {
-        guard let value = BatteryCalculations.plausibleAdapterWatts(value) else {
-            return nil
-        }
-
-        return "\(value.formatted(.number.grouping(.automatic))) W"
     }
 
     static func energy(current: Double?, maximum: Double?) -> String? {
