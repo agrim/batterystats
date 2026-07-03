@@ -551,26 +551,17 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = fixture.preferences
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().attributedTitle, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
+        assertButtonSnapshot(controller, title: "92%", attributedTitle: "92%", imagePosition: .imageLeft)
 
         preferences.menuBarDisplayMode = .iconOnly
         await Self.drainObservationUpdates()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "")
-        XCTAssertEqual(controller.currentButtonSnapshot().attributedTitle, "")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.squareLength)
+        assertButtonSnapshot(controller, title: "", attributedTitle: "", imagePosition: .imageOnly, length: NSStatusItem.squareLength)
 
         preferences.menuBarDisplayMode = .iconAndPower
         await Self.drainObservationUpdates()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "13.9W")
-        XCTAssertEqual(controller.currentButtonSnapshot().attributedTitle, "13.9W")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.variableLength)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery power 13.9 W")
+        assertButtonSnapshot(controller, title: "13.9W", attributedTitle: "13.9W", imagePosition: .imageLeft, length: NSStatusItem.variableLength, toolTip: "Battery power 13.9 W")
     }
 
     @MainActor
@@ -580,22 +571,20 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let controller = fixture.controller
 
         let initialStatusItem = controller.currentStatusItemIdentityForTesting()
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         preferences.menuBarDisplayMode = .iconOnly
         await Self.drainObservationUpdates()
 
         let iconOnlyStatusItem = controller.currentStatusItemIdentityForTesting()
         XCTAssertNotEqual(initialStatusItem, iconOnlyStatusItem)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageOnly)
+        assertButtonSnapshot(controller, title: "", imagePosition: .imageOnly)
 
         preferences.menuBarDisplayMode = .iconAndPower
         await Self.drainObservationUpdates()
 
         XCTAssertNotEqual(iconOnlyStatusItem, controller.currentStatusItemIdentityForTesting())
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "13.9W")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
+        assertButtonSnapshot(controller, title: "13.9W", imagePosition: .imageLeft)
     }
 
     @MainActor
@@ -605,26 +594,21 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = fixture.preferences
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft)
 
         defaults.set(MenuBarDisplayMode.iconOnly.rawValue, forKey: PreferencesStore.menuBarDisplayModeDefaultsKey)
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
         await Self.drainObservationUpdates()
 
         XCTAssertEqual(preferences.menuBarDisplayMode, .iconOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.squareLength)
+        assertButtonSnapshot(controller, title: "", imagePosition: .imageOnly, length: NSStatusItem.squareLength)
 
         defaults.set(MenuBarDisplayMode.iconAndPower.rawValue, forKey: PreferencesStore.menuBarDisplayModeDefaultsKey)
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
         await Self.drainObservationUpdates()
 
         XCTAssertEqual(preferences.menuBarDisplayMode, .iconAndPower)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "13.9W")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.variableLength)
+        assertButtonSnapshot(controller, title: "13.9W", imagePosition: .imageLeft, length: NSStatusItem.variableLength)
     }
 
     @MainActor
@@ -635,26 +619,21 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let settingsPreferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft)
 
         settingsPreferences.menuBarDisplayMode = .iconOnly
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: nil)
         await Self.drainObservationUpdates()
 
         XCTAssertEqual(runtimePreferences.menuBarDisplayMode, .iconOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.squareLength)
+        assertButtonSnapshot(controller, title: "", imagePosition: .imageOnly, length: NSStatusItem.squareLength)
 
         settingsPreferences.menuBarDisplayMode = .iconAndPower
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: nil)
         await Self.drainObservationUpdates()
 
         XCTAssertEqual(runtimePreferences.menuBarDisplayMode, .iconAndPower)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "13.9W")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.variableLength)
+        assertButtonSnapshot(controller, title: "13.9W", imagePosition: .imageLeft, length: NSStatusItem.variableLength)
     }
 
     @MainActor
@@ -665,7 +644,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let controller = fixture.controller
 
         XCTAssertEqual(preferences.menuBarDisplayMode, .iconAndPercentage)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         NotificationCenter.default.post(
             name: .menuBarDisplayPreferencesDidChange,
@@ -678,9 +657,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         await Self.drainObservationUpdates()
 
         XCTAssertEqual(preferences.menuBarDisplayMode, .iconOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.squareLength)
+        assertButtonSnapshot(controller, title: "", imagePosition: .imageOnly, length: NSStatusItem.squareLength)
         XCTAssertEqual(defaults.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey), MenuBarDisplayMode.iconOnly.rawValue)
     }
 
@@ -690,15 +667,13 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = fixture.preferences
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         controller.overwriteButtonTitleForTesting("stale")
         preferences.invalidateMenuBarDisplayPreferences()
         await Self.drainObservationUpdates()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery 92%")
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
     @MainActor
@@ -708,15 +683,13 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let controller = fixture.controller
 
         XCTAssertEqual(preferences.menuBarDisplayMode, .iconAndPercentage)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         controller.overwriteButtonTitleForTesting("stale")
         preferences.reset()
         await Self.drainObservationUpdates()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery 92%")
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
     @MainActor
@@ -738,9 +711,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
         XCTAssertEqual(controller.currentStatusItemIdentityForTesting(), initialStatusItem)
         XCTAssertTrue(try XCTUnwrap(controller.currentPanelSnapshotForTesting()).isVisible)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery 92%")
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
     @MainActor
@@ -749,15 +720,13 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let settingsPreferences = PreferencesStore(defaults: fixture.defaults, sync: NoopPreferencesSync())
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         controller.overwriteButtonTitleForTesting("stale")
         settingsPreferences.invalidateMenuBarDisplayPreferences()
         await Self.drainObservationUpdates()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery 92%")
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
     @MainActor
@@ -768,15 +737,13 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let settingsPreferences = PreferencesStore(defaults: settingsDefaults, sync: NoopPreferencesSync())
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         settingsPreferences.menuBarDisplayMode = .iconOnly
         await Self.drainObservationUpdates()
 
         XCTAssertEqual(runtimePreferences.menuBarDisplayMode, .iconOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageOnly)
-        XCTAssertEqual(controller.currentButtonSnapshot().length, NSStatusItem.squareLength)
+        assertButtonSnapshot(controller, title: "", imagePosition: .imageOnly, length: NSStatusItem.squareLength)
     }
 
     @MainActor
@@ -786,15 +753,13 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let runtimePreferences = runtimeFixture.preferences
         let controller = runtimeFixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         unrelatedPreferences.menuBarDisplayMode = .iconOnly
         await Self.drainObservationUpdates()
 
         XCTAssertEqual(runtimePreferences.menuBarDisplayMode, .iconAndPercentage)
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery 92%")
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
     @MainActor
@@ -803,15 +768,13 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = fixture.preferences
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         preferences.invalidateMenuBarDisplayPreferences()
         controller.overwriteButtonTitleForTesting("stale during picker commit")
         await Self.drainDeferredStatusItemRepaint()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery 92%")
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
     @MainActor
@@ -820,16 +783,14 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = fixture.preferences
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
+        assertButtonSnapshot(controller, title: "92%")
 
         preferences.invalidateMenuBarDisplayPreferences()
         try? await Task.sleep(nanoseconds: 60_000_000)
         controller.overwriteButtonTitleForTesting("stale after picker commit")
         await Self.drainDelayedStatusItemRepaint()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
-        XCTAssertEqual(controller.currentButtonSnapshot().imagePosition, .imageLeft)
-        XCTAssertEqual(controller.currentButtonSnapshot().toolTip, "Battery 92%")
+        assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
     @MainActor
@@ -841,12 +802,12 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = fixture.preferences
         let controller = fixture.controller
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "34°")
+        assertButtonSnapshot(controller, title: "34°")
 
         preferences.temperatureUnitPreference = .fahrenheit
         await Self.drainObservationUpdates()
 
-        XCTAssertEqual(controller.currentButtonSnapshot().title, "94°")
+        assertButtonSnapshot(controller, title: "94°")
     }
 
     func testAccessibilityLabelUsesSelectedTemperatureUnit() {
@@ -1249,6 +1210,33 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     private static func drainDelayedStatusItemRepaint() async {
         try? await Task.sleep(nanoseconds: 450_000_000)
         await drainObservationUpdates()
+    }
+
+    @MainActor
+    private func assertButtonSnapshot(
+        _ controller: MenuBarStatusItemController,
+        title: String,
+        attributedTitle: String? = nil,
+        imagePosition: NSControl.ImagePosition? = nil,
+        length: CGFloat? = nil,
+        toolTip: String? = nil,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let snapshot = controller.currentButtonSnapshot()
+        XCTAssertEqual(snapshot.title, title, file: file, line: line)
+        if let attributedTitle {
+            XCTAssertEqual(snapshot.attributedTitle, attributedTitle, file: file, line: line)
+        }
+        if let imagePosition {
+            XCTAssertEqual(snapshot.imagePosition, imagePosition, file: file, line: line)
+        }
+        if let length {
+            XCTAssertEqual(snapshot.length, length, file: file, line: line)
+        }
+        if let toolTip {
+            XCTAssertEqual(snapshot.toolTip, toolTip, file: file, line: line)
+        }
     }
 
     @MainActor
