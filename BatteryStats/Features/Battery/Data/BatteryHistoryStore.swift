@@ -202,7 +202,6 @@ final class BatteryHistoryStore {
     @ObservationIgnored private let cloudSynchronizeDelay: Duration
     private var policy = BatteryHistoryPolicy.disabled
     @ObservationIgnored private var cloudSynchronizeTask: Task<Void, Never>?
-    @ObservationIgnored private var cloudSynchronizeGeneration = 0
     @ObservationIgnored private var cloudObserverToken: NSObjectProtocol?
 
     init(
@@ -501,7 +500,6 @@ final class BatteryHistoryStore {
 
     private func scheduleCloudSynchronize() {
         cancelCloudSynchronize()
-        let generation = cloudSynchronizeGeneration
         cloudSynchronizeTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
@@ -509,20 +507,16 @@ final class BatteryHistoryStore {
 
             try? await Task.sleep(for: cloudSynchronizeDelay)
             guard Task.isCancelled == false,
-                  cloudSynchronizeGeneration == generation,
                   policy.syncsToICloud else {
                 return
             }
 
             _ = resolvedCloudStore.synchronize()
-            if cloudSynchronizeGeneration == generation {
-                cloudSynchronizeTask = nil
-            }
+            cloudSynchronizeTask = nil
         }
     }
 
     private func cancelCloudSynchronize() {
-        cloudSynchronizeGeneration &+= 1
         cloudSynchronizeTask?.cancel()
         cloudSynchronizeTask = nil
     }

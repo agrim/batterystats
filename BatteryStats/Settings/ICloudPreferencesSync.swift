@@ -59,7 +59,6 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     private var store: (any ICloudPreferencesKeyValueStoring)?
     private(set) var isEnabled = false
     private var synchronizeTask: Task<Void, Never>?
-    private var synchronizeGeneration = 0
 
     init(
         availability: any ICloudKeyValueStoreAvailabilityChecking = SystemICloudKeyValueStoreAvailability(),
@@ -210,7 +209,6 @@ final class ICloudPreferencesSync: PreferencesSyncing {
 
     private func scheduleSynchronize() {
         cancelScheduledSynchronize()
-        let generation = synchronizeGeneration
         synchronizeTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
@@ -218,21 +216,17 @@ final class ICloudPreferencesSync: PreferencesSyncing {
 
             try? await Task.sleep(for: .milliseconds(750))
             guard Task.isCancelled == false,
-                  synchronizeGeneration == generation,
                   isEnabled,
                   let store = resolveStore() else {
                 return
             }
 
             _ = store.synchronize()
-            if synchronizeGeneration == generation {
-                synchronizeTask = nil
-            }
+            synchronizeTask = nil
         }
     }
 
     private func cancelScheduledSynchronize() {
-        synchronizeGeneration &+= 1
         synchronizeTask?.cancel()
         synchronizeTask = nil
     }
