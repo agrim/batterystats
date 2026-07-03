@@ -14,9 +14,9 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     let cycleCount: Int?
 
     init(snapshot: BatterySnapshot) {
-        let powerState = Self.validPowerState(snapshot.powerState.rawValue)
+        let powerState = snapshot.powerState
         timestamp = snapshot.timestamp
-        self.powerState = powerState
+        self.powerState = powerState.rawValue
         healthPercent = BatteryCalculations.presentationPercent(snapshot.healthPercent, maximumAllowed: 120)
         stateOfChargePercent = BatteryCalculations.presentationPercent(snapshot.stateOfChargePercent, maximumAllowed: 105)
         displayedTimeMinutes = Self.displayedTimeMinutes(snapshot.displayedTimeMinutes, powerState: powerState)
@@ -46,10 +46,10 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     }
 
     func normalized() -> BatteryHistoryEntry {
-        let powerState = Self.validPowerState(powerState)
+        let powerState = BatteryPowerState(rawValue: powerState) ?? .unknown
         return BatteryHistoryEntry(
             timestamp: timestamp,
-            powerState: powerState,
+            powerState: powerState.rawValue,
             healthPercent: BatteryCalculations.presentationPercent(healthPercent, maximumAllowed: 120),
             stateOfChargePercent: BatteryCalculations.presentationPercent(stateOfChargePercent, maximumAllowed: 105),
             displayedTimeMinutes: Self.displayedTimeMinutes(displayedTimeMinutes, powerState: powerState),
@@ -59,24 +59,20 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
         )
     }
 
-    private static func validPowerState(_ value: String) -> String {
-        BatteryPowerState(rawValue: value)?.rawValue ?? BatteryPowerState.unknown.rawValue
-    }
-
-    private static func displayedTimeMinutes(_ value: Int?, powerState: String) -> Int? {
-        switch BatteryPowerState(rawValue: powerState) {
+    private static func displayedTimeMinutes(_ value: Int?, powerState: BatteryPowerState) -> Int? {
+        switch powerState {
         case .onBattery, .connectedDischarging, .charging:
             return BatteryCalculations.plausibleDurationMinutes(value)
-        case .connectedNotCharging, .fullOnAC, .unknown, nil:
+        case .connectedNotCharging, .fullOnAC, .unknown:
             return nil
         }
     }
 
-    private static func activePowerWatts(_ value: Double?, powerState: String) -> Double? {
-        switch BatteryPowerState(rawValue: powerState) {
+    private static func activePowerWatts(_ value: Double?, powerState: BatteryPowerState) -> Double? {
+        switch powerState {
         case .onBattery, .connectedDischarging, .charging, .connectedNotCharging, .fullOnAC:
             return BatteryCalculations.plausibleWatts(value)
-        case .unknown, nil:
+        case .unknown:
             return nil
         }
     }
