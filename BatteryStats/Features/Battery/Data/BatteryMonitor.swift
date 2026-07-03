@@ -71,7 +71,7 @@ final class BatteryMonitor {
         pasteboardCopy: @escaping @MainActor (String) -> Void = PasteboardCopying.copy,
         widgetSnapshotStore: BatteryWidgetSnapshotStore = .shared,
         widgetTimelineReloader: @escaping @MainActor () -> Void = {
-            WidgetCenter.shared.reloadTimelines(ofKind: BatteryWidgetTimeline.kind)
+            WidgetCenter.shared.reloadTimelines(ofKind: BatteryWidgetSnapshotStore.timelineKind)
         },
         widgetTimelineReloadMinimumInterval: TimeInterval = 60,
         now: @escaping @MainActor () -> Date = { Date() }

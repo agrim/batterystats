@@ -2,6 +2,7 @@ import Foundation
 
 struct BatteryWidgetSnapshotStore {
     static let appGroupIdentifier = "group.io.github.agrim.batterystats"
+    static let timelineKind = "BatteryStatusWidget"
     static let defaultMaximumAge: TimeInterval = 600
     static let defaultRetentionAge: TimeInterval = 6 * 60 * 60
 
