@@ -257,11 +257,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
     }
 
-    private struct InputPowerReading {
-        let watts: Double
-        let evidence: BatteryInputPowerEvidence?
-    }
-
     private struct AdapterWattsReading {
         let watts: Int
         let hasDerivedEvidence: Bool
@@ -296,7 +291,9 @@ final class SmartBatteryReader: @unchecked Sendable {
 
     private func adapterWatts(from adapterDetails: [String: Any]) -> AdapterWattsReading? {
         reconciledAdapterWatts(
-            reportedWatts: normalizedAdapterWatts(adapterDetails["Watts"]),
+            reportedWatts: SignedIntegerNormalizer.normalize(adapterDetails["Watts"]).flatMap {
+                BatteryCalculations.plausibleAdapterWatts($0)
+            },
             derivedWatts: derivedAdapterWatts(from: adapterDetails)
         )
     }
@@ -312,7 +309,7 @@ final class SmartBatteryReader: @unchecked Sendable {
             return nil
         }
 
-        return adapterWatts(fromMilliwatts: milliwatts)
+        return adapterWatts(fromWatts: milliwatts / 1_000)
     }
 
     private func corroboratedIPDInputPowerMilliwatts(in properties: [String: Any]) -> Double? {
@@ -337,10 +334,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         return negotiatedMilliwatts
-    }
-
-    private func adapterWatts(fromMilliwatts milliwatts: Double) -> Int? {
-        adapterWatts(fromWatts: milliwatts / 1_000)
     }
 
     private func reconciledAdapterMaxWatts(
@@ -417,14 +410,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         return abs(first - second) > tolerance
     }
 
-    private func normalizedAdapterWatts(_ value: Any?) -> Int? {
-        guard let watts = SignedIntegerNormalizer.normalize(value) else {
-            return nil
-        }
-
-        return BatteryCalculations.plausibleAdapterWatts(watts)
-    }
-
     private func derivedAdapterWatts(from adapterDetails: [String: Any]) -> Int? {
         guard let voltageMillivolts = plausibleInteger(
             for: [.root("Voltage"), .root("AdapterVoltage")],
@@ -460,16 +445,19 @@ final class SmartBatteryReader: @unchecked Sendable {
         return BatteryCalculations.plausibleAdapterWatts(Int(watts.rounded(.toNearestOrAwayFromZero)))
     }
 
-    private func inputPower(in properties: [String: Any], adapterMaxWatts: Int?) -> InputPowerReading? {
+    private func inputPower(
+        in properties: [String: Any],
+        adapterMaxWatts: Int?
+    ) -> (watts: Double, evidence: BatteryInputPowerEvidence?)? {
         if let watts = wattsFromCorroboratedSystemPowerIn(in: properties, adapterMaxWatts: adapterMaxWatts) {
-            return InputPowerReading(watts: watts, evidence: .counterBacked)
+            return (watts, .counterBacked)
         }
 
         if let watts = BatteryCalculations.displayableInputPowerWatts(
             liveSystemTelemetryWatts(in: properties, adapterMaxWatts: adapterMaxWatts),
             adapterMaxWatts: adapterMaxWatts
         ) {
-            return InputPowerReading(watts: watts, evidence: nil)
+            return (watts, nil)
         }
 
         return nil
