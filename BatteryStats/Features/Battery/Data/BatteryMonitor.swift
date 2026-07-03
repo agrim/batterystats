@@ -349,10 +349,9 @@ final class BatteryMonitor {
             && isLightningRefreshActive
     }
 
-    @discardableResult
-    private func apply(_ result: BatteryReadResult, readSequence: Int, publicationDate: Date) -> Bool {
+    private func apply(_ result: BatteryReadResult, readSequence: Int, publicationDate: Date) {
         guard readSequence > lastAppliedReadSequence else {
-            return false
+            return
         }
 
         lastAppliedReadSequence = readSequence
@@ -370,7 +369,7 @@ final class BatteryMonitor {
             widgetSnapshotStore.clear()
             requestWidgetTimelineReload(for: nil, at: publicationDate)
             resetTimers()
-            return true
+            return
         }
 
         availabilityState = .available
@@ -407,7 +406,6 @@ final class BatteryMonitor {
         widgetSnapshotStore.save(snapshot)
         requestWidgetTimelineReload(for: snapshot, at: publicationDate)
         resetTimers()
-        return true
     }
 
     private func requestWidgetTimelineReload(for snapshot: BatterySnapshot?, at date: Date) {
@@ -452,7 +450,7 @@ final class BatteryMonitor {
             let rawSnapshotText = result.rawSnapshotText
                 ?? (result.snapshot == nil ? Self.unsupportedRawSnapshotText : Self.unavailableRawSnapshotText)
             if result.snapshot != nil {
-                _ = apply(result, readSequence: readSequence, publicationDate: readDate)
+                apply(result, readSequence: readSequence, publicationDate: readDate)
             }
 
             pasteboardCopy(rawSnapshotText)
