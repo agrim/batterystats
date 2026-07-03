@@ -111,8 +111,7 @@ enum BatteryFormatting {
             return "Unavailable"
         }
 
-        let resolvedUnit = unitPreference.resolvedUnit
-        switch resolvedUnit {
+        switch unitPreference.resolvedUnit {
         case .celsius:
             return "\(celsiusValue.formatted(.number.precision(.fractionLength(1)))) °C"
         case .fahrenheit:

@@ -515,28 +515,44 @@ final class BatteryMonitor {
         }
 
         let desiredRefreshInterval = refreshPolicy.refreshInterval(for: snapshot)
-        if currentRefreshInterval != desiredRefreshInterval {
-            refreshTimer?.invalidate()
-            refreshTimer = Self.scheduledMonitoringTimer(withTimeInterval: desiredRefreshInterval) { [weak self] in
-                self?.requestRefreshIfStarted()
-            }
-            refreshTimer?.tolerance = Self.refreshTimerTolerance(for: desiredRefreshInterval)
-            currentRefreshInterval = desiredRefreshInterval
+        rescheduleTimer(
+            &refreshTimer,
+            currentInterval: &currentRefreshInterval,
+            desiredInterval: desiredRefreshInterval,
+            tolerance: Self.refreshTimerTolerance(for: desiredRefreshInterval)
+        ) { [weak self] in
+            self?.requestRefreshIfStarted()
         }
 
         if shouldUseEnergyChangeProbe {
-            let desiredEnergyProbeInterval = refreshPolicy.energyProbeInterval
-            if currentEnergyProbeInterval != desiredEnergyProbeInterval {
-                energyProbeTimer?.invalidate()
-                energyProbeTimer = Self.scheduledMonitoringTimer(withTimeInterval: desiredEnergyProbeInterval) { [weak self] in
-                    self?.probeEnergyUse()
-                }
-                energyProbeTimer?.tolerance = 3
-                currentEnergyProbeInterval = desiredEnergyProbeInterval
+            rescheduleTimer(
+                &energyProbeTimer,
+                currentInterval: &currentEnergyProbeInterval,
+                desiredInterval: refreshPolicy.energyProbeInterval,
+                tolerance: 3
+            ) { [weak self] in
+                self?.probeEnergyUse()
             }
         } else {
             cancelEnergyProbe()
         }
+    }
+
+    private func rescheduleTimer(
+        _ timer: inout Timer?,
+        currentInterval: inout TimeInterval?,
+        desiredInterval: TimeInterval,
+        tolerance: TimeInterval,
+        block: @escaping @MainActor @Sendable () -> Void
+    ) {
+        guard currentInterval != desiredInterval else {
+            return
+        }
+
+        timer?.invalidate()
+        timer = Self.scheduledMonitoringTimer(withTimeInterval: desiredInterval, block: block)
+        timer?.tolerance = tolerance
+        currentInterval = desiredInterval
     }
 
     private var shouldUseEnergyChangeProbe: Bool {

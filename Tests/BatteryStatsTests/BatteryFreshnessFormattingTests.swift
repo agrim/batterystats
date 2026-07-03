@@ -12,7 +12,7 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
         XCTAssertFalse(source.contains("private func schedulePulse()"))
         XCTAssertFalse(source.contains("private func schedulePulseCancellation()"))
         XCTAssertTrue(source.contains("await Task.yield()"))
-        XCTAssertTrue(source.contains("guard isRefreshing == false,\n              lastUpdated != nil,"))
+        XCTAssertTrue(source.contains("guard isRefreshing == false,\n              BatteryFreshnessFormatting.hasUsableUpdate"))
         XCTAssertTrue(source.contains("BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date())"))
     }
 

@@ -180,11 +180,7 @@ enum BatterySummaryDetailFormatting {
     }
 
     static func power(_ value: Double?) -> String? {
-        guard let value = BatteryCalculations.plausibleWatts(value) else {
-            return nil
-        }
-
-        return BatteryFormatting.watts(value)
+        BatteryCalculations.plausibleWatts(value).map { BatteryFormatting.watts($0) }
     }
 
 }

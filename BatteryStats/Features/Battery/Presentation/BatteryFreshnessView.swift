@@ -89,7 +89,6 @@ struct BatteryFreshnessView: View {
         pulseTask?.cancel()
 
         guard isRefreshing == false,
-              lastUpdated != nil,
               BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date()),
               reduceMotion == false else {
             isPulseActive = false
