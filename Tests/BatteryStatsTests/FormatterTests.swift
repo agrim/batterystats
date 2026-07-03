@@ -615,23 +615,18 @@ final class FormatterTests: XCTestCase {
 
     func testCapacityProgressPresentationKeepsUnavailableDistinctFromZero() {
         let unavailable = BatteryCapacityProgressPresentation(progress: nil)
-        XCTAssertTrue(unavailable.isUnavailable)
         XCTAssertNil(unavailable.fillFraction)
 
         let nonFinite = BatteryCapacityProgressPresentation(progress: .nan)
-        XCTAssertTrue(nonFinite.isUnavailable)
         XCTAssertNil(nonFinite.fillFraction)
 
         let negative = BatteryCapacityProgressPresentation(progress: -4)
-        XCTAssertTrue(negative.isUnavailable)
         XCTAssertNil(negative.fillFraction)
 
         let zero = BatteryCapacityProgressPresentation(progress: 0)
-        XCTAssertFalse(zero.isUnavailable)
         XCTAssertEqual(zero.fillFraction, 0)
 
         let overfull = BatteryCapacityProgressPresentation(progress: 105)
-        XCTAssertFalse(overfull.isUnavailable)
         XCTAssertEqual(overfull.fillFraction, 1)
     }
 

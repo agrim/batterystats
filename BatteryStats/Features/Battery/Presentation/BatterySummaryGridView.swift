@@ -245,10 +245,6 @@ private struct BatteryCapacityBarSectionView: View {
 struct BatteryCapacityProgressPresentation: Equatable {
     let fillFraction: Double?
 
-    var isUnavailable: Bool {
-        fillFraction == nil
-    }
-
     init(progress: Double?) {
         guard let progress, progress.isFinite, progress >= 0 else {
             fillFraction = nil
@@ -269,7 +265,7 @@ private struct BatteryCapacityProgressBar: View {
 
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(tint.opacity(presentation.isUnavailable ? 0.12 : 0.18))
+                    .fill(tint.opacity(presentation.fillFraction == nil ? 0.12 : 0.18))
 
                 if let fillFraction = presentation.fillFraction {
                     let fillWidth = width * fillFraction
