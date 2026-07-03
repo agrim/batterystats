@@ -6,28 +6,18 @@ final class RefreshPolicyTests: XCTestCase {
         let policy = BatteryRefreshPolicy(cadence: .fiveMinutes, energyChangeSensitivity: .balanced)
 
         XCTAssertEqual(policy.refreshInterval(for: .previewDischarging), 300)
-        XCTAssertTrue(policy.usesEnergyChangeProbe)
+        XCTAssertTrue(policy.usesEnergyChangeProbe(for: BatteryMonitoringDemand(needsEnergyChangeAwareness: true)))
     }
 
     func testShortFixedRefreshCadenceDoesNotNeedEnergyProbe() {
         let policy = BatteryRefreshPolicy(cadence: .fifteenSeconds, energyChangeSensitivity: .balanced)
 
         XCTAssertEqual(policy.refreshInterval(for: .previewDischarging), 15)
-        XCTAssertFalse(policy.usesEnergyChangeProbe)
+        XCTAssertFalse(policy.usesEnergyChangeProbe(for: BatteryMonitoringDemand(needsEnergyChangeAwareness: true)))
     }
 
     func testDefaultMonitoringDemandDoesNotRequestEnergyProbe() {
         XCTAssertFalse(BatteryMonitoringDemand().needsEnergyChangeAwareness)
-    }
-
-    func testMonitoringDemandCombinesEnergyAwareness() {
-        let backgroundDemand = BatteryMonitoringDemand(needsEnergyChangeAwareness: true)
-        let visibleDemand = BatteryMonitoringDemand(needsEnergyChangeAwareness: false)
-
-        XCTAssertEqual(
-            backgroundDemand.combined(with: visibleDemand),
-            BatteryMonitoringDemand(needsEnergyChangeAwareness: true)
-        )
     }
 
     func testDynamicRefreshCadenceRespondsToPowerState() {

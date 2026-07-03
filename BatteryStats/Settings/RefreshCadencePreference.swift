@@ -77,12 +77,6 @@ enum EnergyChangeSensitivity: String, CaseIterable, Identifiable {
 
 struct BatteryMonitoringDemand: Equatable, Sendable {
     var needsEnergyChangeAwareness = false
-
-    func combined(with other: BatteryMonitoringDemand) -> BatteryMonitoringDemand {
-        BatteryMonitoringDemand(
-            needsEnergyChangeAwareness: needsEnergyChangeAwareness || other.needsEnergyChangeAwareness
-        )
-    }
 }
 
 struct BatteryRefreshPolicy: Equatable {
@@ -95,10 +89,6 @@ struct BatteryRefreshPolicy: Equatable {
 
     var energyProbeInterval: TimeInterval {
         15
-    }
-
-    var usesEnergyChangeProbe: Bool {
-        usesEnergyChangeProbe(for: BatteryMonitoringDemand(needsEnergyChangeAwareness: true))
     }
 
     func usesEnergyChangeProbe(for demand: BatteryMonitoringDemand) -> Bool {
