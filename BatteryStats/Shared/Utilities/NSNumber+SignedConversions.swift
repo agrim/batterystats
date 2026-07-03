@@ -70,9 +70,3 @@ enum SignedIntegerNormalizer {
         return type == "f" || type == "d"
     }
 }
-
-extension NSNumber {
-    var batteryStatsSignedIntValue: Int {
-        SignedIntegerNormalizer.normalize(self) ?? intValue
-    }
-}
