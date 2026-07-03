@@ -344,14 +344,7 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func adapterWatts(fromMilliwatts milliwatts: Double) -> Int? {
-        let watts = milliwatts / 1_000
-        guard watts.isFinite,
-              watts >= 0,
-              watts <= Double(Int.max) else {
-            return nil
-        }
-
-        return BatteryCalculations.plausibleAdapterWatts(Int(watts.rounded(.toNearestOrAwayFromZero)))
+        adapterWatts(fromWatts: milliwatts / 1_000)
     }
 
     private func reconciledAdapterMaxWatts(
@@ -458,6 +451,10 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         let watts = (Double(voltageMillivolts) * Double(currentMilliamps)) / 1_000_000
+        return adapterWatts(fromWatts: watts)
+    }
+
+    private func adapterWatts(fromWatts watts: Double) -> Int? {
         guard watts.isFinite,
               watts >= 0,
               watts <= Double(Int.max) else {
@@ -615,8 +612,7 @@ final class SmartBatteryReader: @unchecked Sendable {
             return true
         }
 
-        let toleranceMilliwatts = max(1, negotiatedMilliwatts * 0.02)
-        return abs(milliwatts - negotiatedMilliwatts) > toleranceMilliwatts
+        return isDistinct(milliwatts, from: negotiatedMilliwatts, minimumTolerance: 1, relativeTolerance: 0.02)
     }
 
     private func isDistinctFromCounterBackedNegotiatedInputPower(milliwatts: Double, in properties: [String: Any]) -> Bool {
@@ -624,8 +620,7 @@ final class SmartBatteryReader: @unchecked Sendable {
             return true
         }
 
-        let toleranceMilliwatts = max(10, negotiatedMilliwatts * 0.001)
-        return abs(milliwatts - negotiatedMilliwatts) > toleranceMilliwatts
+        return isDistinct(milliwatts, from: negotiatedMilliwatts, minimumTolerance: 10, relativeTolerance: 0.001)
     }
 
     private func isDistinctFromAdapterCapability(milliwatts: Double, adapterMaxWatts: Int?) -> Bool {
@@ -634,8 +629,17 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         let adapterMilliwatts = Double(adapterMaxWatts) * 1_000
-        let toleranceMilliwatts = max(1, adapterMilliwatts * 0.02)
-        return abs(milliwatts - adapterMilliwatts) > toleranceMilliwatts
+        return isDistinct(milliwatts, from: adapterMilliwatts, minimumTolerance: 1, relativeTolerance: 0.02)
+    }
+
+    private func isDistinct(
+        _ milliwatts: Double,
+        from referenceMilliwatts: Double,
+        minimumTolerance: Double,
+        relativeTolerance: Double
+    ) -> Bool {
+        let toleranceMilliwatts = max(minimumTolerance, referenceMilliwatts * relativeTolerance)
+        return abs(milliwatts - referenceMilliwatts) > toleranceMilliwatts
     }
 
     private func negotiatedInputMilliwatts(in properties: [String: Any]) -> Double? {
