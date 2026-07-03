@@ -38,8 +38,7 @@ final class BatteryAlertSettingsModel {
     @ObservationIgnored private let authorizer: any BatteryAlertAuthorizing
     @ObservationIgnored private var authorizationGeneration = 0
     @ObservationIgnored private var alertPreferenceGenerations: [PartialKeyPath<PreferencesStore>: Int] = [:]
-    @ObservationIgnored private var activeAuthorizationRequestCount = 0
-    @ObservationIgnored private var activeAuthorizationStatusRefreshCount = 0
+    @ObservationIgnored private var activeAuthorizationOperationCount = 0
 
     init(authorizer: any BatteryAlertAuthorizing = UserNotificationBatteryAlertAuthorizer()) {
         self.authorizer = authorizer
@@ -60,8 +59,7 @@ final class BatteryAlertSettingsModel {
 
         authorizationGeneration &+= 1
         let generation = authorizationGeneration
-        activeAuthorizationStatusRefreshCount += 1
-        updateResolvingAuthorizationState()
+        updateResolvingAuthorizationOperationCount(by: 1)
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -69,8 +67,7 @@ final class BatteryAlertSettingsModel {
             }
 
             let status = await authorizer.authorizationStatus()
-            activeAuthorizationStatusRefreshCount = max(0, activeAuthorizationStatusRefreshCount - 1)
-            updateResolvingAuthorizationState()
+            updateResolvingAuthorizationOperationCount(by: -1)
 
             guard authorizationGeneration == generation else {
                 return
@@ -95,11 +92,9 @@ final class BatteryAlertSettingsModel {
         }
 
         authorizationGeneration &+= 1
-        activeAuthorizationRequestCount += 1
-        updateResolvingAuthorizationState()
+        updateResolvingAuthorizationOperationCount(by: 1)
         let status = await authorizer.requestAuthorization()
-        activeAuthorizationRequestCount = max(0, activeAuthorizationRequestCount - 1)
-        updateResolvingAuthorizationState()
+        updateResolvingAuthorizationOperationCount(by: -1)
 
         let isCurrentPreferenceRequest = alertPreferenceGenerations[preferenceKey] == generation
         apply(status, to: status.canDeliverAlerts ? nil : preferences)
@@ -116,8 +111,9 @@ final class BatteryAlertSettingsModel {
         preferences[keyPath: keyPath] = true
     }
 
-    private func updateResolvingAuthorizationState() {
-        isResolvingAuthorization = activeAuthorizationRequestCount + activeAuthorizationStatusRefreshCount > 0
+    private func updateResolvingAuthorizationOperationCount(by delta: Int) {
+        activeAuthorizationOperationCount = max(0, activeAuthorizationOperationCount + delta)
+        isResolvingAuthorization = activeAuthorizationOperationCount > 0
     }
 
     private func invalidatePendingAlertEnables() {
@@ -140,7 +136,6 @@ final class BatteryAlertAuthorizationObserver {
     private let preferences: PreferencesStore
     private let authorizer: any BatteryAlertAuthorizing
     private var isStarted = false
-    private var observationGeneration = 0
     private var reconciliationGeneration = 0
 
     init(
@@ -170,9 +165,6 @@ final class BatteryAlertAuthorizationObserver {
     }
 
     private func observeAlertPreferences() {
-        observationGeneration &+= 1
-        let generation = observationGeneration
-
         withObservationTracking {
             _ = preferences.isLowBatteryAlertEnabled
             _ = preferences.isChargeCompleteAlertEnabled
@@ -180,8 +172,7 @@ final class BatteryAlertAuthorizationObserver {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self,
-                      isStarted,
-                      observationGeneration == generation else {
+                      isStarted else {
                     return
                 }
 
