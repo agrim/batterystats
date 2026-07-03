@@ -81,8 +81,7 @@ private struct BatteryDashboardWindowObserver: NSViewRepresentable {
         }
 
         isolated deinit {
-            windowLookupTask?.cancel()
-            removeObservers()
+            stop()
         }
 
         func update(isLightningRefreshEnabled: Binding<Bool>) {

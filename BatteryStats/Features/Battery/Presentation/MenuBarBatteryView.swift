@@ -134,8 +134,6 @@ final class MenuBarStatusItemController: NSObject {
 
     isolated deinit {
         deferredDisplayPreferenceRefreshTask?.cancel()
-        deferredPanelPresentationTask?.cancel()
-        deferredPanelDismissalTask?.cancel()
         closePanel()
 
         if let displayPreferenceObserver {
