@@ -88,13 +88,13 @@ final class ICloudPreferencesSync: PreferencesSyncing {
 
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled && isAvailable
-        guard isEnabled,
-              let store = resolveStore() else {
+
+        guard isEnabled else {
             cancelScheduledSynchronize()
             return
         }
 
-        _ = store.synchronize()
+        _ = resolveStore()?.synchronize()
     }
 
     func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
