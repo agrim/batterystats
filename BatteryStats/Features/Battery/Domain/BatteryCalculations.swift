@@ -107,9 +107,7 @@ enum BatteryCalculations {
         }
 
         let calculatedPercent = (Double(fullChargeCapacityMilliampHours) / Double(designCapacityMilliampHours)) * 100
-        guard calculatedPercent.isFinite,
-              calculatedPercent >= 0,
-              calculatedPercent <= 120 else {
+        guard let calculatedPercent = plausibleFiniteDouble(calculatedPercent, in: 0...120) else {
             return nil
         }
 
@@ -161,21 +159,11 @@ enum BatteryCalculations {
     }
 
     static func plausibleWattHours(_ value: Double?) -> Double? {
-        guard let value,
-              value.isFinite,
-              value >= 0,
-              value <= maximumPlausibleBatteryEnergyWattHours else {
-            return nil
-        }
-
-        return value
+        plausibleFiniteDouble(value, in: 0...maximumPlausibleBatteryEnergyWattHours)
     }
 
     static func presentationPercent(_ value: Double?, maximumAllowed: Double) -> Double? {
-        guard let value,
-              value.isFinite,
-              value >= 0,
-              value <= maximumAllowed else {
+        guard let value = plausibleFiniteDouble(value, in: 0...maximumAllowed) else {
             return nil
         }
 
@@ -192,14 +180,7 @@ enum BatteryCalculations {
     }
 
     static func plausibleWatts(_ value: Double?) -> Double? {
-        guard let value,
-              value.isFinite,
-              value >= minimumPlausibleBatteryPowerWatts,
-              value <= maximumPlausibleBatteryPowerWatts else {
-            return nil
-        }
-
-        return value
+        plausibleFiniteDouble(value, in: minimumPlausibleBatteryPowerWatts...maximumPlausibleBatteryPowerWatts)
     }
 
     static func plausibleInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
@@ -652,6 +633,16 @@ enum BatteryCalculations {
 
     private static func plausibleInteger(_ value: Int?, in range: ClosedRange<Int>) -> Int? {
         guard let value, range.contains(value) else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func plausibleFiniteDouble(_ value: Double?, in range: ClosedRange<Double>) -> Double? {
+        guard let value,
+              value.isFinite,
+              range.contains(value) else {
             return nil
         }
 
