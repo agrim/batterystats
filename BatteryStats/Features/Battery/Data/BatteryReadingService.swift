@@ -1,13 +1,15 @@
 import Foundation
 
-struct BatteryReadOptions: Equatable, Sendable {
-    var includesDiagnostics = false
+enum BatteryReadOptions: Equatable, Sendable {
+    case standard
+    case diagnostics
 
-    static let standard = BatteryReadOptions()
-    static let diagnostics = BatteryReadOptions(includesDiagnostics: true)
+    var includesDiagnostics: Bool {
+        self == .diagnostics
+    }
 
     func merged(with options: BatteryReadOptions) -> BatteryReadOptions {
-        BatteryReadOptions(includesDiagnostics: includesDiagnostics || options.includesDiagnostics)
+        includesDiagnostics || options.includesDiagnostics ? .diagnostics : .standard
     }
 }
 
