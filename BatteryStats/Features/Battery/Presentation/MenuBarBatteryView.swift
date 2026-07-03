@@ -364,7 +364,6 @@ final class MenuBarStatusItemController: NSObject {
 
     private func presentPanel(_ panel: NSPanel) {
         preparePanelForActiveSpacePresentation(panel)
-        panel.level = .popUpMenu
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         panel.displayIfNeeded()
@@ -438,7 +437,6 @@ final class MenuBarStatusItemController: NSObject {
         panel.isMovable = false
         panel.worksWhenModal = true
         panel.level = .popUpMenu
-        panel.collectionBehavior = BatteryWindowSpaceBehavior.menuBarPanelPresentation
         return panel
     }
 

@@ -32,17 +32,13 @@ struct BatteryDashboardView: View {
                 monitor.setLightningRefreshActive(isEnabled)
             }
             .onDisappear {
-                disableLightningRefresh()
+                guard isLightningRefreshEnabled else {
+                    return
+                }
+
+                isLightningRefreshEnabled = false
+                monitor.setLightningRefreshActive(false)
             }
-    }
-
-    private func disableLightningRefresh() {
-        guard isLightningRefreshEnabled else {
-            return
-        }
-
-        isLightningRefreshEnabled = false
-        monitor.setLightningRefreshActive(false)
     }
 }
 
