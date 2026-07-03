@@ -85,7 +85,10 @@ final class BatteryAlertCoordinator {
 
     func clearActiveAlerts() {
         activeAlerts.removeAll()
-        cancelPendingDeliveries()
+        for delivery in pendingDeliveries.values {
+            delivery.task.cancel()
+        }
+        pendingDeliveries.removeAll()
     }
 
     func evaluate(snapshot: BatterySnapshot, policy: BatteryAlertPolicy) {
@@ -196,13 +199,6 @@ final class BatteryAlertCoordinator {
         pendingDeliveries.removeValue(forKey: kind)?.task.cancel()
     }
 
-    private func cancelPendingDeliveries() {
-        for delivery in pendingDeliveries.values {
-            delivery.task.cancel()
-        }
-
-        pendingDeliveries.removeAll()
-    }
 }
 
 #if DEBUG

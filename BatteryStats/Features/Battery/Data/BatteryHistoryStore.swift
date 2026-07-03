@@ -330,7 +330,8 @@ final class BatteryHistoryStore {
 
     private var csvString: String {
         let header = "timestamp,power_state,health_percent,charge_percent,time_minutes,active_power_watts,temperature_celsius,cycle_count"
-        let formatter = Self.makeISOFormatter()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let rows = entries.map { entry in
             [
                 formatter.string(from: entry.timestamp),
@@ -631,11 +632,6 @@ final class BatteryHistoryStore {
         (previous == nil) != (current == nil)
     }
 
-    private static func makeISOFormatter() -> ISO8601DateFormatter {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }
 }
 
 private extension BatteryHistoryEntry {
