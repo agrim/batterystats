@@ -449,9 +449,7 @@ final class PreferencesStore {
     }
 
     var hasEnabledAlerts: Bool {
-        isLowBatteryAlertEnabled
-            || isChargeCompleteAlertEnabled
-            || isHighTemperatureAlertEnabled
+        alertPolicy.hasEnabledAlerts
     }
 
     func disableAllAlerts() {

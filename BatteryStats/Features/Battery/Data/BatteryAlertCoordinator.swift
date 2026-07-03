@@ -90,6 +90,11 @@ final class BatteryAlertCoordinator {
     }
 
     func evaluate(snapshot: BatterySnapshot, policy: BatteryAlertPolicy) {
+        guard policy.hasEnabledAlerts else {
+            clearActiveAlerts()
+            return
+        }
+
         let activeAlertTypes = BatteryAlertEvaluator.activeAlertTypes(snapshot: snapshot, policy: policy)
 
         evaluate(

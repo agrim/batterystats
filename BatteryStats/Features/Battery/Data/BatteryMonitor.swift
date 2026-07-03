@@ -277,6 +277,10 @@ final class BatteryMonitor {
     }
 
     private func hasAlertStateChange(for probedSnapshot: BatterySnapshot) -> Bool {
+        guard alertPolicy.hasEnabledAlerts else {
+            return false
+        }
+
         let currentAlertTypes = snapshot.map {
             BatteryAlertEvaluator.activeAlertTypes(snapshot: $0, policy: alertPolicy)
         } ?? []
