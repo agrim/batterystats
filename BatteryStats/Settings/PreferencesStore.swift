@@ -302,21 +302,12 @@ final class PreferencesStore {
             return defaultValue
         }
 
-        guard let value = strictBool(rawValue) else {
+        guard let value = ICloudPreferencesSync.strictBool(rawValue) else {
             defaults.set(defaultValue, forKey: key)
             return defaultValue
         }
 
         return value
-    }
-
-    private static func strictBool(_ value: Any?) -> Bool? {
-        guard let number = value as? NSNumber,
-              CFGetTypeID(number) == CFBooleanGetTypeID() else {
-            return nil
-        }
-
-        return number.boolValue
     }
 
     private static func defaultsNotificationIdentifier(_ defaults: UserDefaults) -> String {
