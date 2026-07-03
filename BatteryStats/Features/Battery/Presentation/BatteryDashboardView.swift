@@ -33,10 +33,6 @@ struct BatteryDashboardView: View {
                 monitor.setLightningRefreshActive(isEnabled)
             }
             .onDisappear {
-                guard isLightningRefreshEnabled else {
-                    return
-                }
-
                 isLightningRefreshEnabled = false
                 monitor.setLightningRefreshActive(false)
             }
