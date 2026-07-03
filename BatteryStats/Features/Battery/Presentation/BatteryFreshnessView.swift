@@ -69,16 +69,6 @@ struct BatteryFreshnessView: View {
     }
 
     private func refreshPulseState() {
-        schedulePulseUpdate {
-            if isRefreshing || reduceMotion {
-                cancelPulse()
-            } else {
-                triggerPulse()
-            }
-        }
-    }
-
-    private func schedulePulseUpdate(_ update: @escaping @MainActor () -> Void) {
         pulseUpdateTask?.cancel()
         pulseUpdateTask = Task { @MainActor in
             await Task.yield()
@@ -87,7 +77,11 @@ struct BatteryFreshnessView: View {
             }
 
             pulseUpdateTask = nil
-            update()
+            if isRefreshing || reduceMotion {
+                cancelPulse()
+            } else {
+                triggerPulse()
+            }
         }
     }
 
