@@ -7,17 +7,19 @@ struct BatteryStatusWidgetView: View {
     let entry: BatteryStatusEntry
 
     var body: some View {
+        let snapshot = displaySnapshot
+
         Group {
             switch widgetFamily {
             case .systemMedium:
                 BatteryMediumWidgetView(
-                    snapshot: displaySnapshot,
+                    snapshot: snapshot,
                     updatedAt: entry.updatedAt,
                     now: entry.date,
-                    healthTint: BatteryPresentationStyle.healthTint(for: displaySnapshot),
-                    chargeTint: BatteryPresentationStyle.chargeTint(for: displaySnapshot),
-                    timeTint: BatteryPresentationStyle.timeTint(for: displaySnapshot),
-                    statusDescriptor: BatteryPresentationStyle.statusDescriptor(for: displaySnapshot)
+                    healthTint: BatteryPresentationStyle.healthTint(for: snapshot),
+                    chargeTint: BatteryPresentationStyle.chargeTint(for: snapshot),
+                    timeTint: BatteryPresentationStyle.timeTint(for: snapshot),
+                    statusDescriptor: BatteryPresentationStyle.statusDescriptor(for: snapshot)
                 )
             default:
                 GeometryReader { geometry in
@@ -26,13 +28,13 @@ struct BatteryStatusWidgetView: View {
 
                     VStack(spacing: spacing) {
                         HStack(spacing: spacing) {
-                            BatteryWidgetMetricTile(metric: healthMetric, size: circleDiameter)
-                            BatteryWidgetMetricTile(metric: chargeMetric, size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: healthMetric(for: snapshot), size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: chargeMetric(for: snapshot), size: circleDiameter)
                         }
 
                         HStack(spacing: spacing) {
-                            BatteryWidgetMetricTile(metric: timeMetric, size: circleDiameter)
-                            BatteryWidgetMetricTile(metric: statusMetric, size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: timeMetric(for: snapshot), size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: statusMetric(for: snapshot), size: circleDiameter)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -44,35 +46,35 @@ struct BatteryStatusWidgetView: View {
         }
     }
 
-    private var healthMetric: BatteryWidgetMetric {
+    private func healthMetric(for snapshot: BatterySnapshot?) -> BatteryWidgetMetric {
         BatteryWidgetMetric(
-            content: .text(BatteryWidgetMetricFormatting.percentText(displaySnapshot?.presentationHealthPercent)),
-            progress: BatteryWidgetMetricFormatting.clampedProgress(displaySnapshot?.presentationHealthPercent),
-            ringTint: BatteryPresentationStyle.healthTint(for: displaySnapshot),
+            content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent)),
+            progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationHealthPercent),
+            ringTint: BatteryPresentationStyle.healthTint(for: snapshot),
             contentTint: .primary
         )
     }
 
-    private var chargeMetric: BatteryWidgetMetric {
+    private func chargeMetric(for snapshot: BatterySnapshot?) -> BatteryWidgetMetric {
         BatteryWidgetMetric(
-            content: .text(BatteryWidgetMetricFormatting.percentText(displaySnapshot?.presentationStateOfChargePercent)),
-            progress: BatteryWidgetMetricFormatting.clampedProgress(displaySnapshot?.presentationStateOfChargePercent),
-            ringTint: BatteryPresentationStyle.chargeTint(for: displaySnapshot),
+            content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)),
+            progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationStateOfChargePercent),
+            ringTint: BatteryPresentationStyle.chargeTint(for: snapshot),
             contentTint: .primary
         )
     }
 
-    private var timeMetric: BatteryWidgetMetric {
+    private func timeMetric(for snapshot: BatterySnapshot?) -> BatteryWidgetMetric {
         BatteryWidgetMetric(
-            content: .text(BatteryWidgetMetricFormatting.timeText(for: displaySnapshot)),
-            progress: BatteryWidgetMetricFormatting.timeProgress(for: displaySnapshot),
-            ringTint: BatteryPresentationStyle.timeTint(for: displaySnapshot),
+            content: .text(BatteryWidgetMetricFormatting.timeText(for: snapshot)),
+            progress: BatteryWidgetMetricFormatting.timeProgress(for: snapshot),
+            ringTint: BatteryPresentationStyle.timeTint(for: snapshot),
             contentTint: .primary
         )
     }
 
-    private var statusMetric: BatteryWidgetMetric {
-        let descriptor = BatteryPresentationStyle.statusDescriptor(for: displaySnapshot)
+    private func statusMetric(for snapshot: BatterySnapshot?) -> BatteryWidgetMetric {
+        let descriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
         return BatteryWidgetMetric(
             content: .symbol(descriptor.symbolName),
             progress: descriptor.progress,
