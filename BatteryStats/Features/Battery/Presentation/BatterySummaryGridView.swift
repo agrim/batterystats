@@ -168,23 +168,14 @@ enum BatterySummaryDetailFormatting {
             BatteryFormatting.compactDuration(minutes: $0)
         }
 
-        let rateText: String?
-        if snapshot.powerState == .charging {
-            if let activePowerWatts = BatteryCalculations.plausibleWatts(snapshot.activePowerWatts) {
-                rateText = BatteryFormatting.watts(activePowerWatts)
-            } else if let activeCurrentMilliamps = BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps) {
-                rateText = BatteryFormatting.milliamps(activeCurrentMilliamps)
-            } else {
-                rateText = nil
-            }
-        } else if snapshot.powerState.isBatteryDischarging {
-            if let activeCurrentMilliamps = BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps) {
-                rateText = BatteryFormatting.milliamps(activeCurrentMilliamps)
-            } else {
-                rateText = nil
-            }
-        } else {
-            rateText = nil
+        let rateText: String? = switch snapshot.powerState {
+        case .charging:
+            BatteryCalculations.plausibleWatts(snapshot.activePowerWatts).map { BatteryFormatting.watts($0) }
+                ?? BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps).map { BatteryFormatting.milliamps($0) }
+        case .onBattery, .connectedDischarging:
+            BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps).map { BatteryFormatting.milliamps($0) }
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            nil
         }
 
         if let timeText, let rateText {
