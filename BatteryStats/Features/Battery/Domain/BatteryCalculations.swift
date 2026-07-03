@@ -699,19 +699,7 @@ enum BatteryCalculations {
     }
 
     private static func normalizedPercent(_ value: Double) -> Double? {
-        guard value.isFinite else {
-            return nil
-        }
-
-        if value < 0 {
-            return nil
-        }
-
-        if value > 105 {
-            return nil
-        }
-
-        return max(0, min(100, value))
+        presentationPercent(value, maximumAllowed: 105)
     }
 
     private static func shouldPreferCapacityPercent(calculated: Double, publicPercentage: Double) -> Bool {

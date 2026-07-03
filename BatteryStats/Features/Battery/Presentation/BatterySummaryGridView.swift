@@ -237,12 +237,7 @@ struct BatteryCapacityProgressPresentation: Equatable {
     let fillFraction: Double?
 
     init(progress: Double?) {
-        guard let progress, progress.isFinite, progress >= 0 else {
-            fillFraction = nil
-            return
-        }
-
-        fillFraction = max(0, min(100, progress)) / 100
+        fillFraction = BatteryCalculations.presentationPercent(progress, maximumAllowed: 105).map { $0 / 100 }
     }
 }
 
