@@ -92,15 +92,8 @@ struct BatteryRefreshPolicy: Equatable {
     }
 
     func usesEnergyChangeProbe(for demand: BatteryMonitoringDemand) -> Bool {
-        guard demand.needsEnergyChangeAwareness else {
-            return false
-        }
-
-        guard let fixedInterval = cadence.fixedInterval else {
-            return true
-        }
-
-        return fixedInterval > energyProbeInterval
+        demand.needsEnergyChangeAwareness
+            && (cadence.fixedInterval.map { $0 > energyProbeInterval } ?? true)
     }
 
     func refreshInterval(for snapshot: BatterySnapshot?) -> TimeInterval {
