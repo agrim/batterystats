@@ -209,6 +209,7 @@ private struct BatteryCapacityBarSectionView: View {
 
     var body: some View {
         let progressPresentation = BatteryCapacityProgressPresentation(progress: progress)
+        let valueAnimation: Animation? = reduceMotion ? nil : .smooth(duration: 0.35)
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: Self.valueSpacing) {
@@ -238,10 +239,6 @@ private struct BatteryCapacityBarSectionView: View {
                     .animation(valueAnimation, value: percentValue)
             }
         }
-    }
-
-    private var valueAnimation: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.35)
     }
 }
 
@@ -301,6 +298,8 @@ private struct BatteryDetailRowView: View {
     let value: String
 
     var body: some View {
+        let valueAnimation: Animation? = reduceMotion ? nil : .smooth(duration: 0.25)
+
         GridRow {
             Text(title)
                 .lineLimit(1)
@@ -319,10 +318,6 @@ private struct BatteryDetailRowView: View {
         }
         .font(.subheadline)
         .padding(.vertical, 4)
-    }
-
-    private var valueAnimation: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.25)
     }
 }
 
