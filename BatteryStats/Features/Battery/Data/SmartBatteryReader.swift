@@ -28,7 +28,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         case root(String)
         case nested(String, String)
         case nestedRootOnly(String, String)
-        case firstArrayDictionary(String, String)
     }
 
     func read() -> SmartBatteryDetails? {
@@ -234,18 +233,13 @@ final class SmartBatteryReader: @unchecked Sendable {
         in properties: [String: Any],
         transform: (Int) -> Int?
     ) -> Int? {
-        for candidate in candidates {
-            for rawValue in values(for: candidate, in: properties) {
-                guard let parsed = SignedIntegerNormalizer.normalize(rawValue),
-                      let value = transform(parsed) else {
-                    continue
-                }
-
-                return value
+        firstValue(for: candidates, in: properties) { rawValue in
+            guard let parsed = SignedIntegerNormalizer.normalize(rawValue) else {
+                return nil
             }
-        }
 
-        return nil
+            return transform(parsed)
+        }
     }
 
     private func rawTemperatureValue(for candidates: [PropertyCandidate], in properties: [String: Any]) -> Int? {
@@ -258,10 +252,12 @@ final class SmartBatteryReader: @unchecked Sendable {
         for candidates: [PropertyCandidate],
         in properties: [String: Any]
     ) -> Date? {
-        plausibleInteger(for: candidates, in: properties) {
-            ManufactureDateDecoder.decode(rawValue: $0) == nil ? nil : $0
-        }.flatMap {
-            ManufactureDateDecoder.decode(rawValue: $0)
+        firstValue(for: candidates, in: properties) { rawValue in
+            guard let parsed = SignedIntegerNormalizer.normalize(rawValue) else {
+                return nil
+            }
+
+            return ManufactureDateDecoder.decode(rawValue: parsed)
         }
     }
 
@@ -684,15 +680,7 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func boolean(for candidates: [PropertyCandidate], in properties: [String: Any]) -> Bool? {
-        for candidate in candidates {
-            for rawValue in values(for: candidate, in: properties) {
-                if let value = Self.booleanValue(from: rawValue) {
-                    return value
-                }
-            }
-        }
-
-        return nil
+        firstValue(for: candidates, in: properties, transform: Self.booleanValue)
     }
 
     private func physicalCapacityInteger(
@@ -748,6 +736,22 @@ final class SmartBatteryReader: @unchecked Sendable {
         return zeroFallback
     }
 
+    private func firstValue<Result>(
+        for candidates: [PropertyCandidate],
+        in properties: [String: Any],
+        transform: (Any) -> Result?
+    ) -> Result? {
+        for candidate in candidates {
+            for rawValue in values(for: candidate, in: properties) {
+                if let value = transform(rawValue) {
+                    return value
+                }
+            }
+        }
+
+        return nil
+    }
+
     private func values(for candidate: PropertyCandidate, in properties: [String: Any]) -> [Any] {
         switch candidate {
         case let .root(key):
@@ -771,8 +775,6 @@ final class SmartBatteryReader: @unchecked Sendable {
             }
 
             return values
-        case let .firstArrayDictionary(parentKey, childKey):
-            return arrayDictionaries(from: properties[parentKey]).compactMap { $0[childKey] }
         }
     }
 
