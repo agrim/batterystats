@@ -65,4 +65,15 @@ enum BatteryPowerState: String, Codable, Equatable, Sendable {
             return false
         }
     }
+
+    func timeTitle(charging: String, discharging: String, idle: String = "Time") -> String {
+        switch self {
+        case .charging:
+            return charging
+        case .onBattery, .connectedDischarging:
+            return discharging
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return idle
+        }
+    }
 }

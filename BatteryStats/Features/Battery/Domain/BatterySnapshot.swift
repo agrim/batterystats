@@ -333,14 +333,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     private var debugTimeTitle: String {
-        switch powerState {
-        case .charging:
-            return "Time to full"
-        case .onBattery, .connectedDischarging:
-            return "Time left"
-        case .connectedNotCharging, .fullOnAC, .unknown:
-            return "Time"
-        }
+        powerState.timeTitle(charging: "Time to full", discharging: "Time left")
     }
 
     private static func debugAdapterMaxWatts(_ value: Int?) -> String {

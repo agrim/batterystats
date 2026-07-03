@@ -532,14 +532,7 @@ enum BatteryWidgetMetricFormatting {
     }
 
     static func timeTitle(for snapshot: BatterySnapshot?) -> String {
-        switch snapshot?.powerState {
-        case .charging:
-            return "To Full"
-        case .onBattery, .connectedDischarging:
-            return "Time Left"
-        case .connectedNotCharging, .fullOnAC, .unknown, nil:
-            return "Time"
-        }
+        snapshot?.powerState.timeTitle(charging: "To Full", discharging: "Time Left") ?? "Time"
     }
 
     static func timeText(for snapshot: BatterySnapshot?) -> String {
@@ -547,8 +540,7 @@ enum BatteryWidgetMetricFormatting {
     }
 
     static func timeProgress(for snapshot: BatterySnapshot?) -> Double? {
-        guard let snapshot,
-              let displayedMinutes = snapshot.displayedTimeMinutes else {
+        guard let displayedMinutes = snapshot?.displayedTimeMinutes else {
             return nil
         }
 
@@ -622,14 +614,16 @@ enum BatteryPowerDisplayRole {
             return .power
         }
 
+        if snapshot.visibleInputPowerWatts != nil {
+            return .inputPower
+        }
+
         switch snapshot.powerState {
         case .charging:
-            return snapshot.visibleInputPowerWatts == nil ? .chargeRate : .inputPower
+            return .chargeRate
         case .connectedDischarging:
-            return snapshot.visibleInputPowerWatts == nil ? .batteryDrain : .inputPower
-        case .connectedNotCharging, .fullOnAC:
-            return snapshot.visibleInputPowerWatts == nil ? .power : .inputPower
-        case .onBattery, .unknown:
+            return .batteryDrain
+        case .connectedNotCharging, .fullOnAC, .onBattery, .unknown:
             return .power
         }
     }
@@ -662,7 +656,7 @@ enum BatteryWidgetUpdateFormatting {
         }
 
         let relativeText = BatterySnapshotFreshnessPolicy.relativeUpdateText(updatedAt: updatedAt, now: now)
-        guard BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: now) else {
+        guard now.timeIntervalSince(updatedAt) <= BatterySnapshotFreshnessPolicy.maximumLiveAge else {
             return "Stale \(relativeText)"
         }
 

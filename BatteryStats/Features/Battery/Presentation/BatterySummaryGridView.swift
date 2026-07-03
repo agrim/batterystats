@@ -154,13 +154,7 @@ enum BatterySummaryDetailFormatting {
     }
 
     static func timeTitle(for snapshot: BatterySnapshot) -> String {
-        if snapshot.powerState == .charging {
-            return "Time to Full"
-        } else if snapshot.powerState.isBatteryDischarging {
-            return "Time Left"
-        } else {
-            return "Time"
-        }
+        snapshot.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left")
     }
 
     static func timeSummary(for snapshot: BatterySnapshot) -> String {

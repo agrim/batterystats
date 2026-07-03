@@ -15,7 +15,7 @@ enum BatteryFreshnessFormatting {
         }
 
         let relativeText = BatterySnapshotFreshnessPolicy.relativeUpdateText(updatedAt: lastUpdated, now: now)
-        guard hasUsableUpdate(lastUpdated: lastUpdated, now: now) else {
+        guard now.timeIntervalSince(lastUpdated) <= BatterySnapshotFreshnessPolicy.maximumLiveAge else {
             return "Stale - Updated \(relativeText)"
         }
 
