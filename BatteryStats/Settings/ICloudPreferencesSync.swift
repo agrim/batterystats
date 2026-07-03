@@ -147,29 +147,11 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func set(_ value: Bool, forKey key: String) {
-        guard let store = enabledStore() else {
-            return
-        }
-
-        guard Self.strictBool(store.object(forKey: key)) != value else {
-            return
-        }
-
-        store.set(value, forKey: key)
-        scheduleSynchronize()
+        setIfChanged(value, forKey: key) { Self.strictBool($0.object(forKey: key)) }
     }
 
     func set(_ value: String, forKey key: String) {
-        guard let store = enabledStore() else {
-            return
-        }
-
-        guard store.string(forKey: key) != value else {
-            return
-        }
-
-        store.set(value, forKey: key)
-        scheduleSynchronize()
+        setIfChanged(value, forKey: key) { $0.string(forKey: key) }
     }
 
     func removeValue(forKey key: String) {
@@ -225,6 +207,20 @@ final class ICloudPreferencesSync: PreferencesSyncing {
         }
 
         return number.boolValue
+    }
+
+    private func setIfChanged<Value: Equatable>(
+        _ value: Value,
+        forKey key: String,
+        currentValue: (any ICloudPreferencesKeyValueStoring) -> Value?
+    ) {
+        guard let store = enabledStore(),
+              currentValue(store) != value else {
+            return
+        }
+
+        store.set(value as Any, forKey: key)
+        scheduleSynchronize()
     }
 
     private func enabledStore() -> (any ICloudPreferencesKeyValueStoring)? {
