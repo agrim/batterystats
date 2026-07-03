@@ -158,7 +158,7 @@ private struct BatteryDashboardWindowObserver: NSViewRepresentable {
                 object: object,
                 queue: .main
             ) { [weak self] _ in
-                Task { @MainActor in
+                MainActor.assumeIsolated {
                     self?.isLightningRefreshEnabled.wrappedValue = false
                 }
             }

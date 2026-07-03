@@ -169,7 +169,7 @@ final class BatteryMonitor {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                Task { @MainActor in
+                MainActor.assumeIsolated {
                     self?.requestRefreshIfStarted()
                 }
             }
@@ -181,7 +181,7 @@ final class BatteryMonitor {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                Task { @MainActor in
+                MainActor.assumeIsolated {
                     self?.requestRefreshIfStarted()
                 }
             }
@@ -585,7 +585,7 @@ final class BatteryMonitor {
         block: @escaping @MainActor @Sendable () -> Void
     ) -> Timer {
         let timer = Timer(timeInterval: interval, repeats: true) { _ in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 block()
             }
         }

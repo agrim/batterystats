@@ -258,17 +258,11 @@ final class MenuBarStatusItemController: NSObject {
         displayPreferenceObserver = NotificationCenter.default.addObserver(
             forName: .menuBarDisplayPreferencesDidChange,
             object: nil,
-            queue: nil
+            queue: .main
         ) { [weak self] notification in
             let invalidation = MenuBarDisplayPreferencesInvalidation(notification: notification)
-            if Thread.isMainThread {
-                MainActor.assumeIsolated {
-                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
-                }
-            } else {
-                Task { @MainActor [weak self] in
-                    self?.refreshFromDisplayPreferenceInvalidation(invalidation)
-                }
+            MainActor.assumeIsolated {
+                self?.refreshFromDisplayPreferenceInvalidation(invalidation)
             }
         }
     }
@@ -283,7 +277,7 @@ final class MenuBarStatusItemController: NSObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 self?.repositionPanelForActiveSpaceChangeIfNeeded()
             }
         }
