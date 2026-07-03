@@ -488,52 +488,91 @@ final class PreferencesStore {
         isApplyingRemoteChanges = true
         defer { isApplyingRemoteChanges = false }
 
-        applyRemoteEnumPreference(
-            \.menuBarDisplayMode,
-            forKey: Key.menuBarDisplayMode,
-            defaultValue: MenuBarDisplayMode.iconAndPercentage,
-            defaultMissing: defaultMissingValues
-        )
-        applyRemoteEnumPreference(
-            \.temperatureUnitPreference,
-            forKey: Key.temperatureUnitPreference,
-            defaultValue: TemperatureUnitPreference.system,
-            defaultMissing: defaultMissingValues
-        )
-        applyRemoteBoolPreference(\.showAdvancedValues, forKey: Key.showAdvancedValues, defaultMissing: defaultMissingValues)
-        applyRemoteEnumPreference(
-            \.refreshCadencePreference,
-            forKey: Key.refreshCadencePreference,
-            defaultValue: RefreshCadencePreference.dynamic,
-            defaultMissing: defaultMissingValues
-        )
-        applyRemoteEnumPreference(
-            \.energyChangeSensitivity,
-            forKey: Key.energyChangeSensitivity,
-            defaultValue: EnergyChangeSensitivity.balanced,
-            defaultMissing: defaultMissingValues
-        )
-        applyRemoteBoolPreference(
-            \.isLowBatteryAlertEnabled,
-            forKey: Key.isLowBatteryAlertEnabled,
-            defaultMissing: defaultMissingValues
-        )
-        applyRemoteBoolPreference(
-            \.isChargeCompleteAlertEnabled,
-            forKey: Key.isChargeCompleteAlertEnabled,
-            defaultMissing: defaultMissingValues
-        )
-        applyRemoteBoolPreference(
-            \.isHighTemperatureAlertEnabled,
-            forKey: Key.isHighTemperatureAlertEnabled,
-            defaultMissing: defaultMissingValues
-        )
-        applyRemoteBoolPreference(\.isHistoryEnabled, forKey: Key.isHistoryEnabled, defaultMissing: defaultMissingValues)
-        applyRemoteBoolPreference(
-            \.isHistoryICloudSyncEnabled,
-            forKey: Key.isHistoryICloudSyncEnabled,
-            defaultMissing: defaultMissingValues
-        )
+        applyRemotePreferences(defaultMissingValues: defaultMissingValues)
+    }
+
+    private func applyRemotePreferences(
+        changedKeySet: Set<String>? = nil,
+        defaultMissingValues: Bool
+    ) {
+        func shouldApply(_ key: String) -> Bool {
+            changedKeySet?.contains(key) ?? true
+        }
+
+        if shouldApply(Key.menuBarDisplayMode) {
+            applyRemoteEnumPreference(
+                \.menuBarDisplayMode,
+                forKey: Key.menuBarDisplayMode,
+                defaultValue: MenuBarDisplayMode.iconAndPercentage,
+                defaultMissing: defaultMissingValues
+            )
+        }
+
+        if shouldApply(Key.temperatureUnitPreference) {
+            applyRemoteEnumPreference(
+                \.temperatureUnitPreference,
+                forKey: Key.temperatureUnitPreference,
+                defaultValue: TemperatureUnitPreference.system,
+                defaultMissing: defaultMissingValues
+            )
+        }
+
+        if shouldApply(Key.showAdvancedValues) {
+            applyRemoteBoolPreference(\.showAdvancedValues, forKey: Key.showAdvancedValues, defaultMissing: defaultMissingValues)
+        }
+
+        if shouldApply(Key.refreshCadencePreference) {
+            applyRemoteEnumPreference(
+                \.refreshCadencePreference,
+                forKey: Key.refreshCadencePreference,
+                defaultValue: RefreshCadencePreference.dynamic,
+                defaultMissing: defaultMissingValues
+            )
+        }
+
+        if shouldApply(Key.energyChangeSensitivity) {
+            applyRemoteEnumPreference(
+                \.energyChangeSensitivity,
+                forKey: Key.energyChangeSensitivity,
+                defaultValue: EnergyChangeSensitivity.balanced,
+                defaultMissing: defaultMissingValues
+            )
+        }
+
+        if shouldApply(Key.isLowBatteryAlertEnabled) {
+            applyRemoteBoolPreference(\.isLowBatteryAlertEnabled, forKey: Key.isLowBatteryAlertEnabled, defaultMissing: defaultMissingValues)
+        }
+
+        if shouldApply(Key.isChargeCompleteAlertEnabled) {
+            applyRemoteBoolPreference(
+                \.isChargeCompleteAlertEnabled,
+                forKey: Key.isChargeCompleteAlertEnabled,
+                defaultMissing: defaultMissingValues
+            )
+        }
+
+        if shouldApply(Key.isHighTemperatureAlertEnabled) {
+            applyRemoteBoolPreference(
+                \.isHighTemperatureAlertEnabled,
+                forKey: Key.isHighTemperatureAlertEnabled,
+                defaultMissing: defaultMissingValues
+            )
+        }
+
+        if shouldApply(Key.isHistoryEnabled) {
+            applyRemoteBoolPreference(\.isHistoryEnabled, forKey: Key.isHistoryEnabled, defaultMissing: defaultMissingValues)
+            if changedKeySet != nil, isHistoryEnabled {
+                applyRemoteHistoryICloudSyncIfAvailable()
+            }
+        }
+
+        if shouldApply(Key.isHistoryICloudSyncEnabled) {
+            applyRemoteBoolPreference(
+                \.isHistoryICloudSyncEnabled,
+                forKey: Key.isHistoryICloudSyncEnabled,
+                defaultMissing: defaultMissingValues
+            )
+        }
     }
 
     private func remoteEnumPreference<Value>(
@@ -646,80 +685,7 @@ final class PreferencesStore {
         defer { isApplyingRemoteChanges = false }
         let changedKeySet = Set(changedKeys)
 
-        if changedKeySet.contains(Key.menuBarDisplayMode) {
-            applyRemoteEnumPreference(
-                \.menuBarDisplayMode,
-                forKey: Key.menuBarDisplayMode,
-                defaultValue: MenuBarDisplayMode.iconAndPercentage,
-                defaultMissing: true
-            )
-        }
-
-        if changedKeySet.contains(Key.temperatureUnitPreference) {
-            applyRemoteEnumPreference(
-                \.temperatureUnitPreference,
-                forKey: Key.temperatureUnitPreference,
-                defaultValue: TemperatureUnitPreference.system,
-                defaultMissing: true
-            )
-        }
-
-        if changedKeySet.contains(Key.showAdvancedValues) {
-            applyRemoteBoolPreference(\.showAdvancedValues, forKey: Key.showAdvancedValues, defaultMissing: true)
-        }
-
-        if changedKeySet.contains(Key.refreshCadencePreference) {
-            applyRemoteEnumPreference(
-                \.refreshCadencePreference,
-                forKey: Key.refreshCadencePreference,
-                defaultValue: RefreshCadencePreference.dynamic,
-                defaultMissing: true
-            )
-        }
-
-        if changedKeySet.contains(Key.energyChangeSensitivity) {
-            applyRemoteEnumPreference(
-                \.energyChangeSensitivity,
-                forKey: Key.energyChangeSensitivity,
-                defaultValue: EnergyChangeSensitivity.balanced,
-                defaultMissing: true
-            )
-        }
-
-        if changedKeySet.contains(Key.isLowBatteryAlertEnabled) {
-            applyRemoteBoolPreference(\.isLowBatteryAlertEnabled, forKey: Key.isLowBatteryAlertEnabled, defaultMissing: true)
-        }
-
-        if changedKeySet.contains(Key.isChargeCompleteAlertEnabled) {
-            applyRemoteBoolPreference(
-                \.isChargeCompleteAlertEnabled,
-                forKey: Key.isChargeCompleteAlertEnabled,
-                defaultMissing: true
-            )
-        }
-
-        if changedKeySet.contains(Key.isHighTemperatureAlertEnabled) {
-            applyRemoteBoolPreference(
-                \.isHighTemperatureAlertEnabled,
-                forKey: Key.isHighTemperatureAlertEnabled,
-                defaultMissing: true
-            )
-        }
-
-        if changedKeySet.contains(Key.isHistoryEnabled) {
-            applyRemoteBoolPreference(\.isHistoryEnabled, forKey: Key.isHistoryEnabled, defaultMissing: true)
-            if isHistoryEnabled {
-                applyRemoteHistoryICloudSyncIfAvailable()
-            }
-        }
-
-        if changedKeySet.contains(Key.isHistoryICloudSyncEnabled) {
-            applyRemoteBoolPreference(
-                \.isHistoryICloudSyncEnabled,
-                forKey: Key.isHistoryICloudSyncEnabled,
-                defaultMissing: true
-            )
-        }
+        applyRemotePreferences(changedKeySet: changedKeySet, defaultMissingValues: true)
 
         resolveHistoryICloudSyncState()
         repairRemoteHistoryICloudSyncIfNeeded(afterApplyingRemoteKeys: changedKeys)
