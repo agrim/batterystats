@@ -3,13 +3,9 @@ import SwiftUI
 enum BatteryPresentationStyle {
     static func tintStyle(for tone: BatteryLevelTone) -> BatteryPresentationTint {
         switch tone {
-        case .green:
+        case .green, .midGreen:
             return .green
-        case .midGreen:
-            return .green
-        case .greenYellow:
-            return .yellow
-        case .yellow:
+        case .greenYellow, .yellow:
             return .yellow
         case .red:
             return .red

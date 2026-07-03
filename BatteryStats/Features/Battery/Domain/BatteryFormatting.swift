@@ -80,15 +80,11 @@ enum BatteryFormatting {
         let hours = minutes / 60
         let remainingMinutes = minutes % 60
 
-        if hours > 0 {
-            if remainingMinutes == 0 {
-                return "\(hours)h"
-            }
-
-            return "\(hours)h \(remainingMinutes)m"
+        guard hours > 0 else {
+            return "\(remainingMinutes)m"
         }
 
-        return "\(remainingMinutes)m"
+        return remainingMinutes == 0 ? "\(hours)h" : "\(hours)h \(remainingMinutes)m"
     }
 
     static func compactWidgetDuration(minutes: Int?) -> String {
