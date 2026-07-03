@@ -543,12 +543,7 @@ enum BatteryWidgetMetricFormatting {
     }
 
     static func timeText(for snapshot: BatterySnapshot?) -> String {
-        guard let snapshot,
-              let displayedMinutes = snapshot.displayedTimeMinutes else {
-            return "—"
-        }
-
-        return BatteryFormatting.compactWidgetDuration(minutes: displayedMinutes)
+        snapshot?.displayedTimeMinutes.map { BatteryFormatting.compactWidgetDuration(minutes: $0) } ?? "—"
     }
 
     static func timeProgress(for snapshot: BatterySnapshot?) -> Double? {
@@ -566,16 +561,11 @@ enum BatteryWidgetMetricFormatting {
     }
 
     static func powerText(for snapshot: BatterySnapshot?) -> String {
-        guard let activePowerWatts = snapshot?.activePowerWatts else {
-            return "—"
-        }
-
-        return BatteryFormatting.watts(activePowerWatts)
+        snapshot?.activePowerWatts.map { BatteryFormatting.watts($0) } ?? "—"
     }
 
     static func statusProgress(for snapshot: BatterySnapshot?) -> Double? {
-        let descriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
-        return descriptor.ringTintStyle == .secondary ? nil : 1
+        BatteryPresentationStyle.statusDescriptor(for: snapshot).ringTintStyle == .secondary ? nil : 1
     }
 
     static func clampedProgress(_ value: Double?) -> Double? {
