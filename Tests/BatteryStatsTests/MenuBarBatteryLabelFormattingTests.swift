@@ -5,10 +5,7 @@ import XCTest
 final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     @MainActor
     func testLabelStateReadsCurrentSharedPreferences() {
-        let suiteName = "MenuBarBatteryLabelStateTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
+        let preferences = makePreferencesFixture("MenuBarBatteryLabelStateTests").preferences
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
 
@@ -42,10 +39,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
     @MainActor
     func testLabelStateRecomputesFromCurrentDisplayPreferences() {
-        let suiteName = "MenuBarBatteryLabelFormattingTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
+        let preferences = makePreferencesFixture("MenuBarBatteryLabelFormattingTests").preferences
         preferences.menuBarDisplayMode = .iconOnly
         preferences.temperatureUnitPreference = .fahrenheit
 
@@ -398,18 +392,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
     @MainActor
     func testMenuBarPanelPresentationUsesFullScreenAuxiliaryNonActivatingWindow() throws {
-        let suiteName = "MenuBarPanelPresentationTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-        let controller = MenuBarStatusItemController(
-            monitor: monitor,
-            preferences: preferences,
-            historyStore: BatteryHistoryStore()
-        )
-        controller.start()
+        let controller = makeStatusItemControllerFixture("MenuBarPanelPresentationTests").controller
         controller.showPanelForTesting()
         defer {
             controller.closePanelForTesting()
@@ -438,18 +421,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
     @MainActor
     func testMenuBarPanelOutsideClickDuringOpeningGraceStillDismissesAfterGrace() async throws {
-        let suiteName = "MenuBarPanelDismissalGraceTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-        let controller = MenuBarStatusItemController(
-            monitor: monitor,
-            preferences: preferences,
-            historyStore: BatteryHistoryStore()
-        )
-        controller.start()
+        let controller = makeStatusItemControllerFixture("MenuBarPanelDismissalGraceTests").controller
         controller.showPanelForTesting()
         defer {
             controller.closePanelForTesting()
@@ -469,18 +441,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
     @MainActor
     func testMenuBarPanelInsideInteractionCancelsDeferredDismissal() async throws {
-        let suiteName = "MenuBarPanelDismissalCancellationTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-        let controller = MenuBarStatusItemController(
-            monitor: monitor,
-            preferences: preferences,
-            historyStore: BatteryHistoryStore()
-        )
-        controller.start()
+        let controller = makeStatusItemControllerFixture("MenuBarPanelDismissalCancellationTests").controller
         controller.showPanelForTesting()
         defer {
             controller.closePanelForTesting()
@@ -820,22 +781,10 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
     @MainActor
     func testDisplayPreferenceInvalidationFromUnrelatedStoreDoesNotChangeStatusItem() async {
-        let runtimeSuiteName = "MenuBarStatusItemRuntimeInvalidationTests-\(UUID().uuidString)"
-        let unrelatedSuiteName = "MenuBarStatusItemUnrelatedInvalidationTests-\(UUID().uuidString)"
-        let runtimeDefaults = UserDefaults(suiteName: runtimeSuiteName)!
-        let unrelatedDefaults = UserDefaults(suiteName: unrelatedSuiteName)!
-        runtimeDefaults.removePersistentDomain(forName: runtimeSuiteName)
-        unrelatedDefaults.removePersistentDomain(forName: unrelatedSuiteName)
-        let runtimePreferences = PreferencesStore(defaults: runtimeDefaults, sync: NoopPreferencesSync())
-        let unrelatedPreferences = PreferencesStore(defaults: unrelatedDefaults, sync: NoopPreferencesSync())
-        let monitor = BatteryMonitor()
-        monitor.snapshot = .previewDischarging
-        let controller = MenuBarStatusItemController(
-            monitor: monitor,
-            preferences: runtimePreferences,
-            historyStore: BatteryHistoryStore()
-        )
-        controller.start()
+        let runtimeFixture = makeStatusItemControllerFixture("MenuBarStatusItemRuntimeInvalidationTests")
+        let unrelatedPreferences = makePreferencesFixture("MenuBarStatusItemUnrelatedInvalidationTests").preferences
+        let runtimePreferences = runtimeFixture.preferences
+        let controller = runtimeFixture.controller
 
         XCTAssertEqual(controller.currentButtonSnapshot().title, "92%")
 
@@ -1307,10 +1256,8 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         _ suitePrefix: String,
         configure: (PreferencesStore, BatteryMonitor) -> Void = { _, _ in }
     ) -> MenuBarStatusItemControllerFixture {
-        let suiteName = "\(suitePrefix)-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
+        let preferencesFixture = makePreferencesFixture(suitePrefix)
+        let preferences = preferencesFixture.preferences
         let monitor = BatteryMonitor()
         monitor.snapshot = .previewDischarging
         configure(preferences, monitor)
@@ -1322,19 +1269,37 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         controller.start()
 
         return MenuBarStatusItemControllerFixture(
-            suiteName: suiteName,
-            defaults: defaults,
+            suiteName: preferencesFixture.suiteName,
+            defaults: preferencesFixture.defaults,
             preferences: preferences,
-            monitor: monitor,
             controller: controller
         )
+    }
+
+    @MainActor
+    private func makePreferencesFixture(_ suitePrefix: String) -> PreferencesFixture {
+        let suiteName = "\(suitePrefix)-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
+
+        return PreferencesFixture(
+            suiteName: suiteName,
+            defaults: defaults,
+            preferences: preferences
+        )
+    }
+
+    private struct PreferencesFixture {
+        let suiteName: String
+        let defaults: UserDefaults
+        let preferences: PreferencesStore
     }
 
     private struct MenuBarStatusItemControllerFixture {
         let suiteName: String
         let defaults: UserDefaults
         let preferences: PreferencesStore
-        let monitor: BatteryMonitor
         let controller: MenuBarStatusItemController
     }
 
