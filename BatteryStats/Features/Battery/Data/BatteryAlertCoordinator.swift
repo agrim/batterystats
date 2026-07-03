@@ -63,9 +63,9 @@ protocol BatteryAlertNotificationCentering: AnyObject {
 
 @MainActor
 final class BatteryAlertCoordinator {
+    private typealias PendingDelivery = (generation: Int, task: Task<Void, Never>)
     private var activeAlerts: Set<BatteryAlertType> = []
-    private var pendingDeliveries: [BatteryAlertType: Int] = [:]
-    private var pendingDeliveryTasks: [BatteryAlertType: Task<Void, Never>] = [:]
+    private var pendingDeliveries: [BatteryAlertType: PendingDelivery] = [:]
     private var deliveryGeneration = 0
     private let notificationDeliverer: any BatteryAlertNotificationDelivering
 
@@ -85,8 +85,7 @@ final class BatteryAlertCoordinator {
 
     func clearActiveAlerts() {
         activeAlerts.removeAll()
-        pendingDeliveries.removeAll()
-        cancelPendingDeliveryTasks()
+        cancelPendingDeliveries()
     }
 
     func evaluate(snapshot: BatterySnapshot, policy: BatteryAlertPolicy) {
@@ -164,31 +163,29 @@ final class BatteryAlertCoordinator {
             deliveryGeneration &+= 1
             let generation = deliveryGeneration
             let notification = notification()
-            pendingDeliveries[kind] = generation
 
             let deliveryTask = Task { @MainActor [weak self] in
                 guard let self else {
                     return
                 }
 
-                guard pendingDeliveries[kind] == generation,
+                guard pendingDeliveries[kind]?.generation == generation,
                       Task.isCancelled == false else {
                     return
                 }
 
                 let didDeliver = await notificationDeliverer.deliver(notification)
-                guard pendingDeliveries[kind] == generation,
+                guard pendingDeliveries[kind]?.generation == generation,
                       Task.isCancelled == false else {
                     return
                 }
 
                 pendingDeliveries.removeValue(forKey: kind)
-                pendingDeliveryTasks.removeValue(forKey: kind)
                 if didDeliver {
                     activeAlerts.insert(kind)
                 }
             }
-            pendingDeliveryTasks[kind] = deliveryTask
+            pendingDeliveries[kind] = PendingDelivery(generation: generation, task: deliveryTask)
         } else {
             clearAlertState(for: kind)
         }
@@ -196,16 +193,15 @@ final class BatteryAlertCoordinator {
 
     private func clearAlertState(for kind: BatteryAlertType) {
         activeAlerts.remove(kind)
-        pendingDeliveries.removeValue(forKey: kind)
-        pendingDeliveryTasks.removeValue(forKey: kind)?.cancel()
+        pendingDeliveries.removeValue(forKey: kind)?.task.cancel()
     }
 
-    private func cancelPendingDeliveryTasks() {
-        for task in pendingDeliveryTasks.values {
-            task.cancel()
+    private func cancelPendingDeliveries() {
+        for delivery in pendingDeliveries.values {
+            delivery.task.cancel()
         }
 
-        pendingDeliveryTasks.removeAll()
+        pendingDeliveries.removeAll()
     }
 }
 
