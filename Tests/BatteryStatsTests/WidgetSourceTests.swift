@@ -22,12 +22,13 @@ final class WidgetSourceTests: XCTestCase {
 
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.powerTitle(for: snapshot)"))
         XCTAssertTrue(source.contains("BatteryPowerDisplayRole.role(for: snapshot).title"))
-        XCTAssertTrue(source.contains("powerConnectionRows\n\n                    if showsAdvancedValues {"))
+        XCTAssertTrue(source.contains("let chargingSpeed = BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"))
+        XCTAssertTrue(source.contains("powerConnectionRows(chargingSpeed: chargingSpeed)\n\n                    if showsAdvancedValues {"))
+        XCTAssertTrue(source.contains("advancedRows(chargingSpeed: chargingSpeed)"))
         XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts)"))
-        XCTAssertTrue(source.contains("BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"))
         XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Adapter Rating\", value: adapter)"))
         XCTAssertTrue(source.contains("BatteryDetailRowView(title: \"Charging Speed\", value: chargingSpeed)"))
-        XCTAssertTrue(source.contains("if BatterySummaryDetailFormatting.chargingSpeed(for: snapshot) == nil,"))
+        XCTAssertTrue(source.contains("if chargingSpeed == nil,"))
     }
 
     func testMediumWidgetUsesMeasuredPowerTitleWhileCharging() throws {

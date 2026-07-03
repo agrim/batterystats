@@ -7,6 +7,8 @@ struct BatterySummaryGridView: View {
     let showsAdvancedValues: Bool
 
     var body: some View {
+        let chargingSpeed = BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)
+
         VStack(alignment: .leading, spacing: 10) {
             BatteryCapacityBarSectionView(
                 title: "Health",
@@ -64,10 +66,10 @@ struct BatterySummaryGridView: View {
                         .id(temperatureUnitResolutionToken)
                     }
 
-                    powerConnectionRows
+                    powerConnectionRows(chargingSpeed: chargingSpeed)
 
                     if showsAdvancedValues {
-                        advancedRows
+                        advancedRows(chargingSpeed: chargingSpeed)
                     }
                 }
             }
@@ -77,7 +79,7 @@ struct BatterySummaryGridView: View {
     }
 
     @ViewBuilder
-    private var powerConnectionRows: some View {
+    private func powerConnectionRows(chargingSpeed: String?) -> some View {
         if let adapter = BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts) {
             Divider()
                 .gridCellColumns(2)
@@ -85,7 +87,7 @@ struct BatterySummaryGridView: View {
             BatteryDetailRowView(title: "Adapter Rating", value: adapter)
         }
 
-        if let chargingSpeed = BatterySummaryDetailFormatting.chargingSpeed(for: snapshot) {
+        if let chargingSpeed {
             Divider()
                 .gridCellColumns(2)
 
@@ -94,8 +96,8 @@ struct BatterySummaryGridView: View {
     }
 
     @ViewBuilder
-    private var advancedRows: some View {
-        if BatterySummaryDetailFormatting.chargingSpeed(for: snapshot) == nil,
+    private func advancedRows(chargingSpeed: String?) -> some View {
+        if chargingSpeed == nil,
            let power = BatterySummaryDetailFormatting.power(snapshot.activePowerWatts) {
             Divider()
                 .gridCellColumns(2)
