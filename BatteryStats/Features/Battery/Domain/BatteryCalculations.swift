@@ -579,25 +579,11 @@ enum BatteryCalculations {
         onOrAfter minimumComponents: DateComponents,
         calendar: Calendar
     ) -> Bool {
-        let components = calendar.dateComponents([.year, .month, .day], from: date)
-        guard let year = components.year,
-              let month = components.month,
-              let day = components.day,
-              let minimumYear = minimumComponents.year,
-              let minimumMonth = minimumComponents.month,
-              let minimumDay = minimumComponents.day else {
+        guard let minimumDate = calendar.date(from: minimumComponents) else {
             return false
         }
 
-        if year != minimumYear {
-            return year > minimumYear
-        }
-
-        if month != minimumMonth {
-            return month > minimumMonth
-        }
-
-        return day >= minimumDay
+        return calendar.startOfDay(for: date) >= calendar.startOfDay(for: minimumDate)
     }
 
     static func temperatureCelsius(fromRaw rawValue: Int?) -> Double? {
