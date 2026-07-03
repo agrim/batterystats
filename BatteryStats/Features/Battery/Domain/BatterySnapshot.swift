@@ -141,6 +141,10 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         BatteryCalculations.presentationPercent(stateOfChargePercent, maximumAllowed: 105)
     }
 
+    var hasUsableCharge: Bool {
+        presentationStateOfChargePercent != nil
+    }
+
     var isLowCharge: Bool {
         presentationStateOfChargePercent.map { $0 <= 20 } ?? false
     }

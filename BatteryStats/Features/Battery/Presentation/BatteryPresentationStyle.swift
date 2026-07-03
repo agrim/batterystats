@@ -1,10 +1,6 @@
 import SwiftUI
 
 enum BatteryPresentationStyle {
-    static func tint(for tone: BatteryLevelTone) -> Color {
-        tintStyle(for: tone).color
-    }
-
     static func tintStyle(for tone: BatteryLevelTone) -> BatteryPresentationTint {
         switch tone {
         case .green:
@@ -39,7 +35,7 @@ enum BatteryPresentationStyle {
 
     static func chargeTintStyle(for snapshot: BatterySnapshot?) -> BatteryPresentationTint {
         guard let snapshot,
-              snapshot.presentationStateOfChargePercent != nil else {
+              snapshot.hasUsableCharge else {
             return .secondary
         }
 
@@ -51,7 +47,7 @@ enum BatteryPresentationStyle {
             return "questionmark"
         }
 
-        if snapshot.presentationStateOfChargePercent != nil {
+        if snapshot.hasUsableCharge {
             return snapshot.batterySymbolName
         }
 
@@ -75,7 +71,7 @@ enum BatteryPresentationStyle {
 
             return .green
         case .onBattery, .connectedDischarging:
-            guard snapshot.displayedTimeMinutes != nil || hasUsableCharge(snapshot) else {
+            guard snapshot.displayedTimeMinutes != nil || snapshot.hasUsableCharge else {
                 return .secondary
             }
 
@@ -94,7 +90,7 @@ enum BatteryPresentationStyle {
         case .charging, .connectedNotCharging, .fullOnAC:
             return BatteryStatusDescriptor(symbolName: "powerplug", ringTintStyle: .green, contentTintStyle: .primary)
         case .onBattery:
-            guard hasUsableCharge(snapshot) else {
+            guard snapshot.hasUsableCharge else {
                 return BatteryStatusDescriptor(symbolName: "questionmark", ringTintStyle: .secondary, contentTintStyle: .secondary)
             }
 
@@ -104,7 +100,7 @@ enum BatteryPresentationStyle {
 
             return BatteryStatusDescriptor(symbolName: snapshot.batterySymbolName, ringTintStyle: .green, contentTintStyle: .primary)
         case .connectedDischarging:
-            guard hasUsableCharge(snapshot) else {
+            guard snapshot.hasUsableCharge else {
                 return BatteryStatusDescriptor(symbolName: "powerplug", ringTintStyle: .secondary, contentTintStyle: .secondary)
             }
 
@@ -114,9 +110,6 @@ enum BatteryPresentationStyle {
         }
     }
 
-    private static func hasUsableCharge(_ snapshot: BatterySnapshot) -> Bool {
-        snapshot.presentationStateOfChargePercent != nil
-    }
 }
 
 struct BatteryStatusDescriptor {
