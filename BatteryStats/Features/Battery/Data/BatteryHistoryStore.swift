@@ -94,14 +94,13 @@ struct BatteryHistoryStats: Equatable, Sendable {
     let maximumTemperatureCelsius: Double?
 
     init?(entries: [BatteryHistoryEntry]) {
-        let entries = entries.map { $0.normalized() }
-        guard let firstEntry = entries.first else {
+        guard entries.isEmpty == false else {
             return nil
         }
 
         self.sampleCount = entries.count
-        var firstTimestamp = firstEntry.timestamp
-        var latestTimestamp = firstEntry.timestamp
+        var firstTimestamp = Date.distantFuture
+        var latestTimestamp = Date.distantPast
         var powerTotal = 0.0
         var powerCount = 0
         var peakPowerWatts: Double?
@@ -110,7 +109,8 @@ struct BatteryHistoryStats: Equatable, Sendable {
         var minimumTemperatureCelsius: Double?
         var maximumTemperatureCelsius: Double?
 
-        for entry in entries {
+        for rawEntry in entries {
+            let entry = rawEntry.normalized()
             firstTimestamp = min(firstTimestamp, entry.timestamp)
             latestTimestamp = max(latestTimestamp, entry.timestamp)
 

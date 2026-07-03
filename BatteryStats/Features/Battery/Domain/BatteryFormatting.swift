@@ -1,6 +1,16 @@
 import Foundation
 
 enum BatteryFormatting {
+    private static let manufactureDateStyle = Date.FormatStyle(
+        date: .omitted,
+        time: .omitted,
+        locale: .current,
+        calendar: Calendar(identifier: .gregorian),
+        timeZone: TimeZone(secondsFromGMT: 0) ?? .gmt
+    )
+    .year()
+    .month(.abbreviated)
+
     static func milliampHours(_ value: Int?, allowsZero: Bool = true) -> String {
         guard let value = BatteryCalculations.plausibleCapacityMilliampHours(value, allowsZero: allowsZero) else {
             return "Unavailable"
@@ -125,12 +135,7 @@ enum BatteryFormatting {
             return "Unavailable"
         }
 
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("yMMM")
-        return formatter.string(from: value)
+        return value.formatted(manufactureDateStyle)
     }
 
     static func age(_ components: DateComponents?) -> String {
