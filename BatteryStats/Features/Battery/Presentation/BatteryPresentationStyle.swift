@@ -118,7 +118,7 @@ struct BatteryStatusDescriptor {
     }
 }
 
-enum BatteryPresentationTint: Equatable {
+enum BatteryPresentationTint: String, Equatable {
     case primary
     case secondary
     case green
@@ -141,17 +141,6 @@ enum BatteryPresentationTint: Equatable {
     }
 
     var identityToken: String {
-        switch self {
-        case .primary:
-            return "primary"
-        case .secondary:
-            return "secondary"
-        case .green:
-            return "green"
-        case .yellow:
-            return "yellow"
-        case .red:
-            return "red"
-        }
+        rawValue
     }
 }
