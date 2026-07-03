@@ -531,10 +531,6 @@ enum BatteryWidgetMetricFormatting {
         return "\(percent.formatted(.number.precision(.fractionLength(0))))%"
     }
 
-    static func timeTitle(for snapshot: BatterySnapshot?) -> String {
-        snapshot?.powerState.timeTitle(charging: "To Full", discharging: "Time Left") ?? "Time"
-    }
-
     static func timeText(for snapshot: BatterySnapshot?) -> String {
         snapshot?.displayedTimeMinutes.map { BatteryFormatting.compactWidgetDuration(minutes: $0) } ?? "—"
     }

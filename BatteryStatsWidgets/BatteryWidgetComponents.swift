@@ -152,7 +152,7 @@ struct BatteryMediumWidgetView: View {
     }
 
     private var timeTitle: String {
-        BatteryWidgetMetricFormatting.timeTitle(for: snapshot)
+        snapshot?.powerState.timeTitle(charging: "To Full", discharging: "Time Left") ?? "Time"
     }
 
     private var powerTitle: String {

@@ -541,12 +541,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertNil(BatterySummaryDetailFormatting.power(.greatestFiniteMagnitude))
         XCTAssertNil(BatterySummaryDetailFormatting.adapter(-70))
         XCTAssertNil(BatterySummaryDetailFormatting.adapter(Int.max))
-        XCTAssertNil(BatterySummaryDetailFormatting.chargingSpeed(for: makeSnapshot(stateOfChargePercent: 55, powerState: .onBattery)))
-        XCTAssertNil(BatterySummaryDetailFormatting.chargingSpeed(for: makeSnapshot(
-            stateOfChargePercent: 85,
-            powerState: .connectedNotCharging,
-            inputPowerWatts: 39.8
-        )))
         XCTAssertNil(BatterySummaryDetailFormatting.voltage(-12_000))
         XCTAssertNil(BatterySummaryDetailFormatting.voltage(Int.max))
         XCTAssertNil(BatterySummaryDetailFormatting.energy(current: nil, maximum: nil))
@@ -576,7 +570,7 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(BatterySummaryDetailFormatting.adapter(snapshot.adapterMaxWatts), "70 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.chargingSpeed(for: snapshot), "69.4 W")
+        XCTAssertEqual(BatterySummaryDetailFormatting.power(snapshot.activePowerWatts), "69.4 W")
     }
 
     func testSummaryChargingSpeedFallsBackToChargeRateWhenInputPowerIsUnavailable() {
@@ -588,7 +582,7 @@ final class FormatterTests: XCTestCase {
             adapterMaxWatts: 100
         )
 
-        XCTAssertEqual(BatterySummaryDetailFormatting.chargingSpeed(for: snapshot), "25.4 W")
+        XCTAssertEqual(BatterySummaryDetailFormatting.power(snapshot.activePowerWatts), "25.4 W")
     }
 
     func testPowerDisplayRoleReflectsChargingPowerSource() {
@@ -697,13 +691,12 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(fullOnAC.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time")
         XCTAssertEqual(unknown.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time")
 
-        XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: nil), "Time")
-        XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: onBattery), "Time Left")
-        XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: charging), "To Full")
-        XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: connectedDischarging), "Time Left")
-        XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: connectedNotCharging), "Time")
-        XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: fullOnAC), "Time")
-        XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: unknown), "Time")
+        XCTAssertEqual(onBattery.powerState.timeTitle(charging: "To Full", discharging: "Time Left"), "Time Left")
+        XCTAssertEqual(charging.powerState.timeTitle(charging: "To Full", discharging: "Time Left"), "To Full")
+        XCTAssertEqual(connectedDischarging.powerState.timeTitle(charging: "To Full", discharging: "Time Left"), "Time Left")
+        XCTAssertEqual(connectedNotCharging.powerState.timeTitle(charging: "To Full", discharging: "Time Left"), "Time")
+        XCTAssertEqual(fullOnAC.powerState.timeTitle(charging: "To Full", discharging: "Time Left"), "Time")
+        XCTAssertEqual(unknown.powerState.timeTitle(charging: "To Full", discharging: "Time Left"), "Time")
     }
 
     func testNonTimingPowerStatesDoNotExposeSystemTimeRemaining() {

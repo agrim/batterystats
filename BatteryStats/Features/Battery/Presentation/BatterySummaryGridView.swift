@@ -7,7 +7,9 @@ struct BatterySummaryGridView: View {
     let showsAdvancedValues: Bool
 
     var body: some View {
-        let chargingSpeed = BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)
+        let chargingSpeed = snapshot.powerState == .charging
+            ? BatterySummaryDetailFormatting.power(snapshot.activePowerWatts)
+            : nil
 
         VStack(alignment: .leading, spacing: 10) {
             BatteryCapacityBarSectionView(
@@ -213,15 +215,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return "\(value.formatted(.number.grouping(.automatic))) W"
-    }
-
-    static func chargingSpeed(for snapshot: BatterySnapshot) -> String? {
-        guard snapshot.powerState == .charging,
-              let activePower = power(snapshot.activePowerWatts) else {
-            return nil
-        }
-
-        return activePower
     }
 
     static func voltage(_ value: Int?) -> String? {
