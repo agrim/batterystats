@@ -497,11 +497,7 @@ struct BatteryReadingService: Sendable {
             return true
         }
 
-        if let smartExternalPowerConnected = smartBattery?.isExternalPowerConnected {
-            return smartExternalPowerConnected
-        }
-
-        return false
+        return smartBattery?.isExternalPowerConnected ?? false
     }
 
     private static func hasExplicitDisconnectEvidence(
@@ -590,17 +586,17 @@ struct BatteryReadingService: Sendable {
         smartMinutes: Int?,
         zeroIsDisplayable: Bool
     ) -> Int? {
-        displayableReportedMinutes(publicMinutes, zeroIsDisplayable: zeroIsDisplayable)
-            ?? displayableReportedMinutes(smartMinutes, zeroIsDisplayable: zeroIsDisplayable)
-    }
-
-    private static func displayableReportedMinutes(_ minutes: Int?, zeroIsDisplayable: Bool) -> Int? {
-        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes),
-              minutes != 0 || zeroIsDisplayable else {
-            return nil
+        if let publicMinutes = BatteryCalculations.plausibleDurationMinutes(publicMinutes),
+           publicMinutes != 0 || zeroIsDisplayable {
+            return publicMinutes
         }
 
-        return minutes
+        if let smartMinutes = BatteryCalculations.plausibleDurationMinutes(smartMinutes),
+           smartMinutes != 0 || zeroIsDisplayable {
+            return smartMinutes
+        }
+
+        return nil
     }
 
     private func prettyRawSnapshot(publicSnapshot: PublicPowerSourceSnapshot?, smartBattery: SmartBatteryDetails?) -> String {
