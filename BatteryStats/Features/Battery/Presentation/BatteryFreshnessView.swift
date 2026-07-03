@@ -7,8 +7,6 @@ struct BatteryFreshnessView: View {
     let isRefreshing: Bool
 
     @State private var isPulseActive = false
-    @State private var pulseUpdateTask: Task<Void, Never>?
-    @State private var pulseTask: Task<Void, Never>?
 
     var body: some View {
         TimelineView(BatteryFreshnessTimelineSchedule(lastUpdated: lastUpdated, isRefreshing: isRefreshing)) { context in
@@ -28,21 +26,17 @@ struct BatteryFreshnessView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
         }
-        .onAppear(perform: refreshPulseState)
-        .onChange(of: lastUpdated) { _, _ in
-            refreshPulseState()
+        .task(id: pulseTrigger) {
+            await runPulse()
         }
-        .onChange(of: isRefreshing) { _, _ in
-            refreshPulseState()
-        }
-        .onChange(of: reduceMotion) { _, _ in
-            refreshPulseState()
-        }
-        .onDisappear {
-            pulseUpdateTask?.cancel()
-            pulseUpdateTask = nil
-            cancelPulse()
-        }
+    }
+
+    private var pulseTrigger: BatteryFreshnessPulseTrigger {
+        BatteryFreshnessPulseTrigger(
+            lastUpdated: lastUpdated,
+            isRefreshing: isRefreshing,
+            reduceMotion: reduceMotion
+        )
     }
 
     @ViewBuilder
@@ -68,26 +62,9 @@ struct BatteryFreshnessView: View {
         }
     }
 
-    private func refreshPulseState() {
-        pulseUpdateTask?.cancel()
-        pulseUpdateTask = Task { @MainActor in
-            await Task.yield()
-            guard Task.isCancelled == false else {
-                return
-            }
-
-            pulseUpdateTask = nil
-            if isRefreshing || reduceMotion {
-                cancelPulse()
-            } else {
-                triggerPulse()
-            }
-        }
-    }
-
-    private func triggerPulse() {
-        pulseTask?.cancel()
-
+    @MainActor
+    private func runPulse() async {
+        await Task.yield()
         guard isRefreshing == false,
               BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date()),
               reduceMotion == false else {
@@ -97,22 +74,19 @@ struct BatteryFreshnessView: View {
 
         isPulseActive = true
 
-        pulseTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(320))
-            guard Task.isCancelled == false else {
-                return
-            }
-
-            isPulseActive = false
-            pulseTask = nil
+        try? await Task.sleep(for: .milliseconds(320))
+        guard Task.isCancelled == false else {
+            return
         }
-    }
 
-    private func cancelPulse() {
-        pulseTask?.cancel()
-        pulseTask = nil
         isPulseActive = false
     }
+}
+
+private struct BatteryFreshnessPulseTrigger: Equatable {
+    let lastUpdated: Date?
+    let isRefreshing: Bool
+    let reduceMotion: Bool
 }
 
 private struct BatteryFreshnessTimelineSchedule: TimelineSchedule {

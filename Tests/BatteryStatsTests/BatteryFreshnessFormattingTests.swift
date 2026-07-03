@@ -5,12 +5,13 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
     func testFreshnessViewDefersPulseUntilRefreshCompletes() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
 
-        XCTAssertTrue(source.contains(".onAppear(perform: refreshPulseState)"))
-        XCTAssertTrue(source.contains(".onChange(of: lastUpdated) { _, _ in\n            refreshPulseState()\n        }"))
-        XCTAssertTrue(source.contains(".onChange(of: isRefreshing) { _, _ in\n            refreshPulseState()\n        }"))
-        XCTAssertTrue(source.contains("if isRefreshing || reduceMotion {\n                cancelPulse()\n            } else {\n                triggerPulse()\n            }"))
+        XCTAssertTrue(source.contains(".task(id: pulseTrigger)"))
+        XCTAssertTrue(source.contains("await runPulse()"))
+        XCTAssertTrue(source.contains("@MainActor\n    private func runPulse() async"))
         XCTAssertFalse(source.contains("private func schedulePulse()"))
         XCTAssertFalse(source.contains("private func schedulePulseCancellation()"))
+        XCTAssertFalse(source.contains("pulseUpdateTask"))
+        XCTAssertFalse(source.contains("pulseTask"))
         XCTAssertTrue(source.contains("await Task.yield()"))
         XCTAssertTrue(source.contains("guard isRefreshing == false,\n              BatteryFreshnessFormatting.hasUsableUpdate"))
         XCTAssertTrue(source.contains("BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date())"))
@@ -19,7 +20,10 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
     func testFreshnessViewRearmsPulseWhenReduceMotionTurnsOff() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
 
-        XCTAssertTrue(source.contains(".onChange(of: reduceMotion) { _, _ in\n            refreshPulseState()\n        }"))
+        XCTAssertTrue(source.contains("private struct BatteryFreshnessPulseTrigger: Equatable"))
+        XCTAssertTrue(source.contains("reduceMotion: reduceMotion"))
+        XCTAssertTrue(source.contains("let reduceMotion: Bool"))
+        XCTAssertFalse(source.contains(".onChange(of: reduceMotion)"))
     }
 
     func testRefreshingTextTakesPriority() {
