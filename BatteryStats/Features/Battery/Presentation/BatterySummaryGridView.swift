@@ -164,7 +164,7 @@ enum BatterySummaryDetailFormatting {
 
         let rateText: String? = switch snapshot.powerState {
         case .charging:
-            BatteryCalculations.plausibleWatts(snapshot.activePowerWatts).map { BatteryFormatting.watts($0) }
+            power(snapshot.activePowerWatts)
                 ?? BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps).map { BatteryFormatting.milliamps($0) }
         case .onBattery, .connectedDischarging:
             BatteryCalculations.plausibleCurrentMagnitudeMilliamps(snapshot.activeCurrentMilliamps).map { BatteryFormatting.milliamps($0) }
@@ -220,19 +220,12 @@ enum BatterySummaryDetailFormatting {
     }
 
     static func chargingSpeed(for snapshot: BatterySnapshot) -> String? {
-        guard snapshot.powerState == .charging else {
+        guard snapshot.powerState == .charging,
+              let activePower = power(snapshot.activePowerWatts) else {
             return nil
         }
 
-        if let visibleInputPowerWatts = snapshot.visibleInputPowerWatts {
-            return BatteryFormatting.watts(visibleInputPowerWatts)
-        }
-
-        guard let chargeRateWatts = BatteryCalculations.plausibleWatts(snapshot.chargeRateWatts) else {
-            return nil
-        }
-
-        return BatteryFormatting.watts(chargeRateWatts)
+        return activePower
     }
 
     static func powerTitle(for snapshot: BatterySnapshot) -> String {
