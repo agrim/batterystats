@@ -368,9 +368,7 @@ final class SmartBatteryReader: @unchecked Sendable {
             return reportedWatts.watts
         }
 
-        let comparisonWatts = max(reportedWatts.watts, negotiatedWatts)
-        let staleReportTolerance = max(2, Int((Double(comparisonWatts) * 0.05).rounded(.up)))
-        if abs(negotiatedWatts - reportedWatts.watts) > staleReportTolerance {
+        if adapterWattsDifferBeyondStaleTolerance(negotiatedWatts, reportedWatts.watts) {
             if negotiatedWatts > reportedWatts.watts,
                reportedWatts.hasDerivedEvidence,
                counterBackedInputPowerCorroboratesNegotiatedPower(negotiatedWatts, in: properties) == false {
@@ -419,13 +417,16 @@ final class SmartBatteryReader: @unchecked Sendable {
             return AdapterWattsReading(watts: reportedWatts, hasDerivedEvidence: false)
         }
 
-        let comparisonWatts = max(reportedWatts, derivedWatts)
-        let staleReportTolerance = max(2, Int((Double(comparisonWatts) * 0.05).rounded(.up)))
-        if abs(reportedWatts - derivedWatts) > staleReportTolerance {
+        if adapterWattsDifferBeyondStaleTolerance(reportedWatts, derivedWatts) {
             return AdapterWattsReading(watts: derivedWatts, hasDerivedEvidence: true)
         }
 
         return AdapterWattsReading(watts: reportedWatts, hasDerivedEvidence: true)
+    }
+
+    private func adapterWattsDifferBeyondStaleTolerance(_ first: Int, _ second: Int) -> Bool {
+        let tolerance = max(2, Int((Double(max(first, second)) * 0.05).rounded(.up)))
+        return abs(first - second) > tolerance
     }
 
     private func normalizedAdapterWatts(_ value: Any?) -> Int? {
