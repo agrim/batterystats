@@ -4686,8 +4686,8 @@ private actor StubBatteryReader {
         let snapshot = snapshots.isEmpty ? BatterySnapshot.previewDischarging : snapshots.removeFirst()
         return BatteryReadResult(
             snapshot: snapshot,
-            rawSnapshotText: options.includesDiagnostics ? "raw" : nil,
-            parsedSnapshotText: options.includesDiagnostics ? "parsed" : nil
+            rawSnapshotText: options == .diagnostics ? "raw" : nil,
+            parsedSnapshotText: options == .diagnostics ? "parsed" : nil
         )
     }
 }

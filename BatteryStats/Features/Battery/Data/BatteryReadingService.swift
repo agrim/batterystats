@@ -4,12 +4,8 @@ enum BatteryReadOptions: Equatable, Sendable {
     case standard
     case diagnostics
 
-    var includesDiagnostics: Bool {
-        self == .diagnostics
-    }
-
     func merged(with options: BatteryReadOptions) -> BatteryReadOptions {
-        includesDiagnostics || options.includesDiagnostics ? .diagnostics : .standard
+        self == .diagnostics || options == .diagnostics ? .diagnostics : .standard
     }
 }
 
@@ -41,11 +37,11 @@ struct BatteryReadingService: Sendable {
         )
 
         guard let publicSnapshot = resolvedPublicSnapshot else {
-            return unsupportedReadResult(rawSnapshotText: options.includesDiagnostics ? "No internal battery detected." : nil)
+            return unsupportedReadResult(rawSnapshotText: options == .diagnostics ? "No internal battery detected." : nil)
         }
 
         guard publicSnapshot.isPresent, publicSnapshot.isInternalBattery else {
-            return unsupportedReadResult(rawSnapshotText: options.includesDiagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil)
+            return unsupportedReadResult(rawSnapshotText: options == .diagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil)
         }
 
         var notes: [String] = []
@@ -185,8 +181,8 @@ struct BatteryReadingService: Sendable {
 
         return BatteryReadResult(
             snapshot: snapshot,
-            rawSnapshotText: options.includesDiagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil,
-            parsedSnapshotText: options.includesDiagnostics ? snapshot.debugSummary : nil
+            rawSnapshotText: options == .diagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil,
+            parsedSnapshotText: options == .diagnostics ? snapshot.debugSummary : nil
         )
     }
 

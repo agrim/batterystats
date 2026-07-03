@@ -69,7 +69,7 @@ final class SmartBatteryReader: @unchecked Sendable {
            let packBatteryData = stringDictionary(from: packProperties["BatteryData"]) {
             var mergedBatteryData = stringDictionary(from: rootProperties["BatteryData"]) ?? [:]
 
-            for (key, value) in packBatteryData where mergedBatteryData[key] == nil && Self.canMergePackBatteryDataKey(key) {
+            for (key, value) in packBatteryData where mergedBatteryData[key] == nil && key != "ManufactureDate" {
                 mergedBatteryData[key] = value
             }
 
@@ -842,10 +842,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         return swiftDictionary
-    }
-
-    private static func canMergePackBatteryDataKey(_ key: String) -> Bool {
-        key != "ManufactureDate"
     }
 
     private static func booleanValue(from value: Any?) -> Bool? {
