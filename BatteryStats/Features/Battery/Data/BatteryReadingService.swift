@@ -41,19 +41,11 @@ struct BatteryReadingService: Sendable {
         )
 
         guard let publicSnapshot = resolvedPublicSnapshot else {
-            return BatteryReadResult(
-                snapshot: nil,
-                rawSnapshotText: options.includesDiagnostics ? "No internal battery detected." : nil,
-                parsedSnapshotText: options.includesDiagnostics ? "Unsupported" : nil
-            )
+            return unsupportedReadResult(rawSnapshotText: options.includesDiagnostics ? "No internal battery detected." : nil)
         }
 
         guard publicSnapshot.isPresent, publicSnapshot.isInternalBattery else {
-            return BatteryReadResult(
-                snapshot: nil,
-                rawSnapshotText: options.includesDiagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil,
-                parsedSnapshotText: options.includesDiagnostics ? "Unsupported" : nil
-            )
+            return unsupportedReadResult(rawSnapshotText: options.includesDiagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil)
         }
 
         var notes: [String] = []
@@ -196,6 +188,10 @@ struct BatteryReadingService: Sendable {
             rawSnapshotText: options.includesDiagnostics ? prettyRawSnapshot(publicSnapshot: publicSnapshot, smartBattery: smartBattery) : nil,
             parsedSnapshotText: options.includesDiagnostics ? snapshot.debugSummary : nil
         )
+    }
+
+    private func unsupportedReadResult(rawSnapshotText: String?) -> BatteryReadResult {
+        BatteryReadResult(snapshot: nil, rawSnapshotText: rawSnapshotText, parsedSnapshotText: rawSnapshotText == nil ? nil : "Unsupported")
     }
 
     static func resolvedPublicSnapshot(
