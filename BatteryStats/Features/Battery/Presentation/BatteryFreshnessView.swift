@@ -6,7 +6,6 @@ struct BatteryFreshnessView: View {
     let lastUpdated: Date?
     let isRefreshing: Bool
 
-    @State private var pulseToken = 0
     @State private var isPulseActive = false
     @State private var pulseUpdateTask: Task<Void, Never>?
     @State private var pulseTask: Task<Void, Never>?
@@ -123,13 +122,11 @@ struct BatteryFreshnessView: View {
             return
         }
 
-        let nextToken = pulseToken + 1
-        pulseToken = nextToken
         isPulseActive = true
 
         pulseTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(320))
-            guard Task.isCancelled == false, pulseToken == nextToken else {
+            guard Task.isCancelled == false else {
                 return
             }
 
