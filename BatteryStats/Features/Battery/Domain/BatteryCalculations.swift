@@ -295,11 +295,8 @@ enum BatteryCalculations {
     }
 
     private static func baseDisplayableInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
-        guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts) else {
-            return nil
-        }
-
-        guard plausibleAdapterWatts(adapterMaxWatts) != nil || value < maximumUnverifiedInputPowerWatts else {
+        guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
+              plausibleAdapterWatts(adapterMaxWatts) != nil || value < maximumUnverifiedInputPowerWatts else {
             return nil
         }
 
