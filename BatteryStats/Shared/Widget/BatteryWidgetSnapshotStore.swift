@@ -512,12 +512,8 @@ enum BatteryWidgetMetricFormatting {
             return nil
         }
 
-        guard displayedMinutes > 0 else {
-            return 0
-        }
-
         let normalizedHours = Double(displayedMinutes) / (24 * 60)
-        return max(0.15, min(1, normalizedHours))
+        return displayedMinutes > 0 ? max(0.15, min(1, normalizedHours)) : 0
     }
 
     static func powerText(for snapshot: BatterySnapshot?) -> String {
