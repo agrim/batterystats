@@ -143,11 +143,8 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func removeValue(forKey key: String) {
-        guard let store = enabledStore() else {
-            return
-        }
-
-        guard store.object(forKey: key) != nil else {
+        guard let store = enabledStore(),
+              store.object(forKey: key) != nil else {
             return
         }
 
@@ -157,11 +154,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
 
     func flush() {
         cancelScheduledSynchronize()
-        guard let store = enabledStore() else {
-            return
-        }
-
-        _ = store.synchronize()
+        _ = enabledStore()?.synchronize()
     }
 
     private func scheduleSynchronize() {
