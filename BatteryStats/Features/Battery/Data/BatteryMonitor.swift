@@ -12,7 +12,6 @@ final class BatteryMonitor {
         case unsupported
     }
 
-    private static let noParsedSnapshotText = "No parsed battery snapshot has been captured yet."
     private static let unavailableRawSnapshotText = "Raw battery diagnostics are unavailable for the latest snapshot."
     private static let unsupportedRawSnapshotText = "No supported internal battery is currently available."
     private static let unsupportedParsedSnapshotText = "Unsupported"
@@ -24,7 +23,11 @@ final class BatteryMonitor {
     var lastUpdated: Date?
     var isRefreshing = false
     private(set) var isCopyingRawSnapshot = false
-    private(set) var canCopyParsedSnapshot = false
+    private var parsedSnapshotFallbackText: String?
+
+    var canCopyParsedSnapshot: Bool {
+        snapshot != nil || parsedSnapshotFallbackText != nil
+    }
 
     @ObservationIgnored private let reader: BatteryReadingClient
     @ObservationIgnored private var refreshPolicy = BatteryRefreshPolicy()
@@ -54,7 +57,6 @@ final class BatteryMonitor {
     @ObservationIgnored private var readSequence = 0
     @ObservationIgnored private var lastAppliedReadSequence = 0
     @ObservationIgnored private var pendingRefreshOptions: BatteryReadOptions?
-    @ObservationIgnored private var latestParsedSnapshotText = BatteryMonitor.noParsedSnapshotText
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private let widgetSnapshotStore: any BatteryWidgetSnapshotStoring
     @ObservationIgnored private let widgetTimelineReloader: @MainActor () -> Void
@@ -355,21 +357,13 @@ final class BatteryMonitor {
 
         lastAppliedReadSequence = readSequence
 
-        if let parsedSnapshotText = result.parsedSnapshotText {
-            latestParsedSnapshotText = parsedSnapshotText
-            canCopyParsedSnapshot = true
-        }
-
         lastUpdated = publicationDate
 
         guard var snapshot = result.snapshot else {
-            if result.parsedSnapshotText == nil {
-                latestParsedSnapshotText = Self.unsupportedParsedSnapshotText
-            }
+            parsedSnapshotFallbackText = result.parsedSnapshotText ?? Self.unsupportedParsedSnapshotText
 
             availabilityState = .unsupported
             self.snapshot = nil
-            canCopyParsedSnapshot = true
             lastPublishedEnergyUse = nil
             dischargeSamples.removeAll()
             alertCoordinator.clearActiveAlerts()
@@ -406,7 +400,7 @@ final class BatteryMonitor {
         )
 
         self.snapshot = snapshot
-        canCopyParsedSnapshot = true
+        parsedSnapshotFallbackText = nil
         lastPublishedEnergyUse = snapshot.energyUseComparisonValue
         historyStore?.record(snapshot)
         alertCoordinator.evaluate(snapshot: snapshot, policy: alertPolicy)
@@ -456,13 +450,8 @@ final class BatteryMonitor {
             }
 
             let rawSnapshotText = rawSnapshotCopyText(for: result)
-            let didPublish = result.snapshot != nil
-                && apply(result, readSequence: readSequence, publicationDate: readDate)
-
-            if didPublish,
-               result.parsedSnapshotText == nil,
-               let parsedSnapshotText = snapshot?.debugSummary ?? result.snapshot?.debugSummary {
-                latestParsedSnapshotText = parsedSnapshotText
+            if result.snapshot != nil {
+                _ = apply(result, readSequence: readSequence, publicationDate: readDate)
             }
 
             pasteboardCopy(rawSnapshotText)
@@ -482,16 +471,10 @@ final class BatteryMonitor {
     }
 
     func copyParsedSnapshot() {
-        guard canCopyParsedSnapshot else {
-            return
-        }
-
         if let snapshot {
-            let parsedSnapshotText = snapshot.debugSummary
-            latestParsedSnapshotText = parsedSnapshotText
-            pasteboardCopy(parsedSnapshotText)
-        } else {
-            pasteboardCopy(latestParsedSnapshotText)
+            pasteboardCopy(snapshot.debugSummary)
+        } else if let parsedSnapshotFallbackText {
+            pasteboardCopy(parsedSnapshotFallbackText)
         }
     }
 
