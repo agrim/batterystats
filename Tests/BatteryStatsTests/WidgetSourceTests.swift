@@ -3,6 +3,7 @@ import XCTest
 final class WidgetSourceTests: XCTestCase {
     func testMediumWidgetUsesLiveDisplaySnapshotForVisibleMetrics() throws {
         let source = try Self.loadSource(relativePath: "BatteryStatsWidgets/BatteryStatusWidgetView.swift")
+        let componentSource = try Self.loadSource(relativePath: "BatteryStatsWidgets/BatteryWidgetComponents.swift")
 
         XCTAssertTrue(source.contains("private var displaySnapshot: BatterySnapshot?"))
         XCTAssertTrue(source.contains("guard let snapshot = entry.snapshot,"))
@@ -14,10 +15,11 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertFalse(source.contains("private var displayUpdatedAt: Date?"))
         XCTAssertFalse(source.contains("displaySnapshot?.timestamp"))
         XCTAssertFalse(source.contains("BatteryWidgetCompactDisplayPolicy.snapshotForMetrics("))
-        XCTAssertTrue(source.contains("healthTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color"))
-        XCTAssertTrue(source.contains("chargeTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color"))
-        XCTAssertTrue(source.contains("timeTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color"))
-        XCTAssertTrue(source.contains("statusDescriptor: BatteryPresentationStyle.statusDescriptor(for: snapshot)"))
+        XCTAssertFalse(source.contains("healthTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color"))
+        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.healthTintStyle(for: snapshot).color"))
+        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.chargeTintStyle(for: snapshot).color"))
+        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.timeTintStyle(for: snapshot).color"))
+        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.statusDescriptor(for: snapshot)"))
         XCTAssertFalse(source.contains("BatteryMediumWidgetView(\n                    snapshot: entry.snapshot"))
     }
 

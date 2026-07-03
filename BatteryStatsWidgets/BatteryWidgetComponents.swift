@@ -75,12 +75,13 @@ struct BatteryMediumWidgetView: View {
     let snapshot: BatterySnapshot?
     let updatedAt: Date?
     let now: Date
-    let healthTint: Color
-    let chargeTint: Color
-    let timeTint: Color
-    let statusDescriptor: BatteryStatusDescriptor
 
     var body: some View {
+        let healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).color
+        let chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).color
+        let timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).color
+        let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
+
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: BatteryPresentationStyle.batterySymbolName(for: snapshot))

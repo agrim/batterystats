@@ -15,11 +15,7 @@ struct BatteryStatusWidgetView: View {
                 BatteryMediumWidgetView(
                     snapshot: snapshot,
                     updatedAt: entry.updatedAt,
-                    now: entry.date,
-                    healthTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color,
-                    chargeTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color,
-                    timeTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color,
-                    statusDescriptor: BatteryPresentationStyle.statusDescriptor(for: snapshot)
+                    now: entry.date
                 )
             default:
                 GeometryReader { geometry in
