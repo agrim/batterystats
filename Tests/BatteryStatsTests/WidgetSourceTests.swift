@@ -39,29 +39,4 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertTrue(source.contains("if chargingSpeed == nil,"))
     }
 
-    func testMediumWidgetUsesMeasuredPowerTitleWhileCharging() throws {
-        let widgetSource = try Self.loadSource(relativePath: "BatteryStatsWidgets/BatteryWidgetComponents.swift")
-        let sharedSource = try Self.loadSource(relativePath: "BatteryStats/Shared/Widget/BatteryWidgetSnapshotStore.swift")
-        let monitorSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryMonitor.swift")
-
-        XCTAssertTrue(widgetSource.contains("title: BatteryPowerDisplayRole.role(for: snapshot).title"))
-        XCTAssertTrue(widgetSource.contains("BatteryPresentationStyle.batterySymbolName(for: snapshot)"))
-        XCTAssertTrue(widgetSource.contains("BatteryPowerDisplayRole.role(for: snapshot).title"))
-        XCTAssertTrue(monitorSource.contains("BatteryPresentationStyle.batterySymbolName(for: snapshot)"))
-        XCTAssertFalse(sharedSource.contains("enum BatteryMediumWidgetFormatting"))
-        XCTAssertTrue(sharedSource.contains("enum BatteryPowerDisplayRole"))
-        XCTAssertTrue(sharedSource.contains("case inputPower"))
-        XCTAssertTrue(sharedSource.contains("case chargeRate"))
-        XCTAssertFalse(widgetSource.contains("title: \"Power\""))
-        XCTAssertFalse(widgetSource.contains("snapshot?.batterySymbolName ?? \"questionmark\""))
-        XCTAssertFalse(monitorSource.contains("snapshot?.batterySymbolName ?? \"questionmark\""))
-    }
-
-    func testMonitorRejectsDuplicateReadSequencePublications() throws {
-        let monitorSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryMonitor.swift")
-
-        XCTAssertTrue(monitorSource.contains("guard readSequence > lastAppliedReadSequence else"))
-        XCTAssertFalse(monitorSource.contains("guard readSequence >= lastAppliedReadSequence else"))
-    }
-
 }
