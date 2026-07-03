@@ -1,6 +1,5 @@
 import Foundation
 import IOKit.ps
-import OSLog
 
 final class PowerSourceReader: @unchecked Sendable {
     final class NotificationToken {
@@ -50,12 +49,10 @@ final class PowerSourceReader: @unchecked Sendable {
 
     func read() -> PublicPowerSourceSnapshot? {
         guard let powerSourceInfo = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else {
-            Logger.powerSource.debug("Power source info unavailable")
             return nil
         }
 
         guard let powerSourceList = IOPSCopyPowerSourcesList(powerSourceInfo)?.takeRetainedValue() as? [AnyObject] else {
-            Logger.powerSource.debug("Power source list unavailable")
             return nil
         }
 

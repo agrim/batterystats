@@ -1,6 +1,5 @@
 import Foundation
 import IOKit
-import OSLog
 
 struct SmartBatteryDetails {
     let currentChargeMilliampHours: Int?
@@ -32,13 +31,11 @@ final class SmartBatteryReader: @unchecked Sendable {
 
     func read() -> SmartBatteryDetails? {
         guard let matching = IOServiceMatching("AppleSmartBattery") else {
-            Logger.batteryReader.debug("AppleSmartBattery matching dictionary unavailable")
             return nil
         }
 
         let service = IOServiceGetMatchingService(kIOMainPortDefault, matching)
         guard service != 0 else {
-            Logger.batteryReader.debug("AppleSmartBattery service not found")
             return nil
         }
 
@@ -50,7 +47,6 @@ final class SmartBatteryReader: @unchecked Sendable {
         let result = IORegistryEntryCreateCFProperties(service, &propertiesReference, kCFAllocatorDefault, 0)
         guard result == KERN_SUCCESS,
               let rawProperties = propertiesReference?.takeRetainedValue() as? [String: Any] else {
-            Logger.batteryReader.debug("Unable to read AppleSmartBattery properties, kern result \(result)")
             return nil
         }
 
