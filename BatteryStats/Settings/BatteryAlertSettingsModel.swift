@@ -217,18 +217,14 @@ private struct UserNotificationBatteryAlertAuthorizer: BatteryAlertAuthorizing {
     func requestAuthorization() async -> BatteryAlertAuthorizationStatus {
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
+        let status = Self.status(from: settings.authorizationStatus)
 
-        switch settings.authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return .authorized
-        case .notDetermined:
-            let isAuthorized = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
-            return isAuthorized ? .authorized : .denied
-        case .denied:
-            return .denied
-        @unknown default:
-            return .denied
+        guard status == .notDetermined else {
+            return status
         }
+
+        let isAuthorized = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        return isAuthorized ? .authorized : .denied
     }
 
     private static func status(from status: UNAuthorizationStatus) -> BatteryAlertAuthorizationStatus {
