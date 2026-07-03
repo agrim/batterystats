@@ -12,7 +12,6 @@ final class BatteryMonitor {
         case unsupported
     }
 
-    private static let noRawSnapshotText = "No battery snapshot has been captured yet."
     private static let noParsedSnapshotText = "No parsed battery snapshot has been captured yet."
     private static let unavailableRawSnapshotText = "Raw battery diagnostics are unavailable for the latest snapshot."
     private static let unsupportedRawSnapshotText = "No supported internal battery is currently available."
@@ -55,7 +54,6 @@ final class BatteryMonitor {
     @ObservationIgnored private var readSequence = 0
     @ObservationIgnored private var lastAppliedReadSequence = 0
     @ObservationIgnored private var pendingRefreshOptions: BatteryReadOptions?
-    @ObservationIgnored private var latestRawSnapshotText = BatteryMonitor.noRawSnapshotText
     @ObservationIgnored private var latestParsedSnapshotText = BatteryMonitor.noParsedSnapshotText
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private let widgetSnapshotStore: any BatteryWidgetSnapshotStoring
@@ -357,10 +355,6 @@ final class BatteryMonitor {
 
         lastAppliedReadSequence = readSequence
 
-        if let rawSnapshotText = result.rawSnapshotText {
-            latestRawSnapshotText = rawSnapshotText
-        }
-
         if let parsedSnapshotText = result.parsedSnapshotText {
             latestParsedSnapshotText = parsedSnapshotText
             canCopyParsedSnapshot = true
@@ -369,10 +363,6 @@ final class BatteryMonitor {
         lastUpdated = publicationDate
 
         guard var snapshot = result.snapshot else {
-            if result.rawSnapshotText == nil {
-                latestRawSnapshotText = Self.unsupportedRawSnapshotText
-            }
-
             if result.parsedSnapshotText == nil {
                 latestParsedSnapshotText = Self.unsupportedParsedSnapshotText
             }
@@ -468,10 +458,6 @@ final class BatteryMonitor {
             let rawSnapshotText = rawSnapshotCopyText(for: result)
             let didPublish = result.snapshot != nil
                 && apply(result, readSequence: readSequence, publicationDate: readDate)
-
-            if didPublish, result.rawSnapshotText == nil {
-                latestRawSnapshotText = rawSnapshotText
-            }
 
             if didPublish,
                result.parsedSnapshotText == nil,
