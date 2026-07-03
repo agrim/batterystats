@@ -63,11 +63,7 @@ final class LaunchAtLoginSettingsModel {
         statusDescription = manager.statusDescription
     }
 
-    func refresh() {
-        refresh(clearsError: true)
-    }
-
-    private func refresh(clearsError: Bool) {
+    func refresh(clearsError: Bool = true) {
         isEnabled = manager.isEnabled
         statusDescription = manager.statusDescription
         if clearsError {
@@ -77,7 +73,7 @@ final class LaunchAtLoginSettingsModel {
 
     func setEnabled(_ enabled: Bool) {
         guard manager.isEnabled != enabled else {
-            refresh(clearsError: true)
+            refresh()
             return
         }
 
@@ -97,7 +93,6 @@ final class LaunchAtLoginSettingsModel {
 
     func disableForReset() {
         guard manager.isEnabled else {
-            errorMessage = nil
             refresh()
             return
         }
