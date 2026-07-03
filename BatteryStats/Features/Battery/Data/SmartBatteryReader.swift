@@ -314,16 +314,8 @@ final class SmartBatteryReader: @unchecked Sendable {
 
     private func corroboratedIPDInputPowerMilliwatts(in properties: [String: Any]) -> Double? {
         guard hasLiveSystemPowerInCounter(in: properties),
-              let ipdInputPower = plausibleInteger(
-                  for: [.nested("PowerDistribution", "IPDInputPower")],
-                  in: properties,
-                  transform: { $0 > 0 ? $0 : nil }
-              ),
-              let systemPowerIn = plausibleInteger(
-                  for: [.nested("PowerTelemetryData", "SystemPowerIn")],
-                  in: properties,
-                  transform: { $0 > 0 ? $0 : nil }
-              ) else {
+              let ipdInputPower = positiveInteger(for: [.nested("PowerDistribution", "IPDInputPower")], in: properties),
+              let systemPowerIn = positiveInteger(for: [.nested("PowerTelemetryData", "SystemPowerIn")], in: properties) else {
             return nil
         }
 
@@ -541,22 +533,11 @@ final class SmartBatteryReader: @unchecked Sendable {
 
     private func counterBackedSystemPowerInMilliwatts(in properties: [String: Any]) -> Double? {
         guard hasLiveSystemPowerInCounter(in: properties),
-              let milliwatts = plausibleInteger(
-                  for: [.nested("PowerTelemetryData", "SystemPowerIn")],
-                  in: properties,
-                  transform: { value in
-                      guard value > 0,
-                            BatteryCalculations.plausibleWatts(Double(value) / 1_000) != nil else {
-                          return nil
-                      }
-
-                      return value
-                  }
-              ) else {
+              let milliwatts = positiveMilliwatts(for: [.nested("PowerTelemetryData", "SystemPowerIn")], in: properties) else {
             return nil
         }
 
-        return Double(milliwatts)
+        return milliwatts
     }
 
     private func liveSystemTelemetryCorroborates(milliwatts: Double, in properties: [String: Any]) -> Bool {
@@ -584,11 +565,7 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func hasLiveSystemPowerInCounter(in properties: [String: Any]) -> Bool {
-        plausibleInteger(
-            for: [.nested("PowerTelemetryData", "SystemPowerInAccumulatorCount")],
-            in: properties,
-            transform: { $0 > 0 ? $0 : nil }
-        ) != nil
+        positiveInteger(for: [.nested("PowerTelemetryData", "SystemPowerInAccumulatorCount")], in: properties) != nil
     }
 
     private func isDistinctFromNegotiatedInputPower(milliwatts: Double, in properties: [String: Any]) -> Bool {
@@ -627,11 +604,7 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func negotiatedInputMilliwatts(in properties: [String: Any]) -> Double? {
-        if let milliwatts = plausibleInteger(
-            for: [.nested("PowerDistribution", "IPDInputPower")],
-            in: properties,
-            transform: { $0 > 0 ? $0 : nil }
-        ) {
+        if let milliwatts = positiveInteger(for: [.nested("PowerDistribution", "IPDInputPower")], in: properties) {
             return Double(milliwatts)
         }
 
@@ -668,6 +641,19 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         return BatteryCalculations.plausibleCurrentMagnitudeMilliamps(abs(value))
+    }
+
+    private func positiveInteger(for candidates: [PropertyCandidate], in properties: [String: Any]) -> Int? {
+        plausibleInteger(for: candidates, in: properties) { $0 > 0 ? $0 : nil }
+    }
+
+    private func positiveMilliwatts(for candidates: [PropertyCandidate], in properties: [String: Any]) -> Double? {
+        guard let milliwatts = positiveInteger(for: candidates, in: properties),
+              BatteryCalculations.plausibleWatts(Double(milliwatts) / 1_000) != nil else {
+            return nil
+        }
+
+        return Double(milliwatts)
     }
 
     private func boolean(for candidates: [PropertyCandidate], in properties: [String: Any]) -> Bool? {
