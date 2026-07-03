@@ -41,7 +41,7 @@ final class BatteryAlertSettingsModel {
     }
 
     func cancelPendingAlertEnables() {
-        invalidatePendingAlertEnables()
+        alertPreferenceGenerations = alertPreferenceGenerations.mapValues { $0 &+ 1 }
     }
 
     func refreshAuthorizationStatus(preferences: PreferencesStore? = nil) {
@@ -92,7 +92,7 @@ final class BatteryAlertSettingsModel {
         apply(status, to: status == .authorized ? nil : preferences)
 
         if status != .authorized {
-            invalidatePendingAlertEnables()
+            cancelPendingAlertEnables()
             return
         }
 
@@ -106,10 +106,6 @@ final class BatteryAlertSettingsModel {
     private func updateResolvingAuthorizationOperationCount(by delta: Int) {
         activeAuthorizationOperationCount = max(0, activeAuthorizationOperationCount + delta)
         isResolvingAuthorization = activeAuthorizationOperationCount > 0
-    }
-
-    private func invalidatePendingAlertEnables() {
-        alertPreferenceGenerations = alertPreferenceGenerations.mapValues { $0 &+ 1 }
     }
 
     private func apply(_ status: BatteryAlertAuthorizationStatus, to preferences: PreferencesStore?) {
