@@ -47,11 +47,11 @@ struct BatterySummaryGridView: View {
 
                     BatteryDetailRowView(title: "Status", value: snapshot.statusDisplayTitle)
 
-                    if let cycleCount = BatterySummaryDetailFormatting.cycleCount(snapshot.cycleCount) {
+                    if let cycleCount = BatteryCalculations.plausibleCycleCount(snapshot.cycleCount) {
                         Divider()
                             .gridCellColumns(2)
 
-                        BatteryDetailRowView(title: "Charge Cycles", value: cycleCount)
+                        BatteryDetailRowView(title: "Charge Cycles", value: String(cycleCount))
                     }
 
                     if let temperature = BatterySummaryDetailFormatting.temperature(
@@ -107,11 +107,11 @@ struct BatterySummaryGridView: View {
             BatteryDetailRowView(title: BatteryPowerDisplayRole.role(for: snapshot).title, value: power)
         }
 
-        if let voltage = BatterySummaryDetailFormatting.voltage(snapshot.voltageMillivolts) {
+        if let voltage = BatteryCalculations.plausibleVoltageMillivolts(snapshot.voltageMillivolts) {
             Divider()
                 .gridCellColumns(2)
 
-            BatteryDetailRowView(title: "Voltage", value: voltage)
+            BatteryDetailRowView(title: "Voltage", value: BatteryFormatting.millivolts(voltage))
         }
 
         if let energy = BatterySummaryDetailFormatting.energy(
@@ -185,14 +185,6 @@ enum BatterySummaryDetailFormatting {
         return "—"
     }
 
-    static func cycleCount(_ value: Int?) -> String? {
-        guard let value = BatteryCalculations.plausibleCycleCount(value) else {
-            return nil
-        }
-
-        return String(value)
-    }
-
     static func temperature(_ value: Double?, unitPreference: TemperatureUnitPreference) -> String? {
         guard let value = BatteryCalculations.plausibleTemperatureCelsius(value) else {
             return nil
@@ -215,14 +207,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return "\(value.formatted(.number.grouping(.automatic))) W"
-    }
-
-    static func voltage(_ value: Int?) -> String? {
-        guard let value = BatteryCalculations.plausibleVoltageMillivolts(value) else {
-            return nil
-        }
-
-        return BatteryFormatting.millivolts(value)
     }
 
     static func energy(current: Double?, maximum: Double?) -> String? {

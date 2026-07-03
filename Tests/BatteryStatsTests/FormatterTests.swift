@@ -522,27 +522,21 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(.nan), "—")
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(-4), "—")
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(150), "—")
-        XCTAssertNil(BatterySummaryDetailFormatting.cycleCount(-1))
-        XCTAssertNil(BatterySummaryDetailFormatting.cycleCount(Int.max))
         XCTAssertNil(BatterySummaryDetailFormatting.temperature(.nan, unitPreference: .celsius))
         XCTAssertNil(BatterySummaryDetailFormatting.temperature(180, unitPreference: .celsius))
         XCTAssertNil(BatterySummaryDetailFormatting.power(-4.2))
         XCTAssertNil(BatterySummaryDetailFormatting.power(.greatestFiniteMagnitude))
         XCTAssertNil(BatterySummaryDetailFormatting.adapter(-70))
         XCTAssertNil(BatterySummaryDetailFormatting.adapter(Int.max))
-        XCTAssertNil(BatterySummaryDetailFormatting.voltage(-12_000))
-        XCTAssertNil(BatterySummaryDetailFormatting.voltage(Int.max))
         XCTAssertNil(BatterySummaryDetailFormatting.energy(current: nil, maximum: nil))
     }
 
     func testSummaryDetailFormattingShowsValidAndPartialValues() {
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(81.38), "81%")
         XCTAssertEqual(BatterySummaryDetailFormatting.compactPercent(100), "100%")
-        XCTAssertEqual(BatterySummaryDetailFormatting.cycleCount(120), "120")
         XCTAssertEqual(BatterySummaryDetailFormatting.temperature(34.2, unitPreference: .fahrenheit), "93.6 °F")
         XCTAssertEqual(BatterySummaryDetailFormatting.power(13.9), "13.9 W")
         XCTAssertEqual(BatterySummaryDetailFormatting.adapter(140), "140 W")
-        XCTAssertEqual(BatterySummaryDetailFormatting.voltage(12_780), "12,780 mV")
         XCTAssertEqual(BatterySummaryDetailFormatting.energy(current: 40.2, maximum: nil), "40.2 Wh")
     }
 
