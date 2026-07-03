@@ -53,22 +53,19 @@ struct BatteryFreshnessView: View {
                 .scaleEffect(0.62)
                 .frame(width: 8, height: 8)
         } else {
+            let hasLiveUpdate = BatteryFreshnessFormatting.hasUsableUpdate(
+                lastUpdated: lastUpdated,
+                now: now
+            )
+
             Circle()
-                .fill(indicatorTint(now: now))
+                .fill(hasLiveUpdate ? .green : .secondary)
                 .frame(width: 6, height: 6)
                 .scaleEffect(isPulseActive ? 1.45 : 1)
                 .opacity(isPulseActive ? 1 : 0.72)
-                .animation(pulseAnimation, value: isPulseActive)
+                .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: isPulseActive)
                 .accessibilityHidden(true)
         }
-    }
-
-    private func indicatorTint(now: Date) -> Color {
-        BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: now) ? .green : .secondary
-    }
-
-    private var pulseAnimation: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.28)
     }
 
     private func refreshPulseState() {
