@@ -44,7 +44,7 @@ final class WidgetSourceTests: XCTestCase {
         let sharedSource = try Self.loadSource(relativePath: "BatteryStats/Shared/Widget/BatteryWidgetSnapshotStore.swift")
         let monitorSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryMonitor.swift")
 
-        XCTAssertTrue(widgetSource.contains("title: powerTitle"))
+        XCTAssertTrue(widgetSource.contains("title: BatteryPowerDisplayRole.role(for: snapshot).title"))
         XCTAssertTrue(widgetSource.contains("BatteryPresentationStyle.batterySymbolName(for: snapshot)"))
         XCTAssertTrue(widgetSource.contains("BatteryPowerDisplayRole.role(for: snapshot).title"))
         XCTAssertTrue(monitorSource.contains("BatteryPresentationStyle.batterySymbolName(for: snapshot)"))

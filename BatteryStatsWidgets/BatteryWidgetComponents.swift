@@ -89,7 +89,7 @@ struct BatteryMediumWidgetView: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(chargeTint)
 
-                Text(statusTitle)
+                Text(snapshot?.statusDisplayTitle ?? "Unavailable")
                     .font(.headline)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -129,15 +129,18 @@ struct BatteryMediumWidgetView: View {
 
                 GridRow {
                     BatteryMediumMetricView(
-                        title: timeTitle,
+                        title: snapshot?.powerState.timeTitle(
+                            charging: "To Full",
+                            discharging: "Time Left"
+                        ) ?? "Time",
                         value: BatteryWidgetMetricFormatting.timeText(for: snapshot),
                         symbolName: "clock",
                         tint: timeTint
                     )
 
                     BatteryMediumMetricView(
-                        title: powerTitle,
-                        value: powerValue,
+                        title: BatteryPowerDisplayRole.role(for: snapshot).title,
+                        value: BatteryWidgetMetricFormatting.powerText(for: snapshot),
                         symbolName: statusDescriptor.symbolName,
                         tint: statusDescriptor.ringTint
                     )
@@ -146,22 +149,6 @@ struct BatteryMediumWidgetView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var statusTitle: String {
-        snapshot?.statusDisplayTitle ?? "Unavailable"
-    }
-
-    private var timeTitle: String {
-        snapshot?.powerState.timeTitle(charging: "To Full", discharging: "Time Left") ?? "Time"
-    }
-
-    private var powerTitle: String {
-        BatteryPowerDisplayRole.role(for: snapshot).title
-    }
-
-    private var powerValue: String {
-        BatteryWidgetMetricFormatting.powerText(for: snapshot)
     }
 }
 
