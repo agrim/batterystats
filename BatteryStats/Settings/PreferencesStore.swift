@@ -607,41 +607,37 @@ final class PreferencesStore {
         return defaultMissing ? defaultValue : nil
     }
 
-    @discardableResult
     private func applyRemoteEnumPreference<Value>(
         _ keyPath: ReferenceWritableKeyPath<PreferencesStore, Value>,
         forKey key: String,
         defaultValue: Value,
         defaultMissing: Bool
-    ) -> Bool where Value: RawRepresentable, Value.RawValue == String {
+    ) where Value: RawRepresentable, Value.RawValue == String {
         guard let value = remoteEnumPreference(
             forKey: key,
             defaultValue: defaultValue,
             defaultMissing: defaultMissing
         ) else {
-            return false
+            return
         }
 
         self[keyPath: keyPath] = value
-        return true
     }
 
-    @discardableResult
     private func applyRemoteBoolPreference(
         _ keyPath: ReferenceWritableKeyPath<PreferencesStore, Bool>,
         forKey key: String,
         defaultMissing: Bool
-    ) -> Bool {
+    ) {
         guard let value = remoteBoolPreference(
             forKey: key,
             defaultValue: false,
             defaultMissing: defaultMissing
         ) else {
-            return false
+            return
         }
 
         self[keyPath: keyPath] = value
-        return true
     }
 
     private func pushLocalValues() {
