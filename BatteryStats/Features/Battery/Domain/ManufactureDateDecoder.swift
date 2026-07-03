@@ -13,11 +13,8 @@ enum ManufactureDateDecoder {
         calendar providedCalendar: Calendar? = nil,
         latestDate: Date = Date()
     ) -> Date? {
-        guard let rawValue else {
-            return nil
-        }
-
-        guard (1...Int(UInt16.max)).contains(rawValue) else {
+        guard let rawValue,
+              (1...Int(UInt16.max)).contains(rawValue) else {
             return nil
         }
 
