@@ -156,7 +156,7 @@ enum BatteryFormatting {
     static func compactCapacityPair(current: Int?, maximum: Int?, currentAllowsZero: Bool = true) -> String {
         let current = BatteryCalculations.plausibleCapacityMilliampHours(current, allowsZero: currentAllowsZero)
         let maximum = BatteryCalculations.plausibleCapacityMilliampHours(maximum, allowsZero: false)
-        let displayCurrent = displayablePairCurrent(current: current, maximum: maximum)
+        let displayCurrent = displayablePairCurrent(current: current, maximum: maximum, numericValue: Double.init)
 
         switch (displayCurrent, maximum) {
         case let (current?, maximum?):
@@ -173,7 +173,7 @@ enum BatteryFormatting {
     static func compactWattHourPair(current: Double?, maximum: Double?) -> String {
         let current = BatteryCalculations.plausibleWattHours(current)
         let maximum = BatteryCalculations.positiveWattHours(maximum)
-        let displayCurrent = displayablePairCurrent(current: current, maximum: maximum)
+        let displayCurrent = displayablePairCurrent(current: current, maximum: maximum) { $0 }
 
         switch (displayCurrent, maximum) {
         case let (current?, maximum?):
@@ -195,34 +195,22 @@ enum BatteryFormatting {
         value.formatted(.number.precision(.fractionLength(1)))
     }
 
-    private static func displayablePairCurrent(current: Int?, maximum: Int?) -> Int? {
+    private static func displayablePairCurrent<Value>(
+        current: Value?,
+        maximum: Value?,
+        numericValue: (Value) -> Double
+    ) -> Value? {
         guard let current, let maximum else {
             return current
         }
 
-        guard current > maximum else {
+        let currentValue = numericValue(current)
+        let maximumValue = numericValue(maximum)
+        guard currentValue > maximumValue else {
             return current
         }
 
-        let overagePercent = (Double(current) / Double(maximum)) * 100
-        guard overagePercent.isFinite,
-              overagePercent <= 105 else {
-            return nil
-        }
-
-        return current
-    }
-
-    private static func displayablePairCurrent(current: Double?, maximum: Double?) -> Double? {
-        guard let current, let maximum else {
-            return current
-        }
-
-        guard current > maximum else {
-            return current
-        }
-
-        let overagePercent = (current / maximum) * 100
+        let overagePercent = (currentValue / maximumValue) * 100
         guard overagePercent.isFinite,
               overagePercent <= 105 else {
             return nil

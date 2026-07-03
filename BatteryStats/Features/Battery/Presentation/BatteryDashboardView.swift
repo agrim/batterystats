@@ -4,6 +4,7 @@ import SwiftUI
 
 enum BatterySurfaceLayout {
     static let minimumWidth: CGFloat = 248
+    static let contentMinimumWidth: CGFloat = minimumWidth - (horizontalPadding * 2)
     static let menuBarPanelMinimumHeight: CGFloat = 260
     static let menuBarPanelCornerRadius: CGFloat = 18
     static let horizontalPadding: CGFloat = 14
@@ -178,14 +179,14 @@ struct BatterySurfaceView: View {
             case .loading:
                 ProgressView("Reading battery information…")
                     .frame(
-                        minWidth: BatterySurfaceLayout.minimumWidth - (BatterySurfaceLayout.horizontalPadding * 2),
+                        minWidth: BatterySurfaceLayout.contentMinimumWidth,
                         minHeight: BatterySurfaceLayout.unavailableMinHeight,
                         alignment: .center
                     )
             case .unsupported:
                 UnsupportedBatteryView()
                     .frame(
-                        minWidth: BatterySurfaceLayout.minimumWidth - (BatterySurfaceLayout.horizontalPadding * 2),
+                        minWidth: BatterySurfaceLayout.contentMinimumWidth,
                         minHeight: BatterySurfaceLayout.unavailableMinHeight
                     )
             case .available:
@@ -213,7 +214,7 @@ struct BatterySurfaceView: View {
                 } else {
                     UnsupportedBatteryView()
                         .frame(
-                            minWidth: BatterySurfaceLayout.minimumWidth - (BatterySurfaceLayout.horizontalPadding * 2),
+                            minWidth: BatterySurfaceLayout.contentMinimumWidth,
                             minHeight: BatterySurfaceLayout.unavailableMinHeight
                         )
                 }
