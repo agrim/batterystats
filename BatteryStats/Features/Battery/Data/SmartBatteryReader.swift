@@ -336,8 +336,7 @@ final class SmartBatteryReader: @unchecked Sendable {
 
         let negotiatedMilliwatts = Double(ipdInputPower)
         let systemMilliwatts = Double(systemPowerIn)
-        let toleranceMilliwatts = max(1_000.0, negotiatedMilliwatts * 0.05)
-        guard abs(negotiatedMilliwatts - systemMilliwatts) <= toleranceMilliwatts else {
+        guard isWithinTelemetryTolerance(systemMilliwatts, referenceMilliwatts: negotiatedMilliwatts) else {
             return nil
         }
 
@@ -552,8 +551,7 @@ final class SmartBatteryReader: @unchecked Sendable {
         }
 
         let negotiatedMilliwatts = Double(negotiatedWatts) * 1_000
-        let toleranceMilliwatts = max(1_000.0, negotiatedMilliwatts * 0.05)
-        guard abs(systemMilliwatts - negotiatedMilliwatts) <= toleranceMilliwatts else {
+        guard isWithinTelemetryTolerance(systemMilliwatts, referenceMilliwatts: negotiatedMilliwatts) else {
             return false
         }
 
@@ -585,8 +583,12 @@ final class SmartBatteryReader: @unchecked Sendable {
             return false
         }
 
-        let toleranceMilliwatts = max(1_000.0, milliwatts * 0.05)
-        return abs(milliwatts - corroboratingMilliwatts) <= toleranceMilliwatts
+        return isWithinTelemetryTolerance(corroboratingMilliwatts, referenceMilliwatts: milliwatts)
+    }
+
+    private func isWithinTelemetryTolerance(_ milliwatts: Double, referenceMilliwatts: Double) -> Bool {
+        let toleranceMilliwatts = max(1_000.0, referenceMilliwatts * 0.05)
+        return abs(milliwatts - referenceMilliwatts) <= toleranceMilliwatts
     }
 
     private func isNearHighAdapterCapability(milliwatts: Double, adapterMaxWatts: Int?) -> Bool {
