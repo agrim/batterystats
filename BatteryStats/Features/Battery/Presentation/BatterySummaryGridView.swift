@@ -54,16 +54,13 @@ struct BatterySummaryGridView: View {
                         BatteryDetailRowView(title: "Charge Cycles", value: String(cycleCount))
                     }
 
-                    if let temperature = BatterySummaryDetailFormatting.temperature(
-                        snapshot.presentationTemperatureCelsius,
-                        unitPreference: temperatureUnitPreference
-                    ) {
+                    if let temperature = BatteryCalculations.plausibleTemperatureCelsius(snapshot.presentationTemperatureCelsius) {
                         Divider()
                             .gridCellColumns(2)
 
                         BatteryDetailRowView(
                             title: "Temperature",
-                            value: temperature
+                            value: BatteryFormatting.temperature(temperature, unitPreference: temperatureUnitPreference)
                         )
                         .id(temperatureUnitResolutionToken)
                     }
@@ -186,14 +183,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return "—"
-    }
-
-    static func temperature(_ value: Double?, unitPreference: TemperatureUnitPreference) -> String? {
-        guard let value = BatteryCalculations.plausibleTemperatureCelsius(value) else {
-            return nil
-        }
-
-        return BatteryFormatting.temperature(value, unitPreference: unitPreference)
     }
 
     static func power(_ value: Double?) -> String? {
