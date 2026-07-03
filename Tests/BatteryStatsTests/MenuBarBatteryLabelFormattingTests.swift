@@ -217,7 +217,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertFalse(menuBarSource.contains("anchorWindow.addChildWindow(panel, ordered: .above)"))
         XCTAssertTrue(menuBarSource.contains("panel.parent?.removeChildWindow(panel)"))
         XCTAssertTrue(menuBarSource.contains("panel.collectionBehavior = BatteryWindowSpaceBehavior.menuBarPanelPresentation"))
-        XCTAssertTrue(menuBarSource.contains("presentPanel(panel, relativeTo: button)"))
+        XCTAssertTrue(menuBarSource.contains("presentPanel(panel)"))
         XCTAssertTrue(menuBarSource.contains("scheduleDeferredPanelPresentationRetries(for: panel, relativeTo: button)"))
         XCTAssertFalse(menuBarSource.contains("panel.order(.above, relativeTo: anchorWindowNumber)"))
         XCTAssertTrue(menuBarSource.contains("panel.makeKeyAndOrderFront(nil)"))

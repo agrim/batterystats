@@ -244,7 +244,7 @@ final class MenuBarStatusItemController: NSObject {
                     return
                 }
 
-                refreshStatusItemNow()
+                applyCurrentStatusItemState()
                 observeStatusItemInputs()
             }
         }
@@ -298,7 +298,7 @@ final class MenuBarStatusItemController: NSObject {
         if didChangeDisplayPreferences || currentDisplayPreferences != installedDisplayPreferences {
             reinstallStatusItemForDisplayPreferenceChange()
         }
-        refreshStatusItemNow(force: true)
+        applyCurrentStatusItemState(force: true)
         scheduleDeferredDisplayPreferenceRefresh()
     }
 
@@ -328,13 +328,9 @@ final class MenuBarStatusItemController: NSObject {
                     return
                 }
 
-                self?.refreshStatusItemNow(force: true)
+                self?.applyCurrentStatusItemState(force: true)
             }
         }
-    }
-
-    private func refreshStatusItemNow(force: Bool = false) {
-        applyCurrentStatusItemState(force: force)
     }
 
     private func applyCurrentStatusItemState(force: Bool = false) {
@@ -370,12 +366,12 @@ final class MenuBarStatusItemController: NSObject {
         layoutPanel(panel, relativeTo: button)
         lastPanelShowDate = Date()
 
-        presentPanel(panel, relativeTo: button)
+        presentPanel(panel)
         scheduleDeferredPanelPresentationRetries(for: panel, relativeTo: button)
         installDismissalMonitors()
     }
 
-    private func presentPanel(_ panel: NSPanel, relativeTo _: NSStatusBarButton) {
+    private func presentPanel(_ panel: NSPanel) {
         preparePanelForActiveSpacePresentation(panel)
         panel.level = .popUpMenu
         panel.makeKeyAndOrderFront(nil)
@@ -404,7 +400,7 @@ final class MenuBarStatusItemController: NSObject {
                 }
 
                 self.layoutPanel(panel, relativeTo: button)
-                self.presentPanel(panel, relativeTo: button)
+                self.presentPanel(panel)
             }
         }
     }
@@ -416,10 +412,6 @@ final class MenuBarStatusItemController: NSObject {
             historyStore: historyStore,
             prepareForSettingsAction: { [weak self] in
                 self?.closePanel()
-            },
-            openSettingsAction: {
-                NotificationCenter.default.post(name: .showBatteryStatsSettingsWindow, object: nil)
-                NSApp.activate(ignoringOtherApps: true)
             }
         )
         .environment(monitor)
@@ -617,7 +609,7 @@ final class MenuBarStatusItemController: NSObject {
         }
 
         layoutPanel(panel, relativeTo: button)
-        presentPanel(panel, relativeTo: button)
+        presentPanel(panel)
     }
 
     private func closePanelFromGlobalEventIfNeeded(now: Date = Date()) {
