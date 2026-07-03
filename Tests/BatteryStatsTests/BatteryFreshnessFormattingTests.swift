@@ -5,9 +5,10 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
     func testFreshnessViewDefersPulseUntilRefreshCompletes() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
 
-        XCTAssertTrue(source.contains(".onAppear {\n            schedulePulseUpdate { triggerPulse() }\n        }"))
-        XCTAssertTrue(source.contains(".onChange(of: isRefreshing)"))
-        XCTAssertTrue(source.contains("if isRefreshing {\n                schedulePulseUpdate { cancelPulse() }\n            } else {\n                schedulePulseUpdate { triggerPulse() }\n            }"))
+        XCTAssertTrue(source.contains(".onAppear(perform: refreshPulseState)"))
+        XCTAssertTrue(source.contains(".onChange(of: lastUpdated) { _, _ in\n            refreshPulseState()\n        }"))
+        XCTAssertTrue(source.contains(".onChange(of: isRefreshing) { _, _ in\n            refreshPulseState()\n        }"))
+        XCTAssertTrue(source.contains("if isRefreshing || reduceMotion {\n                cancelPulse()\n            } else {\n                triggerPulse()\n            }"))
         XCTAssertFalse(source.contains("private func schedulePulse()"))
         XCTAssertFalse(source.contains("private func schedulePulseCancellation()"))
         XCTAssertTrue(source.contains("await Task.yield()"))
@@ -18,8 +19,7 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
     func testFreshnessViewRearmsPulseWhenReduceMotionTurnsOff() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
 
-        XCTAssertTrue(source.contains(".onChange(of: reduceMotion) { _, reduceMotion in"))
-        XCTAssertTrue(source.contains("if reduceMotion {\n                schedulePulseUpdate { cancelPulse() }\n            } else {\n                schedulePulseUpdate { triggerPulse() }\n            }"))
+        XCTAssertTrue(source.contains(".onChange(of: reduceMotion) { _, _ in\n            refreshPulseState()\n        }"))
     }
 
     func testRefreshingTextTakesPriority() {

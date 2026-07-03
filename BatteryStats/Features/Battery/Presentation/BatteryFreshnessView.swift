@@ -28,28 +28,19 @@ struct BatteryFreshnessView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
         }
-        .onAppear {
-            schedulePulseUpdate { triggerPulse() }
-        }
+        .onAppear(perform: refreshPulseState)
         .onChange(of: lastUpdated) { _, _ in
-            schedulePulseUpdate { triggerPulse() }
+            refreshPulseState()
         }
-        .onChange(of: isRefreshing) { _, isRefreshing in
-            if isRefreshing {
-                schedulePulseUpdate { cancelPulse() }
-            } else {
-                schedulePulseUpdate { triggerPulse() }
-            }
+        .onChange(of: isRefreshing) { _, _ in
+            refreshPulseState()
         }
-        .onChange(of: reduceMotion) { _, reduceMotion in
-            if reduceMotion {
-                schedulePulseUpdate { cancelPulse() }
-            } else {
-                schedulePulseUpdate { triggerPulse() }
-            }
+        .onChange(of: reduceMotion) { _, _ in
+            refreshPulseState()
         }
         .onDisappear {
-            cancelPulseUpdate()
+            pulseUpdateTask?.cancel()
+            pulseUpdateTask = nil
             cancelPulse()
         }
     }
@@ -80,6 +71,16 @@ struct BatteryFreshnessView: View {
         reduceMotion ? nil : .smooth(duration: 0.28)
     }
 
+    private func refreshPulseState() {
+        schedulePulseUpdate {
+            if isRefreshing || reduceMotion {
+                cancelPulse()
+            } else {
+                triggerPulse()
+            }
+        }
+    }
+
     private func schedulePulseUpdate(_ update: @escaping @MainActor () -> Void) {
         pulseUpdateTask?.cancel()
         pulseUpdateTask = Task { @MainActor in
@@ -91,11 +92,6 @@ struct BatteryFreshnessView: View {
             pulseUpdateTask = nil
             update()
         }
-    }
-
-    private func cancelPulseUpdate() {
-        pulseUpdateTask?.cancel()
-        pulseUpdateTask = nil
     }
 
     private func triggerPulse() {
