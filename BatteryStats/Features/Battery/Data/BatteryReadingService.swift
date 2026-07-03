@@ -5,6 +5,10 @@ struct BatteryReadOptions: Equatable, Sendable {
 
     static let standard = BatteryReadOptions()
     static let diagnostics = BatteryReadOptions(includesDiagnostics: true)
+
+    func merged(with options: BatteryReadOptions) -> BatteryReadOptions {
+        BatteryReadOptions(includesDiagnostics: includesDiagnostics || options.includesDiagnostics)
+    }
 }
 
 struct BatteryReadResult: Sendable {

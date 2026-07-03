@@ -54,8 +54,7 @@ final class BatteryMonitor {
     @ObservationIgnored private var diagnosticsGeneration = 0
     @ObservationIgnored private var readSequence = 0
     @ObservationIgnored private var lastAppliedReadSequence = 0
-    @ObservationIgnored private var pendingRefresh = false
-    @ObservationIgnored private var pendingRefreshNeedsDiagnostics = false
+    @ObservationIgnored private var pendingRefreshOptions: BatteryReadOptions?
     @ObservationIgnored private var latestRawSnapshotText = BatteryMonitor.noRawSnapshotText
     @ObservationIgnored private var latestParsedSnapshotText = BatteryMonitor.noParsedSnapshotText
     @ObservationIgnored private var isStarted = false
@@ -159,7 +158,7 @@ final class BatteryMonitor {
         if powerSourceNotificationToken == nil {
             powerSourceNotificationToken = reader.makeNotificationToken { [weak self] in
                 Task { @MainActor in
-                    self?.refreshIfStarted()
+                    self?.requestRefreshIfStarted()
                 }
             }
         }
@@ -171,7 +170,7 @@ final class BatteryMonitor {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in
-                    self?.refreshIfStarted()
+                    self?.requestRefreshIfStarted()
                 }
             }
         }
@@ -183,7 +182,7 @@ final class BatteryMonitor {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in
-                    self?.refreshIfStarted()
+                    self?.requestRefreshIfStarted()
                 }
             }
         }
@@ -202,14 +201,10 @@ final class BatteryMonitor {
     }
 
     func refreshForVisibleSurface() {
-        guard isStarted else {
-            return
-        }
-
-        requestRefresh()
+        requestRefreshIfStarted()
     }
 
-    private func refreshIfStarted() {
+    private func requestRefreshIfStarted() {
         guard isStarted else {
             return
         }
@@ -293,8 +288,7 @@ final class BatteryMonitor {
         cancelEnergyProbeTask()
 
         if refreshTask != nil {
-            pendingRefresh = true
-            pendingRefreshNeedsDiagnostics = pendingRefreshNeedsDiagnostics || options.includesDiagnostics
+            pendingRefreshOptions = pendingRefreshOptions?.merged(with: options) ?? options
             return
         }
 
@@ -310,8 +304,7 @@ final class BatteryMonitor {
             if refreshGeneration == generation {
                 isRefreshing = false
                 refreshTask = nil
-                pendingRefresh = false
-                pendingRefreshNeedsDiagnostics = false
+                pendingRefreshOptions = nil
             }
         }
 
@@ -328,10 +321,9 @@ final class BatteryMonitor {
 
             apply(result, readSequence: readSequence, publicationDate: readDate)
 
-            if pendingRefresh {
-                options = pendingRefreshNeedsDiagnostics ? .diagnostics : .standard
-                pendingRefresh = false
-                pendingRefreshNeedsDiagnostics = false
+            if let pendingOptions = pendingRefreshOptions {
+                options = pendingOptions
+                pendingRefreshOptions = nil
             } else {
                 guard shouldContinueLightningRefreshLoop(for: generation) else {
                     break
@@ -522,7 +514,7 @@ final class BatteryMonitor {
         if currentRefreshInterval != desiredRefreshInterval {
             refreshTimer?.invalidate()
             refreshTimer = Self.scheduledMonitoringTimer(withTimeInterval: desiredRefreshInterval) { [weak self] in
-                self?.refreshIfStarted()
+                self?.requestRefreshIfStarted()
             }
             refreshTimer?.tolerance = Self.refreshTimerTolerance(for: desiredRefreshInterval)
             currentRefreshInterval = desiredRefreshInterval
@@ -634,8 +626,7 @@ final class BatteryMonitor {
         isRefreshing = false
         isCopyingRawSnapshot = false
 
-        pendingRefresh = false
-        pendingRefreshNeedsDiagnostics = false
+        pendingRefreshOptions = nil
     }
 
     private func nextReadSequence() -> Int {
