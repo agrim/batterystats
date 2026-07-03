@@ -50,15 +50,9 @@ struct BatteryWidgetSnapshotStore {
     }
 
     func snapshot(now: Date = .now, maximumAge: TimeInterval = defaultRetentionAge) -> BatterySnapshot? {
-        guard maximumAge > 0 else {
-            return nil
-        }
-
-        guard let defaults else {
-            return nil
-        }
-
-        guard let data = defaults.data(forKey: Self.snapshotKey) else {
+        guard maximumAge > 0,
+              let defaults,
+              let data = defaults.data(forKey: Self.snapshotKey) else {
             return nil
         }
 
