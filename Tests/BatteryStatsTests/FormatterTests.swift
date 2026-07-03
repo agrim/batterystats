@@ -245,40 +245,33 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: nil).title, "Power")
     }
 
-    func testCompactWidgetMetricsUseLiveSnapshotWithinFreshnessWindow() {
+    func testWidgetFreshnessUsesLiveSnapshotWithinFreshnessWindow() {
         let now = Date(timeIntervalSinceReferenceDate: 12_345)
-        let snapshot = makeSnapshot(stateOfChargePercent: 80, powerState: .onBattery)
 
-        XCTAssertEqual(
-            BatteryWidgetCompactDisplayPolicy.snapshotForMetrics(
-                snapshot,
+        XCTAssertTrue(
+            BatterySnapshotFreshnessPolicy.isLive(
                 updatedAt: now.addingTimeInterval(-BatteryWidgetSnapshotStore.defaultMaximumAge),
                 now: now
-            ),
-            snapshot
+            )
         )
     }
 
-    func testCompactWidgetMetricsHideRetainedStaleSnapshot() {
+    func testWidgetFreshnessHidesRetainedStaleSnapshot() {
         let now = Date(timeIntervalSinceReferenceDate: 12_345)
-        let snapshot = makeSnapshot(stateOfChargePercent: 80, powerState: .onBattery)
 
-        XCTAssertNil(
-            BatteryWidgetCompactDisplayPolicy.snapshotForMetrics(
-                snapshot,
+        XCTAssertFalse(
+            BatterySnapshotFreshnessPolicy.isLive(
                 updatedAt: now.addingTimeInterval(-(BatteryWidgetSnapshotStore.defaultMaximumAge + 1)),
                 now: now
             )
         )
     }
 
-    func testCompactWidgetMetricsHideFarFutureSnapshot() {
+    func testWidgetFreshnessHidesFarFutureSnapshot() {
         let now = Date(timeIntervalSinceReferenceDate: 12_345)
-        let snapshot = makeSnapshot(stateOfChargePercent: 80, powerState: .onBattery)
 
-        XCTAssertNil(
-            BatteryWidgetCompactDisplayPolicy.snapshotForMetrics(
-                snapshot,
+        XCTAssertFalse(
+            BatterySnapshotFreshnessPolicy.isLive(
                 updatedAt: now.addingTimeInterval(61),
                 now: now
             )

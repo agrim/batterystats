@@ -84,10 +84,12 @@ struct BatteryStatusWidgetView: View {
     }
 
     private var displaySnapshot: BatterySnapshot? {
-        BatteryWidgetCompactDisplayPolicy.snapshotForMetrics(
-            entry.snapshot,
-            updatedAt: entry.updatedAt,
-            now: entry.date
-        )
+        guard let snapshot = entry.snapshot,
+              let updatedAt = entry.updatedAt,
+              BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: entry.date) else {
+            return nil
+        }
+
+        return snapshot
     }
 }

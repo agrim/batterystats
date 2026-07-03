@@ -615,22 +615,6 @@ enum BatteryPowerDisplayRole {
     }
 }
 
-enum BatteryWidgetCompactDisplayPolicy {
-    static func snapshotForMetrics(
-        _ snapshot: BatterySnapshot?,
-        updatedAt: Date?,
-        now: Date = .now
-    ) -> BatterySnapshot? {
-        guard let snapshot,
-              let updatedAt,
-              BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: now) else {
-            return nil
-        }
-
-        return snapshot
-    }
-}
-
 enum BatteryWidgetUpdateFormatting {
     static func statusText(updatedAt: Date?, now: Date = .now) -> String {
         guard let updatedAt else {
