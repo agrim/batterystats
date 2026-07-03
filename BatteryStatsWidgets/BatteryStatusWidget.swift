@@ -5,11 +5,17 @@ struct BatteryStatusEntry: TimelineEntry {
     let date: Date
     let snapshot: BatterySnapshot?
 
-    static let placeholder = BatteryStatusEntry(date: .now, snapshot: .previewDischarging)
+    var updatedAt: Date? {
+        snapshot?.timestamp
+    }
+
+    static var placeholder: BatteryStatusEntry {
+        BatteryStatusEntry(date: .now, snapshot: .previewDischarging)
+    }
 }
 
 struct BatteryStatusProvider: TimelineProvider {
-    private let service = BatteryReadingService()
+    private let snapshotStore: BatteryWidgetSnapshotStore = .shared
 
     func placeholder(in context: Context) -> BatteryStatusEntry {
         .placeholder
@@ -21,8 +27,10 @@ struct BatteryStatusProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BatteryStatusEntry>) -> Void) {
         let entry = makeEntry(at: .now, isPreview: context.isPreview)
-        // Widgets refresh on a coarse schedule, so ask for a modest cadence.
-        let nextRefreshDate = entry.date.addingTimeInterval(300)
+        let nextRefreshDate = BatteryWidgetUpdateFormatting.nextStatusChangeDate(
+            updatedAt: entry.updatedAt,
+            now: entry.date
+        )
         completion(Timeline(entries: [entry], policy: .after(nextRefreshDate)))
     }
 
@@ -31,15 +39,14 @@ struct BatteryStatusProvider: TimelineProvider {
             return .placeholder
         }
 
-        return BatteryStatusEntry(date: date, snapshot: service.read(at: date).snapshot)
+        let snapshot = snapshotStore.snapshot(now: date, maximumAge: BatteryWidgetSnapshotStore.defaultRetentionAge)
+        return BatteryStatusEntry(date: date, snapshot: snapshot)
     }
 }
 
 struct BatteryStatusWidget: Widget {
-    private let kind = "BatteryStatusWidget"
-
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: BatteryStatusProvider()) { entry in
+        StaticConfiguration(kind: BatteryWidgetSnapshotStore.timelineKind, provider: BatteryStatusProvider()) { entry in
             BatteryStatusWidgetView(entry: entry)
         }
         .configurationDisplayName("Battery Circles")

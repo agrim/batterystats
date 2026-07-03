@@ -10,14 +10,27 @@ struct ReleaseVersion: Equatable {
 
     static func from(_ infoDictionary: [String: Any]?) -> ReleaseVersion? {
         guard
-            let marketingVersion = infoDictionary?["CFBundleShortVersionString"] as? String,
-            let buildNumber = infoDictionary?["CFBundleVersion"] as? String,
-            marketingVersion.isEmpty == false,
-            buildNumber.isEmpty == false
+            let marketingVersion = metadataString(infoDictionary?["CFBundleShortVersionString"]),
+            let buildNumber = metadataString(infoDictionary?["CFBundleVersion"])
         else {
             return nil
         }
 
         return ReleaseVersion(marketingVersion: marketingVersion, buildNumber: buildNumber)
+    }
+
+    private static func metadataString(_ value: Any?) -> String? {
+        let rawString: String
+        if let string = value as? String {
+            rawString = string
+        } else if let number = value as? NSNumber,
+                  CFGetTypeID(number) != CFBooleanGetTypeID() {
+            rawString = number.stringValue
+        } else {
+            return nil
+        }
+
+        let trimmedString = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedString.isEmpty ? nil : trimmedString
     }
 }

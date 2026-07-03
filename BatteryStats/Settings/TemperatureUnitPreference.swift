@@ -1,11 +1,11 @@
 import Foundation
 
-enum ResolvedTemperatureUnit {
+enum ResolvedTemperatureUnit: Sendable {
     case celsius
     case fahrenheit
 }
 
-enum TemperatureUnitPreference: String, CaseIterable, Identifiable {
+enum TemperatureUnitPreference: String, CaseIterable, Identifiable, Sendable {
     case system
     case celsius
     case fahrenheit

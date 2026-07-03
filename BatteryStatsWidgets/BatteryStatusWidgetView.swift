@@ -7,441 +7,71 @@ struct BatteryStatusWidgetView: View {
     let entry: BatteryStatusEntry
 
     var body: some View {
+        let snapshot = displaySnapshot
+
         Group {
             switch widgetFamily {
             case .systemMedium:
                 BatteryMediumWidgetView(
-                    snapshot: entry.snapshot,
-                    healthTint: healthTint,
-                    chargeTint: chargeTint,
-                    timeTint: timeTint,
-                    statusDescriptor: statusDescriptor
+                    snapshot: snapshot,
+                    updatedAt: entry.updatedAt,
+                    now: entry.date
                 )
             default:
                 GeometryReader { geometry in
-                    let layout = BatteryWidgetLayout(size: geometry.size)
+                    let circleDiameter = floor(min(geometry.size.width * 0.392, geometry.size.height * 0.399))
+                    let spacing = max(20, round(min(geometry.size.width, geometry.size.height) * 0.073))
+                    let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
+                    let healthMetric = BatteryWidgetMetric(
+                        content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent)),
+                        progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationHealthPercent),
+                        ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color
+                    )
+                    let chargeMetric = BatteryWidgetMetric(
+                        content: .text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)),
+                        progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationStateOfChargePercent),
+                        ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color
+                    )
+                    let timeMetric = BatteryWidgetMetric(
+                        content: .text(BatteryWidgetMetricFormatting.timeText(for: snapshot)),
+                        progress: BatteryWidgetMetricFormatting.timeProgress(for: snapshot),
+                        ringTint: BatteryPresentationStyle.timeTintStyle(for: snapshot).color
+                    )
+                    let statusMetric = BatteryWidgetMetric(
+                        content: .symbol(statusDescriptor.symbolName),
+                        progress: statusDescriptor.progress,
+                        ringTint: statusDescriptor.ringTint,
+                        contentTint: statusDescriptor.contentTint
+                    )
 
-                    ZStack(alignment: .topLeading) {
-                        BatteryWidgetMetricTile(metric: healthMetric, size: layout.circleDiameter)
-                            .offset(x: layout.leadingInset, y: layout.topInset)
+                    VStack(spacing: spacing) {
+                        HStack(spacing: spacing) {
+                            BatteryWidgetMetricTile(metric: healthMetric, size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: chargeMetric, size: circleDiameter)
+                        }
 
-                        BatteryWidgetMetricTile(metric: chargeMetric, size: layout.circleDiameter)
-                            .offset(x: layout.trailingColumnInset, y: layout.topInset)
-
-                        BatteryWidgetMetricTile(metric: timeMetric, size: layout.circleDiameter)
-                            .offset(x: layout.leadingInset, y: layout.bottomRowInset)
-
-                        BatteryWidgetMetricTile(metric: statusMetric, size: layout.circleDiameter)
-                            .offset(x: layout.trailingColumnInset, y: layout.bottomRowInset)
+                        HStack(spacing: spacing) {
+                            BatteryWidgetMetricTile(metric: timeMetric, size: circleDiameter)
+                            BatteryWidgetMetricTile(metric: statusMetric, size: circleDiameter)
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
         .containerBackground(for: .widget) {
-            BatteryWidgetBackground()
+            ContainerRelativeShape()
+                .fill(.ultraThinMaterial)
         }
     }
 
-    private var healthMetric: BatteryWidgetMetric {
-        BatteryWidgetMetric(
-            content: .symbol("heart.fill"),
-            progress: clampedProgress(entry.snapshot?.healthPercent) ?? 0.25,
-            ringTint: healthTint,
-            contentTint: .white
-        )
-    }
-
-    private var chargeMetric: BatteryWidgetMetric {
-        BatteryWidgetMetric(
-            content: .symbol("bolt.fill"),
-            progress: clampedProgress(entry.snapshot?.stateOfChargePercent) ?? 0.25,
-            ringTint: chargeTint,
-            contentTint: .white
-        )
-    }
-
-    private var timeMetric: BatteryWidgetMetric {
-        BatteryWidgetMetric(
-            content: .text(timeText),
-            progress: timeProgress,
-            ringTint: timeTint,
-            contentTint: .white
-        )
-    }
-
-    private var statusMetric: BatteryWidgetMetric {
-        let descriptor = statusDescriptor
-        return BatteryWidgetMetric(
-            content: .symbol(descriptor.symbolName),
-            progress: statusProgress,
-            ringTint: descriptor.ringTint,
-            contentTint: descriptor.contentTint
-        )
-    }
-
-    private var healthTint: Color {
-        guard let healthPercent = entry.snapshot?.healthPercent else {
-            return .secondary
-        }
-
-        if healthPercent >= 95 {
-            return .green
-        }
-
-        if healthPercent >= 90 {
-            return Color(red: 0.40, green: 0.85, blue: 0.36)
-        }
-
-        if healthPercent >= 80 {
-            return .yellow
-        }
-
-        return .red
-    }
-
-    private var chargeTint: Color {
-        guard let stateOfChargePercent = entry.snapshot?.stateOfChargePercent else {
-            return .secondary
-        }
-
-        if stateOfChargePercent >= 40 {
-            return .green
-        }
-
-        if stateOfChargePercent >= 20 {
-            return .yellow
-        }
-
-        return .red
-    }
-
-    private var timeText: String {
-        guard let snapshot = entry.snapshot else {
-            return "--"
-        }
-
-        if let displayedMinutes = snapshot.displayedTimeMinutes {
-            return BatteryFormatting.compactWidgetDuration(minutes: displayedMinutes)
-        }
-
-        return "--"
-    }
-
-    private var timeProgress: Double {
-        guard let snapshot = entry.snapshot else {
-            return 0.25
-        }
-
-        if let displayedMinutes = snapshot.displayedTimeMinutes {
-            let normalizedHours = Double(displayedMinutes) / (24 * 60)
-            return max(0.15, min(1, normalizedHours))
-        }
-
-        switch snapshot.powerState {
-        case .connectedNotCharging, .fullOnAC:
-            return clampedProgress(snapshot.stateOfChargePercent) ?? 0.5
-        case .charging:
-            return clampedProgress(snapshot.stateOfChargePercent) ?? 0.7
-        case .onBattery:
-            return clampedProgress(snapshot.stateOfChargePercent) ?? 0.35
-        case .unknown:
-            return 0.25
-        }
-    }
-
-    private var timeTint: Color {
-        guard let snapshot = entry.snapshot else {
-            return .secondary
-        }
-
-        switch snapshot.powerState {
-        case .charging:
-            if let stateOfChargePercent = snapshot.stateOfChargePercent,
-               stateOfChargePercent < 20 {
-                return .yellow
-            }
-
-            return .green
-        case .connectedNotCharging, .fullOnAC:
-            if let stateOfChargePercent = snapshot.stateOfChargePercent,
-               stateOfChargePercent < 20 {
-                return .yellow
-            }
-
-            return .green
-        case .onBattery:
-            if let stateOfChargePercent = snapshot.stateOfChargePercent,
-               stateOfChargePercent < 20 {
-                return .red
-            }
-
-            return .yellow
-        case .unknown:
-            return .secondary
-        }
-    }
-
-    private var statusProgress: Double {
-        guard entry.snapshot != nil else {
-            return 0.25
-        }
-
-        return 1
-    }
-
-    private var statusDescriptor: BatteryWidgetStatusDescriptor {
-        guard let snapshot = entry.snapshot else {
-            return BatteryWidgetStatusDescriptor(symbolName: "questionmark", ringTint: .secondary, contentTint: .white)
-        }
-
-        switch snapshot.powerState {
-        case .charging, .connectedNotCharging, .fullOnAC:
-            return BatteryWidgetStatusDescriptor(symbolName: "powerplug", ringTint: .green, contentTint: .white)
-        case .onBattery:
-            if isLowPowerBatteryState(snapshot) {
-                return BatteryWidgetStatusDescriptor(symbolName: "battery.100", ringTint: .yellow, contentTint: .yellow)
-            }
-
-            return BatteryWidgetStatusDescriptor(symbolName: "battery.100", ringTint: .green, contentTint: .white)
-        case .unknown:
-            return BatteryWidgetStatusDescriptor(symbolName: "questionmark", ringTint: .secondary, contentTint: .white)
-        }
-    }
-
-    private func isLowPowerBatteryState(_ snapshot: BatterySnapshot) -> Bool {
-        snapshot.powerState == .onBattery && (snapshot.stateOfChargePercent ?? 100) < 20
-    }
-
-    private func clampedProgress(_ value: Double?) -> Double? {
-        guard let value else {
+    private var displaySnapshot: BatterySnapshot? {
+        guard let snapshot = entry.snapshot,
+              let updatedAt = entry.updatedAt,
+              BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: entry.date) else {
             return nil
         }
 
-        return max(0, min(100, value)) / 100
+        return snapshot
     }
-}
-
-private struct BatteryWidgetLayout {
-    let circleDiameter: CGFloat
-    let horizontalSpacing: CGFloat
-    let verticalSpacing: CGFloat
-    let leadingInset: CGFloat
-    let topInset: CGFloat
-
-    init(size: CGSize) {
-        // Match Apple's widget by giving the rings more true center gap while
-        // keeping the overall grid tucked close to the widget edges.
-        circleDiameter = floor(min(size.width * 0.392, size.height * 0.399))
-        horizontalSpacing = max(20, round(min(size.width, size.height) * 0.073))
-        verticalSpacing = max(20, round(min(size.width, size.height) * 0.073))
-
-        let contentWidth = (circleDiameter * 2) + horizontalSpacing
-        let contentHeight = (circleDiameter * 2) + verticalSpacing
-
-        leadingInset = floor(max(0, (size.width - contentWidth) / 2))
-        topInset = floor(max(0, (size.height - contentHeight) / 2))
-    }
-
-    var trailingColumnInset: CGFloat {
-        leadingInset + circleDiameter + horizontalSpacing
-    }
-
-    var bottomRowInset: CGFloat {
-        topInset + circleDiameter + verticalSpacing
-    }
-}
-
-private struct BatteryWidgetBackground: View {
-    var body: some View {
-        ZStack {
-            ContainerRelativeShape()
-                .fill(.ultraThinMaterial)
-
-            ContainerRelativeShape()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.04),
-                            Color.black.opacity(0.14)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        }
-        .overlay {
-            ContainerRelativeShape()
-                .stroke(Color.white.opacity(0.10), lineWidth: 0.9)
-        }
-    }
-}
-
-private struct BatteryWidgetMetricTile: View {
-    let metric: BatteryWidgetMetric
-    let size: CGFloat
-
-    var body: some View {
-        Gauge(value: metric.progress) {
-            EmptyView()
-        } currentValueLabel: {
-            BatteryWidgetMetricContent(metric: metric, size: size)
-        }
-        .gaugeStyle(.accessoryCircularCapacity)
-        .tint(metric.ringTint)
-        .frame(width: size, height: size)
-    }
-}
-
-private struct BatteryWidgetMetric {
-    enum Content {
-        case text(String)
-        case symbol(String)
-    }
-
-    let content: Content
-    let progress: Double
-    let ringTint: Color
-    let contentTint: Color
-}
-
-private struct BatteryWidgetMetricContent: View {
-    let metric: BatteryWidgetMetric
-    let size: CGFloat
-
-    var body: some View {
-        switch metric.content {
-        case let .text(value):
-            Text(value)
-                .font(.system(size: max(16, size * 0.26), weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(metric.contentTint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.55)
-                .contentTransition(.numericText())
-        case let .symbol(name):
-            Image(systemName: name)
-                .font(.system(size: max(18, size * 0.30), weight: .semibold, design: .rounded))
-                .foregroundStyle(metric.contentTint)
-        }
-    }
-}
-
-private struct BatteryMediumWidgetView: View {
-    let snapshot: BatterySnapshot?
-    let healthTint: Color
-    let chargeTint: Color
-    let timeTint: Color
-    let statusDescriptor: BatteryWidgetStatusDescriptor
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: snapshot?.batterySymbolName ?? "battery.0")
-                    .font(.system(size: 22, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(chargeTint)
-
-                Text(statusTitle)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Spacer(minLength: 8)
-
-                Text(BatteryFormatting.percent(snapshot?.stateOfChargePercent))
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-            }
-
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 8) {
-                GridRow {
-                    BatteryMediumMetricView(
-                        title: "Health",
-                        value: BatteryFormatting.percent(snapshot?.healthPercent, decimals: 0),
-                        symbolName: "heart.fill",
-                        tint: healthTint
-                    )
-
-                    BatteryMediumMetricView(
-                        title: "Charge",
-                        value: BatteryFormatting.percent(snapshot?.stateOfChargePercent, decimals: 0),
-                        symbolName: "bolt.fill",
-                        tint: chargeTint
-                    )
-                }
-
-                GridRow {
-                    BatteryMediumMetricView(
-                        title: timeTitle,
-                        value: BatteryFormatting.compactDuration(minutes: snapshot?.displayedTimeMinutes),
-                        symbolName: "clock",
-                        tint: timeTint
-                    )
-
-                    BatteryMediumMetricView(
-                        title: "Power",
-                        value: powerValue,
-                        symbolName: statusDescriptor.symbolName,
-                        tint: statusDescriptor.ringTint
-                    )
-                }
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var statusTitle: String {
-        snapshot?.statusDisplayTitle ?? "Unavailable"
-    }
-
-    private var timeTitle: String {
-        snapshot?.powerState == .charging ? "To Full" : "Time Left"
-    }
-
-    private var powerValue: String {
-        guard let activePowerWatts = snapshot?.activePowerWatts else {
-            return snapshot?.statusDisplayTitle ?? "—"
-        }
-
-        return BatteryFormatting.watts(activePowerWatts)
-    }
-}
-
-private struct BatteryMediumMetricView: View {
-    let title: String
-    let value: String
-    let symbolName: String
-    let tint: Color
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Image(systemName: symbolName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 14)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Text(value)
-                    .font(.callout.weight(.semibold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct BatteryWidgetStatusDescriptor {
-    let symbolName: String
-    let ringTint: Color
-    let contentTint: Color
 }

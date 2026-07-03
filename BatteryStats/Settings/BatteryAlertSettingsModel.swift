@@ -1,0 +1,230 @@
+import Foundation
+import Observation
+import UserNotifications
+
+enum BatteryAlertAuthorizationStatus: Equatable {
+    case notDetermined
+    case authorized
+    case denied
+
+    var statusDescription: String {
+        switch self {
+        case .notDetermined:
+            return "macOS will ask for notification permission when you enable an alert."
+        case .authorized:
+            return "Battery alerts can deliver notifications."
+        case .denied:
+            return "Notifications are off for BatteryStats in System Settings."
+        }
+    }
+}
+
+@MainActor
+protocol BatteryAlertAuthorizing {
+    func authorizationStatus() async -> BatteryAlertAuthorizationStatus
+    func requestAuthorization() async -> BatteryAlertAuthorizationStatus
+}
+
+@MainActor
+@Observable
+final class BatteryAlertSettingsModel {
+    private(set) var authorizationStatus: BatteryAlertAuthorizationStatus = .notDetermined
+    private(set) var isResolvingAuthorization = false
+
+    @ObservationIgnored private let authorizer: any BatteryAlertAuthorizing
+    @ObservationIgnored private var authorizationGeneration = 0
+    @ObservationIgnored private var alertPreferenceGenerations: [PartialKeyPath<PreferencesStore>: Int] = [:]
+    @ObservationIgnored private var activeAuthorizationOperationCount = 0
+
+    init(authorizer: any BatteryAlertAuthorizing = UserNotificationBatteryAlertAuthorizer()) {
+        self.authorizer = authorizer
+    }
+
+    func cancelPendingAlertEnables() {
+        alertPreferenceGenerations = alertPreferenceGenerations.mapValues { $0 &+ 1 }
+    }
+
+    func refreshAuthorizationStatus(preferences: PreferencesStore? = nil) {
+        guard isResolvingAuthorization == false else {
+            return
+        }
+
+        authorizationGeneration &+= 1
+        let generation = authorizationGeneration
+        updateResolvingAuthorizationOperationCount(by: 1)
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            let status = await authorizer.authorizationStatus()
+            updateResolvingAuthorizationOperationCount(by: -1)
+
+            guard authorizationGeneration == generation else {
+                return
+            }
+
+            apply(status, to: preferences)
+        }
+    }
+
+    func setAlertEnabled(
+        _ enabled: Bool,
+        preferences: PreferencesStore,
+        keyPath: ReferenceWritableKeyPath<PreferencesStore, Bool>
+    ) async {
+        let preferenceKey: PartialKeyPath<PreferencesStore> = keyPath
+        alertPreferenceGenerations[preferenceKey, default: 0] &+= 1
+        let generation = alertPreferenceGenerations[preferenceKey] ?? 0
+
+        guard enabled else {
+            preferences[keyPath: keyPath] = false
+            return
+        }
+
+        authorizationGeneration &+= 1
+        updateResolvingAuthorizationOperationCount(by: 1)
+        let status = await authorizer.requestAuthorization()
+        updateResolvingAuthorizationOperationCount(by: -1)
+
+        let isCurrentPreferenceRequest = alertPreferenceGenerations[preferenceKey] == generation
+        apply(status, to: status == .authorized ? nil : preferences)
+
+        if status != .authorized {
+            cancelPendingAlertEnables()
+            return
+        }
+
+        guard isCurrentPreferenceRequest else {
+            return
+        }
+
+        preferences[keyPath: keyPath] = true
+    }
+
+    private func updateResolvingAuthorizationOperationCount(by delta: Int) {
+        activeAuthorizationOperationCount = max(0, activeAuthorizationOperationCount + delta)
+        isResolvingAuthorization = activeAuthorizationOperationCount > 0
+    }
+
+    private func apply(_ status: BatteryAlertAuthorizationStatus, to preferences: PreferencesStore?) {
+        authorizationStatus = status
+
+        guard status == .denied else {
+            return
+        }
+
+        preferences?.disableAllAlerts()
+    }
+}
+
+@MainActor
+final class BatteryAlertAuthorizationObserver {
+    private let preferences: PreferencesStore
+    private let authorizer: any BatteryAlertAuthorizing
+    private var isStarted = false
+    private var reconciliationGeneration = 0
+
+    init(
+        preferences: PreferencesStore,
+        authorizer: any BatteryAlertAuthorizing = UserNotificationBatteryAlertAuthorizer()
+    ) {
+        self.preferences = preferences
+        self.authorizer = authorizer
+    }
+
+    func start() {
+        guard isStarted == false else {
+            return
+        }
+
+        isStarted = true
+        reconcileIfNeeded()
+        observeAlertPreferences()
+    }
+
+    func refreshAuthorizationStatus() {
+        guard isStarted else {
+            return
+        }
+
+        reconcileIfNeeded()
+    }
+
+    private func observeAlertPreferences() {
+        withObservationTracking {
+            _ = preferences.isLowBatteryAlertEnabled
+            _ = preferences.isChargeCompleteAlertEnabled
+            _ = preferences.isHighTemperatureAlertEnabled
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      isStarted else {
+                    return
+                }
+
+                reconcileIfNeeded()
+                observeAlertPreferences()
+            }
+        }
+    }
+
+    private func reconcileIfNeeded() {
+        guard preferences.hasEnabledAlerts else {
+            return
+        }
+
+        reconciliationGeneration &+= 1
+        let generation = reconciliationGeneration
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            let status = await authorizer.authorizationStatus()
+            guard isStarted,
+                  reconciliationGeneration == generation,
+                  status == .denied else {
+                return
+            }
+
+            preferences.disableAllAlerts()
+        }
+    }
+}
+
+@MainActor
+private struct UserNotificationBatteryAlertAuthorizer: BatteryAlertAuthorizing {
+    func authorizationStatus() async -> BatteryAlertAuthorizationStatus {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return Self.status(from: settings.authorizationStatus)
+    }
+
+    func requestAuthorization() async -> BatteryAlertAuthorizationStatus {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        let status = Self.status(from: settings.authorizationStatus)
+
+        guard status == .notDetermined else {
+            return status
+        }
+
+        let isAuthorized = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        return isAuthorized ? .authorized : .denied
+    }
+
+    private static func status(from status: UNAuthorizationStatus) -> BatteryAlertAuthorizationStatus {
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            return .authorized
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        @unknown default:
+            return .denied
+        }
+    }
+}

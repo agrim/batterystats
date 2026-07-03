@@ -1,13 +1,19 @@
+import AppKit
 import SwiftUI
+
+enum SettingsLayout {
+    static let contentWidth: CGFloat = 520
+    static let contentPadding: CGFloat = 20
+    static let minimumWindowWidth: CGFloat = contentWidth + (contentPadding * 2)
+}
 
 struct SettingsView: View {
     @Bindable var preferences: PreferencesStore
     let monitor: BatteryMonitor
     let historyStore: BatteryHistoryStore
 
-    @State private var launchAtLoginManager = LaunchAtLoginManager()
-    @State private var launchAtLoginError: String?
-    @State private var isUpdatingLaunchAtLogin = false
+    @State private var launchAtLoginState = LaunchAtLoginSettingsModel()
+    @State private var alertSettings = BatteryAlertSettingsModel()
 
     var body: some View {
         Form {
@@ -19,8 +25,14 @@ struct SettingsView: View {
             aboutSection
         }
         .formStyle(.grouped)
-        .padding(20)
-        .frame(width: 520)
+        .frame(width: SettingsLayout.contentWidth)
+        .padding(SettingsLayout.contentPadding)
+        .onAppear {
+            refreshExternalSettingsState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshExternalSettingsState()
+        }
     }
 
     private var generalSection: some View {
@@ -28,22 +40,23 @@ struct SettingsView: View {
             Toggle(
                 "Launch at Login",
                 isOn: Binding(
-                    get: { launchAtLoginManager.isEnabled },
+                    get: { launchAtLoginState.isEnabled },
                     set: { updateLaunchAtLogin($0) }
                 )
             )
-            .disabled(isUpdatingLaunchAtLogin)
+            .disabled(launchAtLoginState.isUpdating)
 
-            if isUpdatingLaunchAtLogin {
+            if launchAtLoginState.isUpdating {
                 ProgressView()
                     .controlSize(.small)
             }
 
-            Text(launchAtLoginError ?? launchAtLoginManager.statusDescription)
+            Text(launchAtLoginState.errorMessage ?? launchAtLoginState.statusDescription)
                 .font(.footnote)
-                .foregroundStyle(launchAtLoginError == nil ? Color.secondary : Color.red)
+                .foregroundStyle(launchAtLoginState.errorMessage == nil ? Color.secondary : Color.red)
 
             Toggle("Sync Preferences with iCloud", isOn: $preferences.isICloudSyncEnabled)
+                .disabled(preferences.isICloudSyncAvailable == false)
 
             Text(preferences.syncStatusMessage)
                 .font(.footnote)
@@ -53,13 +66,13 @@ struct SettingsView: View {
 
     private var displaySection: some View {
         Section("Display") {
-            Picker("Menu Bar Display", selection: $preferences.menuBarDisplayMode) {
+            Picker("Menu Bar Display", selection: menuBarDisplayPreferenceBinding(\.menuBarDisplayMode)) {
                 ForEach(MenuBarDisplayMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
 
-            Picker("Temperature Unit", selection: $preferences.temperatureUnitPreference) {
+            Picker("Temperature Unit", selection: menuBarDisplayPreferenceBinding(\.temperatureUnitPreference)) {
                 ForEach(TemperatureUnitPreference.allCases) { preference in
                     Text(preference.title).tag(preference)
                 }
@@ -89,9 +102,18 @@ struct SettingsView: View {
 
     private var alertsSection: some View {
         Section("Alerts") {
-            Toggle("Low Battery", isOn: $preferences.isLowBatteryAlertEnabled)
-            Toggle("Charge Complete", isOn: $preferences.isChargeCompleteAlertEnabled)
-            Toggle("High Temperature", isOn: $preferences.isHighTemperatureAlertEnabled)
+            Toggle("Low Battery", isOn: alertBinding(\.isLowBatteryAlertEnabled))
+            Toggle("Charge Complete", isOn: alertBinding(\.isChargeCompleteAlertEnabled))
+            Toggle("High Temperature", isOn: alertBinding(\.isHighTemperatureAlertEnabled))
+
+            if alertSettings.isResolvingAuthorization {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            Text(alertSettings.authorizationStatus.statusDescription)
+                .font(.footnote)
+                .foregroundStyle(alertSettings.authorizationStatus == .denied ? Color.red : Color.secondary)
         }
     }
 
@@ -102,21 +124,33 @@ struct SettingsView: View {
             Toggle("Keep Battery History", isOn: $preferences.isHistoryEnabled)
 
             Toggle("Sync History with iCloud", isOn: $preferences.isHistoryICloudSyncEnabled)
-                .disabled(preferences.isHistoryEnabled == false)
+                .disabled(preferences.canEnableHistoryICloudSync == false)
 
             HistoryStatsView(
                 stats: historyStore.stats,
                 unitPreference: preferences.temperatureUnitPreference,
+                unitResolutionToken: preferences.temperatureUnitResolutionToken,
                 emptyText: historyStore.summaryText
             )
 
-            Button("Copy Raw Battery Snapshot") {
+            Button {
                 monitor.copyRawSnapshot()
+            } label: {
+                HStack(spacing: 6) {
+                    if monitor.isCopyingRawSnapshot {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Text("Copy Raw Battery Snapshot")
+                }
             }
+            .disabled(monitor.isCopyingRawSnapshot)
 
             Button("Copy Parsed Battery Snapshot") {
                 monitor.copyParsedSnapshot()
             }
+            .disabled(monitor.canCopyParsedSnapshot == false)
 
             Button("Copy History CSV") {
                 historyStore.copyCSV()
@@ -124,7 +158,7 @@ struct SettingsView: View {
             .disabled(historyStore.entries.isEmpty)
 
             Button("Reset Settings") {
-                preferences.reset()
+                resetSettings()
             }
         }
     }
@@ -138,137 +172,61 @@ struct SettingsView: View {
     }
 
     private func updateLaunchAtLogin(_ enabled: Bool) {
-        isUpdatingLaunchAtLogin = true
-        defer {
-            isUpdatingLaunchAtLogin = false
-        }
-
-        do {
-            try launchAtLoginManager.setEnabled(enabled)
-            preferences.launchAtLoginEnabled = launchAtLoginManager.isEnabled
-            launchAtLoginError = nil
-        } catch {
-            launchAtLoginError = error.localizedDescription
-            preferences.launchAtLoginEnabled = launchAtLoginManager.isEnabled
-        }
+        launchAtLoginState.setEnabled(enabled)
+        preferences.launchAtLoginEnabled = launchAtLoginState.isEnabled
     }
-}
 
-private struct HistoryStatsView: View {
-    let stats: BatteryHistoryStats?
-    let unitPreference: TemperatureUnitPreference
-    let emptyText: String
+    private func resetSettings() {
+        launchAtLoginState.disableForReset()
+        alertSettings.cancelPendingAlertEnables()
+        preferences.reset()
+        preferences.launchAtLoginEnabled = launchAtLoginState.isEnabled
+    }
 
-    var body: some View {
-        Group {
-            if let stats {
-                VStack(alignment: .leading, spacing: 5) {
-                    HistoryStatRow(title: "History", value: "\(stats.sampleCount) samples")
-                    HistoryStatRow(title: "Latest", value: dateText(stats.latestTimestamp))
-                    HistoryStatRow(title: "Captured", value: capturedText(for: stats))
-                    HistoryStatRow(title: "Power", value: powerText(for: stats))
-                    HistoryStatRow(
-                        title: "Charge",
-                        value: percentRangeText(
-                            minimum: stats.minimumChargePercent,
-                            maximum: stats.maximumChargePercent
-                        )
-                    )
-                    HistoryStatRow(
-                        title: "Temperature",
-                        value: temperatureRangeText(
-                            minimum: stats.minimumTemperatureCelsius,
-                            maximum: stats.maximumTemperatureCelsius
-                        )
+    private func refreshLaunchAtLoginState() {
+        launchAtLoginState.refresh()
+        preferences.launchAtLoginEnabled = launchAtLoginState.isEnabled
+    }
+
+    private func refreshExternalSettingsState() {
+        preferences.refreshICloudSyncAvailability()
+        refreshLaunchAtLoginState()
+        alertSettings.refreshAuthorizationStatus(preferences: preferences)
+    }
+
+    private func menuBarDisplayPreferenceBinding<Value>(
+        _ keyPath: ReferenceWritableKeyPath<PreferencesStore, Value>
+    ) -> Binding<Value> where Value: Equatable {
+        Binding(
+            get: {
+                preferences[keyPath: keyPath]
+            },
+            set: { value in
+                guard preferences[keyPath: keyPath] != value else {
+                    preferences.invalidateMenuBarDisplayPreferences()
+                    return
+                }
+
+                preferences[keyPath: keyPath] = value
+            }
+        )
+    }
+
+    private func alertBinding(_ keyPath: ReferenceWritableKeyPath<PreferencesStore, Bool>) -> Binding<Bool> {
+        Binding(
+            get: {
+                preferences[keyPath: keyPath]
+            },
+            set: { enabled in
+                Task { @MainActor in
+                    await alertSettings.setAlertEnabled(
+                        enabled,
+                        preferences: preferences,
+                        keyPath: keyPath
                     )
                 }
-                .font(.footnote)
-            } else {
-                Text(emptyText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
-        }
-        .padding(.vertical, 2)
-    }
-
-    private func capturedText(for stats: BatteryHistoryStats) -> String {
-        if Calendar.current.isDate(stats.firstTimestamp, inSameDayAs: stats.latestTimestamp) {
-            return "\(dateText(stats.firstTimestamp)) - \(timeText(stats.latestTimestamp))"
-        }
-
-        return "\(dateText(stats.firstTimestamp)) - \(dateText(stats.latestTimestamp))"
-    }
-
-    private func powerText(for stats: BatteryHistoryStats) -> String {
-        switch (stats.averagePowerWatts, stats.peakPowerWatts) {
-        case let (.some(average), .some(peak)):
-            return "Avg \(BatteryFormatting.watts(average)), Peak \(BatteryFormatting.watts(peak))"
-        case let (.some(average), .none):
-            return "Avg \(BatteryFormatting.watts(average))"
-        case let (.none, .some(peak)):
-            return "Peak \(BatteryFormatting.watts(peak))"
-        case (.none, .none):
-            return "Unavailable"
-        }
-    }
-
-    private func percentRangeText(minimum: Double?, maximum: Double?) -> String {
-        guard let minimum, let maximum else {
-            return "Unavailable"
-        }
-
-        let minimumText = BatteryFormatting.percent(minimum)
-        let maximumText = BatteryFormatting.percent(maximum)
-        guard minimumText != maximumText else {
-            return minimumText
-        }
-
-        return "\(minimumText) - \(maximumText)"
-    }
-
-    private func temperatureRangeText(minimum: Double?, maximum: Double?) -> String {
-        guard let minimum, let maximum else {
-            return "Unavailable"
-        }
-
-        let minimumText = BatteryFormatting.temperature(minimum, unitPreference: unitPreference)
-        let maximumText = BatteryFormatting.temperature(maximum, unitPreference: unitPreference)
-        guard minimumText != maximumText else {
-            return minimumText
-        }
-
-        return "\(minimumText) - \(maximumText)"
-    }
-
-    private func dateText(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
-    }
-
-    private func timeText(_ date: Date) -> String {
-        date.formatted(.dateTime.hour().minute())
-    }
-}
-
-private struct HistoryStatRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 12)
-
-            Text(value)
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.trailing)
-                .monospacedDigit()
-                .lineLimit(2)
-                .layoutPriority(1)
-        }
-        .fixedSize(horizontal: false, vertical: true)
+        )
     }
 }
 

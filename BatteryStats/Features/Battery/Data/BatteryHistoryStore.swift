@@ -14,14 +14,67 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     let cycleCount: Int?
 
     init(snapshot: BatterySnapshot) {
+        let powerState = snapshot.powerState
         timestamp = snapshot.timestamp
-        powerState = snapshot.powerState.rawValue
-        healthPercent = snapshot.healthPercent
-        stateOfChargePercent = snapshot.stateOfChargePercent
-        displayedTimeMinutes = snapshot.displayedTimeMinutes
-        activePowerWatts = snapshot.activePowerWatts
-        temperatureCelsius = snapshot.temperatureCelsius
-        cycleCount = snapshot.cycleCount
+        self.powerState = powerState.rawValue
+        healthPercent = BatteryCalculations.presentationPercent(snapshot.healthPercent, maximumAllowed: 120)
+        stateOfChargePercent = BatteryCalculations.presentationPercent(snapshot.stateOfChargePercent, maximumAllowed: 105)
+        displayedTimeMinutes = Self.displayedTimeMinutes(snapshot.displayedTimeMinutes, powerState: powerState)
+        activePowerWatts = Self.activePowerWatts(snapshot.activePowerWatts, powerState: powerState)
+        temperatureCelsius = BatteryCalculations.plausibleTemperatureCelsius(snapshot.temperatureCelsius)
+        cycleCount = BatteryCalculations.plausibleCycleCount(snapshot.cycleCount)
+    }
+
+    private init(
+        timestamp: Date,
+        powerState: String,
+        healthPercent: Double?,
+        stateOfChargePercent: Double?,
+        displayedTimeMinutes: Int?,
+        activePowerWatts: Double?,
+        temperatureCelsius: Double?,
+        cycleCount: Int?
+    ) {
+        self.timestamp = timestamp
+        self.powerState = powerState
+        self.healthPercent = healthPercent
+        self.stateOfChargePercent = stateOfChargePercent
+        self.displayedTimeMinutes = displayedTimeMinutes
+        self.activePowerWatts = activePowerWatts
+        self.temperatureCelsius = temperatureCelsius
+        self.cycleCount = cycleCount
+    }
+
+    func normalized() -> BatteryHistoryEntry {
+        let powerState = BatteryPowerState(rawValue: powerState) ?? .unknown
+        return BatteryHistoryEntry(
+            timestamp: timestamp,
+            powerState: powerState.rawValue,
+            healthPercent: BatteryCalculations.presentationPercent(healthPercent, maximumAllowed: 120),
+            stateOfChargePercent: BatteryCalculations.presentationPercent(stateOfChargePercent, maximumAllowed: 105),
+            displayedTimeMinutes: Self.displayedTimeMinutes(displayedTimeMinutes, powerState: powerState),
+            activePowerWatts: Self.activePowerWatts(activePowerWatts, powerState: powerState),
+            temperatureCelsius: BatteryCalculations.plausibleTemperatureCelsius(temperatureCelsius),
+            cycleCount: BatteryCalculations.plausibleCycleCount(cycleCount)
+        )
+    }
+
+    private static func displayedTimeMinutes(_ value: Int?, powerState: BatteryPowerState) -> Int? {
+        switch powerState {
+        case .onBattery, .connectedDischarging, .charging:
+            return BatteryCalculations.plausibleDurationMinutes(value)
+        case .connectedNotCharging, .fullOnAC, .unknown:
+            return nil
+        }
+    }
+
+    private static func activePowerWatts(_ value: Double?, powerState: BatteryPowerState) -> Double? {
+        switch powerState {
+        case .onBattery, .connectedDischarging, .charging, .connectedNotCharging, .fullOnAC:
+            return BatteryCalculations.plausibleWatts(value)
+        case .unknown:
+            return nil
+        }
     }
 }
 
@@ -37,33 +90,92 @@ struct BatteryHistoryStats: Equatable, Sendable {
     let maximumTemperatureCelsius: Double?
 
     init?(entries: [BatteryHistoryEntry]) {
-        guard entries.isEmpty == false,
-              let firstTimestamp = entries.map(\.timestamp).min(),
-              let latestTimestamp = entries.map(\.timestamp).max() else {
+        guard entries.isEmpty == false else {
             return nil
         }
-
-        let powerValues = entries.compactMap(\.activePowerWatts)
-        let chargeValues = entries.compactMap(\.stateOfChargePercent)
-        let temperatureValues = entries.compactMap(\.temperatureCelsius)
 
         self.sampleCount = entries.count
-        self.firstTimestamp = firstTimestamp
-        self.latestTimestamp = latestTimestamp
-        averagePowerWatts = Self.average(powerValues)
-        peakPowerWatts = powerValues.max()
-        minimumChargePercent = chargeValues.min()
-        maximumChargePercent = chargeValues.max()
-        minimumTemperatureCelsius = temperatureValues.min()
-        maximumTemperatureCelsius = temperatureValues.max()
-    }
+        var firstTimestamp = Date.distantFuture
+        var latestTimestamp = Date.distantPast
+        var powerTotal = 0.0
+        var powerCount = 0
+        var peakPowerWatts: Double?
+        var minimumChargePercent: Double?
+        var maximumChargePercent: Double?
+        var minimumTemperatureCelsius: Double?
+        var maximumTemperatureCelsius: Double?
 
-    private static func average(_ values: [Double]) -> Double? {
-        guard values.isEmpty == false else {
-            return nil
+        for rawEntry in entries {
+            let entry = rawEntry.normalized()
+            firstTimestamp = min(firstTimestamp, entry.timestamp)
+            latestTimestamp = max(latestTimestamp, entry.timestamp)
+
+            if let activePowerWatts = entry.activePowerWatts, activePowerWatts.isFinite {
+                powerTotal += activePowerWatts
+                powerCount += 1
+                peakPowerWatts = max(peakPowerWatts ?? activePowerWatts, activePowerWatts)
+            }
+
+            if let chargePercent = entry.stateOfChargePercent, chargePercent.isFinite {
+                minimumChargePercent = min(minimumChargePercent ?? chargePercent, chargePercent)
+                maximumChargePercent = max(maximumChargePercent ?? chargePercent, chargePercent)
+            }
+
+            if let temperatureCelsius = entry.temperatureCelsius, temperatureCelsius.isFinite {
+                minimumTemperatureCelsius = min(minimumTemperatureCelsius ?? temperatureCelsius, temperatureCelsius)
+                maximumTemperatureCelsius = max(maximumTemperatureCelsius ?? temperatureCelsius, temperatureCelsius)
+            }
         }
 
-        return values.reduce(0, +) / Double(values.count)
+        self.firstTimestamp = firstTimestamp
+        self.latestTimestamp = latestTimestamp
+        self.averagePowerWatts = powerCount == 0 ? nil : powerTotal / Double(powerCount)
+        self.peakPowerWatts = peakPowerWatts
+        self.minimumChargePercent = minimumChargePercent
+        self.maximumChargePercent = maximumChargePercent
+        self.minimumTemperatureCelsius = minimumTemperatureCelsius
+        self.maximumTemperatureCelsius = maximumTemperatureCelsius
+    }
+}
+
+enum BatteryHistoryTextFormatting {
+    static func sampleCountText(_ count: Int) -> String {
+        count == 1 ? "1 sample" : "\(count) samples"
+    }
+
+    static func summary(count: Int, syncsToICloud: Bool) -> String {
+        let storageText = syncsToICloud ? "synced with iCloud" : "stored locally"
+        return "\(sampleCountText(count)) \(storageText)."
+    }
+}
+
+@MainActor
+protocol BatteryHistoryCloudStoring: AnyObject {
+    func synchronize() -> Bool
+    func string(forKey key: String) -> String?
+    func setString(_ value: String, forKey key: String)
+    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol
+    func removeObserver(_ token: NSObjectProtocol)
+}
+
+extension NSUbiquitousKeyValueStore: BatteryHistoryCloudStoring {
+    func setString(_ value: String, forKey key: String) {
+        set(value, forKey: key)
+    }
+
+    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: self,
+            queue: .main
+        ) { notification in
+            let keys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
+            handler(keys)
+        }
+    }
+
+    func removeObserver(_ token: NSObjectProtocol) {
+        NotificationCenter.default.removeObserver(token)
     }
 }
 
@@ -75,16 +187,37 @@ final class BatteryHistoryStore {
         static let cloudEntries = "batteryHistoryEntries"
     }
 
+    private static let significantTemperatureChangeThresholdCelsius = 2.0
+
     var entries: [BatteryHistoryEntry] = []
 
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private var cloudStore: NSUbiquitousKeyValueStore?
-    @ObservationIgnored private var policy = BatteryHistoryPolicy.disabled
+    @ObservationIgnored private var cloudStore: (any BatteryHistoryCloudStoring)?
+    @ObservationIgnored private let pasteboardCopy: @MainActor (String) -> Void
+    @ObservationIgnored private let cloudSynchronizeDelay: Duration
+    private var policy = BatteryHistoryPolicy.disabled
+    @ObservationIgnored private var cloudSynchronizeTask: Task<Void, Never>?
+    @ObservationIgnored private var cloudObserverToken: NSObjectProtocol?
 
-    init(defaults: UserDefaults = .standard, cloudStore: NSUbiquitousKeyValueStore? = nil) {
+    init(
+        defaults: UserDefaults = .standard,
+        cloudStore: (any BatteryHistoryCloudStoring)? = nil,
+        pasteboardCopy: @escaping @MainActor (String) -> Void = PasteboardCopying.copy,
+        cloudSynchronizeDelay: Duration = .milliseconds(750)
+    ) {
         self.defaults = defaults
         self.cloudStore = cloudStore
-        entries = Self.decodeEntries(from: defaults.string(forKey: Key.localEntries))
+        self.pasteboardCopy = pasteboardCopy
+        self.cloudSynchronizeDelay = cloudSynchronizeDelay
+
+        let storedEntries = defaults.string(forKey: Key.localEntries)
+        entries = Self.decodeHistoryEntries(from: storedEntries)?.entries ?? []
+        rewriteNormalizedLocalEntriesIfNeeded(previouslyStoredEntries: storedEntries)
+    }
+
+    isolated deinit {
+        stopObservingCloudEntries()
+        cancelCloudSynchronize()
     }
 
     var summaryText: String {
@@ -92,25 +225,73 @@ final class BatteryHistoryStore {
             return "No history recorded yet."
         }
 
-        return "\(entries.count) samples stored locally."
+        return BatteryHistoryTextFormatting.summary(count: entries.count, syncsToICloud: policy.syncsToICloud)
     }
 
     var stats: BatteryHistoryStats? {
         BatteryHistoryStats(entries: entries)
     }
 
-    func updatePolicy(_ policy: BatteryHistoryPolicy) {
-        self.policy = policy
+    @discardableResult
+    func updatePolicy(_ policy: BatteryHistoryPolicy) -> Bool {
+        let previousPolicy = self.policy
+        let resolvedPolicy = BatteryHistoryPolicy(
+            isEnabled: policy.isEnabled,
+            syncsToICloud: policy.isEnabled && policy.syncsToICloud && canUseCloudStore
+        )
 
-        guard policy.isEnabled else {
-            return
+        guard resolvedPolicy != previousPolicy else {
+            if resolvedPolicy.isEnabled == false {
+                clearHistory(syncsToCloud: false)
+            }
+            return false
         }
 
-        if policy.syncsToICloud {
-            mergeCloudEntries()
+        self.policy = resolvedPolicy
+
+        if self.policy.syncsToICloud == false {
+            stopObservingCloudEntries()
+            cancelCloudSynchronize()
+        }
+
+        guard self.policy.isEnabled else {
+            clearHistory(syncsToCloud: previousPolicy.syncsToICloud)
+            return false
+        }
+
+        if self.policy.syncsToICloud {
+            startObservingCloudEntries()
+            _ = mergeCloudEntries(
+                allowsEmptyCloudReplacement: false,
+                allowsMissingCloudReplacement: false
+            )
         }
 
         persist()
+        return previousPolicy.isEnabled == false
+    }
+
+    private func clearHistory(syncsToCloud: Bool) {
+        if entries.isEmpty == false {
+            entries = []
+        }
+
+        let encodedEntries = "[]"
+        if defaults.string(forKey: Key.localEntries) != encodedEntries {
+            defaults.set(encodedEntries, forKey: Key.localEntries)
+        }
+
+        guard syncsToCloud else {
+            return
+        }
+
+        let cloudStore = resolvedCloudStore
+        guard cloudStore.string(forKey: Key.cloudEntries) != encodedEntries else {
+            return
+        }
+
+        cloudStore.setString(encodedEntries, forKey: Key.cloudEntries)
+        _ = cloudStore.synchronize()
     }
 
     func record(_ snapshot: BatterySnapshot) {
@@ -123,20 +304,32 @@ final class BatteryHistoryStore {
             return
         }
 
-        entries.append(entry)
-        entries = Array(entries.sorted { $0.timestamp < $1.timestamp }.suffix(288))
+        let normalizedEntries = Self.normalizedEntries(entries + [entry])
+        guard normalizedEntries != entries else {
+            return
+        }
+
+        entries = normalizedEntries
         persist()
     }
 
-    func copyCSV() {
-        PasteboardCopying.copy(csvString)
+    @discardableResult
+    func copyCSV() -> Bool {
+        guard entries.isEmpty == false else {
+            return false
+        }
+
+        pasteboardCopy(csvString)
+        return true
     }
 
     private var csvString: String {
         let header = "timestamp,power_state,health_percent,charge_percent,time_minutes,active_power_watts,temperature_celsius,cycle_count"
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let rows = entries.map { entry in
             [
-                Self.isoString(from: entry.timestamp),
+                formatter.string(from: entry.timestamp),
                 entry.powerState,
                 Self.csvValue(entry.healthPercent),
                 Self.csvValue(entry.stateOfChargePercent),
@@ -151,50 +344,111 @@ final class BatteryHistoryStore {
     }
 
     private func shouldRecord(_ entry: BatteryHistoryEntry) -> Bool {
-        guard let previous = entries.last else {
+        guard let comparisonEntry = nearestEntry(to: entry.timestamp) else {
             return true
         }
 
-        if entry.timestamp.timeIntervalSince(previous.timestamp) >= 300 {
+        if entry.timestamp == comparisonEntry.timestamp {
             return true
         }
 
-        if entry.powerState != previous.powerState {
+        if abs(entry.timestamp.timeIntervalSince(comparisonEntry.timestamp)) >= 300 {
+            return true
+        }
+
+        if entry.powerState != comparisonEntry.powerState {
             return true
         }
 
         if BatteryRefreshPolicy.isSignificantEnergyChange(
-            previous: previous.activePowerWatts,
+            previous: comparisonEntry.activePowerWatts,
             current: entry.activePowerWatts,
             thresholdPercent: 35
         ) {
             return true
         }
 
-        if let previousCharge = previous.stateOfChargePercent,
+        if let previousCharge = comparisonEntry.stateOfChargePercent,
            let currentCharge = entry.stateOfChargePercent,
            abs(currentCharge - previousCharge) >= 2 {
+            return true
+        }
+
+        if let previousTemperature = comparisonEntry.temperatureCelsius,
+           let currentTemperature = entry.temperatureCelsius,
+           abs(currentTemperature - previousTemperature) >= Self.significantTemperatureChangeThresholdCelsius {
+            return true
+        }
+
+        if let previousCycleCount = comparisonEntry.cycleCount,
+           let currentCycleCount = entry.cycleCount,
+           previousCycleCount != currentCycleCount {
+            return true
+        }
+
+        if (comparisonEntry.healthPercent == nil) != (entry.healthPercent == nil)
+            || (comparisonEntry.stateOfChargePercent == nil) != (entry.stateOfChargePercent == nil)
+            || (comparisonEntry.displayedTimeMinutes == nil) != (entry.displayedTimeMinutes == nil)
+            || (comparisonEntry.activePowerWatts == nil) != (entry.activePowerWatts == nil)
+            || (comparisonEntry.temperatureCelsius == nil) != (entry.temperatureCelsius == nil)
+            || (comparisonEntry.cycleCount == nil) != (entry.cycleCount == nil) {
             return true
         }
 
         return false
     }
 
-    private func mergeCloudEntries() {
+    private func nearestEntry(to timestamp: Date) -> BatteryHistoryEntry? {
+        entries.min { first, second in
+            abs(first.timestamp.timeIntervalSince(timestamp)) < abs(second.timestamp.timeIntervalSince(timestamp))
+        }
+    }
+
+    @discardableResult
+    private func mergeCloudEntries(
+        allowsEmptyCloudReplacement: Bool,
+        allowsMissingCloudReplacement: Bool
+    ) -> Bool {
         let cloudStore = resolvedCloudStore
-        cloudStore.synchronize()
-        let cloudEntries = Self.decodeEntries(from: cloudStore.string(forKey: Key.cloudEntries))
-        guard cloudEntries.isEmpty == false else {
-            return
+        _ = cloudStore.synchronize()
+
+        guard let cloudHistoryString = cloudStore.string(forKey: Key.cloudEntries) else {
+            guard allowsMissingCloudReplacement, entries.isEmpty == false else {
+                return false
+            }
+
+            entries = []
+            return true
         }
 
-        entries = Array((entries + cloudEntries)
-            .reduce(into: [Date: BatteryHistoryEntry]()) { partialResult, entry in
-                partialResult[entry.timestamp] = entry
+        guard let decodedCloudEntries = Self.decodeHistoryEntries(from: cloudHistoryString) else {
+            repairMalformedCloudEntries(cloudStore: cloudStore)
+            return false
+        }
+        let normalizedCloudHistoryString = Self.encodeEntries(decodedCloudEntries.entries)
+        let cloudHistoryNeedsRepair = normalizedCloudHistoryString != cloudHistoryString
+
+        if decodedCloudEntries.entries.isEmpty {
+            guard decodedCloudEntries.rawEntryCount == 0 else {
+                repairMalformedCloudEntries(cloudStore: cloudStore)
+                return false
             }
-            .values
-            .sorted { $0.timestamp < $1.timestamp }
-            .suffix(288))
+
+            guard allowsEmptyCloudReplacement, entries.isEmpty == false else {
+                return false
+            }
+
+            entries = []
+            return true
+        }
+
+        let mergedEntries = Self.normalizedEntries(entries + decodedCloudEntries.entries)
+        guard mergedEntries != entries else {
+            return cloudHistoryNeedsRepair
+        }
+
+        entries = mergedEntries
+        return true
     }
 
     private func persist() {
@@ -206,12 +460,106 @@ final class BatteryHistoryStore {
 
         if policy.syncsToICloud {
             let cloudStore = resolvedCloudStore
-            cloudStore.set(encodedEntries, forKey: Key.cloudEntries)
-            cloudStore.synchronize()
+            cloudStore.setString(encodedEntries, forKey: Key.cloudEntries)
+            scheduleCloudSynchronize()
         }
     }
 
-    private var resolvedCloudStore: NSUbiquitousKeyValueStore {
+    private func repairMalformedCloudEntries(cloudStore: any BatteryHistoryCloudStoring) {
+        guard let encodedEntries = Self.encodeEntries(entries) else {
+            return
+        }
+
+        cloudStore.setString(encodedEntries, forKey: Key.cloudEntries)
+        scheduleCloudSynchronize()
+    }
+
+    private func rewriteNormalizedLocalEntriesIfNeeded(previouslyStoredEntries: String?) {
+        guard let previouslyStoredEntries,
+              let normalizedEntries = Self.encodeEntries(entries),
+              normalizedEntries != previouslyStoredEntries else {
+            return
+        }
+
+        defaults.set(normalizedEntries, forKey: Key.localEntries)
+    }
+
+    func flushPendingWrites() {
+        cancelCloudSynchronize()
+
+        guard policy.syncsToICloud else {
+            return
+        }
+
+        _ = resolvedCloudStore.synchronize()
+    }
+
+    private func scheduleCloudSynchronize() {
+        cancelCloudSynchronize()
+        cloudSynchronizeTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            try? await Task.sleep(for: cloudSynchronizeDelay)
+            guard Task.isCancelled == false,
+                  policy.syncsToICloud else {
+                return
+            }
+
+            _ = resolvedCloudStore.synchronize()
+            cloudSynchronizeTask = nil
+        }
+    }
+
+    private func cancelCloudSynchronize() {
+        cloudSynchronizeTask?.cancel()
+        cloudSynchronizeTask = nil
+    }
+
+    private func startObservingCloudEntries() {
+        guard cloudObserverToken == nil else {
+            return
+        }
+
+        cloudObserverToken = resolvedCloudStore.observeChanges { [weak self] changedKeys in
+            Task { @MainActor in
+                self?.handleCloudEntriesChanged(keys: changedKeys)
+            }
+        }
+    }
+
+    private func stopObservingCloudEntries() {
+        guard let cloudObserverToken else {
+            return
+        }
+
+        resolvedCloudStore.removeObserver(cloudObserverToken)
+        self.cloudObserverToken = nil
+    }
+
+    private func handleCloudEntriesChanged(keys: [String]) {
+        guard policy.syncsToICloud else {
+            return
+        }
+
+        guard keys.isEmpty || keys.contains(Key.cloudEntries) else {
+            return
+        }
+
+        if mergeCloudEntries(
+            allowsEmptyCloudReplacement: true,
+            allowsMissingCloudReplacement: keys.contains(Key.cloudEntries)
+        ) {
+            persist()
+        }
+    }
+
+    private var canUseCloudStore: Bool {
+        cloudStore != nil || ICloudKeyValueStoreAvailability.isAvailable
+    }
+
+    private var resolvedCloudStore: any BatteryHistoryCloudStoring {
         if let cloudStore {
             return cloudStore
         }
@@ -221,14 +569,22 @@ final class BatteryHistoryStore {
         return store
     }
 
-    private static func decodeEntries(from string: String?) -> [BatteryHistoryEntry] {
+    private struct DecodedHistoryEntries {
+        let entries: [BatteryHistoryEntry]
+        let rawEntryCount: Int
+    }
+
+    private static func decodeHistoryEntries(from string: String?) -> DecodedHistoryEntries? {
         guard let string,
               let data = string.data(using: .utf8),
               let entries = try? JSONDecoder().decode([BatteryHistoryEntry].self, from: data) else {
-            return []
+            return nil
         }
 
-        return entries
+        return DecodedHistoryEntries(
+            entries: normalizedEntries(entries),
+            rawEntryCount: entries.count
+        )
     }
 
     private static func encodeEntries(_ entries: [BatteryHistoryEntry]) -> String? {
@@ -239,13 +595,45 @@ final class BatteryHistoryStore {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func csvValue(_ value: Double?) -> String {
-        value.map { $0.formatted(.number.precision(.fractionLength(2))) } ?? ""
+    static func csvValue(_ value: Double?) -> String {
+        guard let value, value.isFinite else {
+            return ""
+        }
+
+        return String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
     }
 
-    private static func isoString(from date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.string(from: date)
+    private static func normalizedEntries(_ entries: [BatteryHistoryEntry], now: Date = Date()) -> [BatteryHistoryEntry] {
+        Array(entries
+            .reduce(into: [Date: BatteryHistoryEntry]()) { partialResult, entry in
+                let normalizedEntry = entry.normalized()
+                guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: normalizedEntry.timestamp, now: now) else {
+                    return
+                }
+
+                if let existingEntry = partialResult[normalizedEntry.timestamp],
+                   normalizedEntry.completenessScore < existingEntry.completenessScore {
+                    return
+                }
+
+                partialResult[normalizedEntry.timestamp] = normalizedEntry
+            }
+            .values
+            .sorted { $0.timestamp < $1.timestamp }
+            .suffix(288))
+    }
+
+}
+
+private extension BatteryHistoryEntry {
+    var completenessScore: Int {
+        var score = powerState == BatteryPowerState.unknown.rawValue ? 0 : 1
+        score += healthPercent == nil ? 0 : 1
+        score += stateOfChargePercent == nil ? 0 : 1
+        score += displayedTimeMinutes == nil ? 0 : 1
+        score += activePowerWatts == nil ? 0 : 1
+        score += temperatureCelsius == nil ? 0 : 1
+        score += cycleCount == nil ? 0 : 1
+        return score
     }
 }
