@@ -556,10 +556,6 @@ enum BatteryWidgetMetricFormatting {
         snapshot?.activePowerWatts.map { BatteryFormatting.watts($0) } ?? "—"
     }
 
-    static func statusProgress(for snapshot: BatterySnapshot?) -> Double? {
-        BatteryPresentationStyle.statusDescriptor(for: snapshot).ringTintStyle == .secondary ? nil : 1
-    }
-
     static func clampedProgress(_ value: Double?) -> Double? {
         guard let value,
               value.isFinite,

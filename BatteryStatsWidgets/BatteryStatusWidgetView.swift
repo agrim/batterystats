@@ -75,7 +75,7 @@ struct BatteryStatusWidgetView: View {
         let descriptor = BatteryPresentationStyle.statusDescriptor(for: displaySnapshot)
         return BatteryWidgetMetric(
             content: .symbol(descriptor.symbolName),
-            progress: BatteryWidgetMetricFormatting.statusProgress(for: displaySnapshot),
+            progress: descriptor.progress,
             ringTint: descriptor.ringTint,
             contentTint: descriptor.contentTint
         )

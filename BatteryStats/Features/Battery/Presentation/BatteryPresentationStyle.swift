@@ -124,6 +124,10 @@ struct BatteryStatusDescriptor {
     var contentTint: Color {
         contentTintStyle.color
     }
+
+    var progress: Double? {
+        ringTintStyle == .secondary ? nil : 1
+    }
 }
 
 enum BatteryPresentationTint: Equatable {

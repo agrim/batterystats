@@ -36,7 +36,7 @@ struct BatterySummaryGridView: View {
             GroupBox {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 0) {
                     BatteryDetailRowView(
-                        title: BatterySummaryDetailFormatting.timeTitle(for: snapshot),
+                        title: snapshot.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"),
                         value: BatterySummaryDetailFormatting.timeSummary(for: snapshot)
                     )
 
@@ -151,10 +151,6 @@ enum BatterySummaryDetailFormatting {
         }
 
         return BatteryFormatting.percent(value, decimals: 0)
-    }
-
-    static func timeTitle(for snapshot: BatterySnapshot) -> String {
-        snapshot.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left")
     }
 
     static func timeSummary(for snapshot: BatterySnapshot) -> String {

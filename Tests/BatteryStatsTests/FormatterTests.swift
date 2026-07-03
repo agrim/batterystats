@@ -312,9 +312,9 @@ final class FormatterTests: XCTestCase {
         let unknown = makeSnapshot(stateOfChargePercent: 80, powerState: .unknown)
         let invalidOnBattery = makeSnapshot(stateOfChargePercent: .nan, powerState: .onBattery)
 
-        XCTAssertNil(BatteryWidgetMetricFormatting.statusProgress(for: missingSnapshot))
-        XCTAssertNil(BatteryWidgetMetricFormatting.statusProgress(for: unknown))
-        XCTAssertNil(BatteryWidgetMetricFormatting.statusProgress(for: invalidOnBattery))
+        XCTAssertNil(BatteryPresentationStyle.statusDescriptor(for: missingSnapshot).progress)
+        XCTAssertNil(BatteryPresentationStyle.statusDescriptor(for: unknown).progress)
+        XCTAssertNil(BatteryPresentationStyle.statusDescriptor(for: invalidOnBattery).progress)
     }
 
     func testWidgetStatusMetricProgressIsFullForKnownStatus() {
@@ -326,7 +326,7 @@ final class FormatterTests: XCTestCase {
         let fullOnAC = makeSnapshot(stateOfChargePercent: 100, powerState: .fullOnAC)
 
         for snapshot in [onBattery, lowBattery, charging, connectedDischarging, connectedNotCharging, fullOnAC] {
-            XCTAssertEqual(BatteryWidgetMetricFormatting.statusProgress(for: snapshot), 1)
+            XCTAssertEqual(BatteryPresentationStyle.statusDescriptor(for: snapshot).progress, 1)
         }
     }
 
@@ -690,12 +690,12 @@ final class FormatterTests: XCTestCase {
         let fullOnAC = makeSnapshot(stateOfChargePercent: 100, powerState: .fullOnAC)
         let unknown = makeSnapshot(stateOfChargePercent: 55, powerState: .unknown)
 
-        XCTAssertEqual(BatterySummaryDetailFormatting.timeTitle(for: onBattery), "Time Left")
-        XCTAssertEqual(BatterySummaryDetailFormatting.timeTitle(for: charging), "Time to Full")
-        XCTAssertEqual(BatterySummaryDetailFormatting.timeTitle(for: connectedDischarging), "Time Left")
-        XCTAssertEqual(BatterySummaryDetailFormatting.timeTitle(for: connectedNotCharging), "Time")
-        XCTAssertEqual(BatterySummaryDetailFormatting.timeTitle(for: fullOnAC), "Time")
-        XCTAssertEqual(BatterySummaryDetailFormatting.timeTitle(for: unknown), "Time")
+        XCTAssertEqual(onBattery.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time Left")
+        XCTAssertEqual(charging.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time to Full")
+        XCTAssertEqual(connectedDischarging.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time Left")
+        XCTAssertEqual(connectedNotCharging.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time")
+        XCTAssertEqual(fullOnAC.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time")
+        XCTAssertEqual(unknown.powerState.timeTitle(charging: "Time to Full", discharging: "Time Left"), "Time")
 
         XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: nil), "Time")
         XCTAssertEqual(BatteryWidgetMetricFormatting.timeTitle(for: onBattery), "Time Left")
