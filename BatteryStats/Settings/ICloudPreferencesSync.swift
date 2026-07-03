@@ -74,16 +74,12 @@ final class ICloudPreferencesSync: PreferencesSyncing {
         availability.isAvailable
     }
 
-    var isICloudAccountAvailable: Bool {
-        availability.hasAccount
-    }
-
     var availabilityDescription: String {
         guard availability.hasEntitlement else {
             return "iCloud sync requires an iCloud Key-Value Storage entitlement in the signed app."
         }
 
-        if isICloudAccountAvailable {
+        if availability.hasAccount {
             return "Uses your existing iCloud account when the app is signed with iCloud Key-Value Storage."
         }
 

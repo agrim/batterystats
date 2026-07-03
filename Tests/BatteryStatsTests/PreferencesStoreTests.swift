@@ -784,7 +784,6 @@ final class PreferencesStoreTests: XCTestCase {
         )
 
         XCTAssertFalse(sync.isAvailable)
-        XCTAssertFalse(sync.isICloudAccountAvailable)
         XCTAssertEqual(
             sync.availabilityDescription,
             "iCloud sync requires an iCloud Key-Value Storage entitlement in the signed app."
