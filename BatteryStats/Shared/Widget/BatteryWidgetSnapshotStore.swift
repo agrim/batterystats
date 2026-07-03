@@ -662,12 +662,11 @@ enum BatteryWidgetUpdateFormatting {
             return now.addingTimeInterval(300)
         }
 
-        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateBoundary(updatedAt: updatedAt, now: now)
-        let staleDate = updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultMaximumAge + 1)
-        let retentionDate = updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultRetentionAge + 1)
-        return [nextRelativeDate, staleDate, retentionDate]
-            .filter { $0 > now }
-            .min() ?? now.addingTimeInterval(300)
+        return BatterySnapshotFreshnessPolicy.nextStatusChangeDate(
+            updatedAt: updatedAt,
+            now: now,
+            additionalDates: [updatedAt.addingTimeInterval(BatteryWidgetSnapshotStore.defaultRetentionAge + 1)]
+        )
     }
 }
 
@@ -690,6 +689,17 @@ enum BatterySnapshotFreshnessPolicy {
         }
 
         return nextRelativeUpdateDate(updatedAt: updatedAt, now: now)
+    }
+
+    static func nextStatusChangeDate(
+        updatedAt: Date,
+        now: Date,
+        additionalDates: [Date] = []
+    ) -> Date {
+        let nextRelativeDate = nextRelativeUpdateBoundary(updatedAt: updatedAt, now: now)
+        return ([nextRelativeDate, updatedAt.addingTimeInterval(maximumLiveAge + 1)] + additionalDates)
+            .filter { $0 > now }
+            .min() ?? nextRelativeDate
     }
 
     static func relativeUpdateText(updatedAt: Date, now: Date) -> String {

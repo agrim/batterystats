@@ -23,11 +23,7 @@ enum BatteryFreshnessFormatting {
     }
 
     static func hasUsableUpdate(lastUpdated: Date?, now: Date) -> Bool {
-        guard let lastUpdated else {
-            return false
-        }
-
-        return BatterySnapshotFreshnessPolicy.isLive(updatedAt: lastUpdated, now: now)
+        lastUpdated.map { BatterySnapshotFreshnessPolicy.isLive(updatedAt: $0, now: now) } ?? false
     }
 
     static func nextStatusChangeDate(lastUpdated: Date?, now: Date, isRefreshing: Bool) -> Date {
@@ -36,15 +32,6 @@ enum BatteryFreshnessFormatting {
             return now.addingTimeInterval(60)
         }
 
-        let nextRelativeDate = BatterySnapshotFreshnessPolicy.nextRelativeUpdateBoundary(updatedAt: lastUpdated, now: now)
-
-        if hasUsableUpdate(lastUpdated: lastUpdated, now: now) {
-            let staleDate = lastUpdated.addingTimeInterval(BatterySnapshotFreshnessPolicy.maximumLiveAge + 1)
-            if staleDate > now {
-                return min(nextRelativeDate, staleDate)
-            }
-        }
-
-        return nextRelativeDate
+        return BatterySnapshotFreshnessPolicy.nextStatusChangeDate(updatedAt: lastUpdated, now: now)
     }
 }
