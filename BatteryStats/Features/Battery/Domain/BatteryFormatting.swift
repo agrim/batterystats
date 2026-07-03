@@ -12,35 +12,23 @@ enum BatteryFormatting {
     .month(.abbreviated)
 
     static func milliampHours(_ value: Int?, allowsZero: Bool = true) -> String {
-        guard let value = BatteryCalculations.plausibleCapacityMilliampHours(value, allowsZero: allowsZero) else {
-            return "Unavailable"
-        }
-
-        return "\(value.formatted(.number.grouping(.automatic))) mAh"
+        BatteryCalculations.plausibleCapacityMilliampHours(value, allowsZero: allowsZero)
+            .map { "\($0.formatted(.number.grouping(.automatic))) mAh" } ?? "Unavailable"
     }
 
     static func millivolts(_ value: Int?) -> String {
-        guard let value = BatteryCalculations.plausibleVoltageMillivolts(value) else {
-            return "Unavailable"
-        }
-
-        return "\(value.formatted(.number.grouping(.automatic))) mV"
+        BatteryCalculations.plausibleVoltageMillivolts(value)
+            .map { "\($0.formatted(.number.grouping(.automatic))) mV" } ?? "Unavailable"
     }
 
     static func wattHours(_ value: Double?) -> String {
-        guard let value = BatteryCalculations.plausibleWattHours(value) else {
-            return "Unavailable"
-        }
-
-        return "\(value.formatted(.number.precision(.fractionLength(1)))) Wh"
+        BatteryCalculations.plausibleWattHours(value)
+            .map { "\($0.formatted(.number.precision(.fractionLength(1)))) Wh" } ?? "Unavailable"
     }
 
     static func watts(_ value: Double?) -> String {
-        guard let value = BatteryCalculations.plausibleWatts(value) else {
-            return "Unavailable"
-        }
-
-        return "\(value.formatted(.number.precision(.fractionLength(1)))) W"
+        BatteryCalculations.plausibleWatts(value)
+            .map { "\($0.formatted(.number.precision(.fractionLength(1)))) W" } ?? "Unavailable"
     }
 
     static func adapterWatts(_ value: Int?) -> String? {
@@ -61,19 +49,11 @@ enum BatteryFormatting {
     }
 
     static func signedMilliamps(_ value: Int?) -> String {
-        guard let value = BatteryCalculations.plausibleSignedCurrentMilliamps(value) else {
-            return "Unavailable"
-        }
-
-        return formattedMilliamps(value)
+        BatteryCalculations.plausibleSignedCurrentMilliamps(value).map(formattedMilliamps) ?? "Unavailable"
     }
 
     static func milliamps(_ value: Int?) -> String {
-        guard let value = BatteryCalculations.plausibleCurrentMagnitudeMilliamps(value) else {
-            return "Unavailable"
-        }
-
-        return formattedMilliamps(value)
+        BatteryCalculations.plausibleCurrentMagnitudeMilliamps(value).map(formattedMilliamps) ?? "Unavailable"
     }
 
     static func duration(minutes: Int?) -> String {
@@ -131,11 +111,7 @@ enum BatteryFormatting {
     }
 
     static func date(_ value: Date?) -> String {
-        guard let value else {
-            return "Unavailable"
-        }
-
-        return value.formatted(manufactureDateStyle)
+        value.map { $0.formatted(manufactureDateStyle) } ?? "Unavailable"
     }
 
     static func age(_ components: DateComponents?) -> String {
