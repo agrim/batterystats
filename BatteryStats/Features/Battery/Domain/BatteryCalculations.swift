@@ -130,23 +130,11 @@ enum BatteryCalculations {
     }
 
     static func plausibleCapacityMilliampHours(_ value: Int?, allowsZero: Bool = true) -> Int? {
-        guard let value,
-              value >= (allowsZero ? 0 : 1),
-              value <= maximumPlausibleBatteryCapacityMilliampHours else {
-            return nil
-        }
-
-        return value
+        plausibleInteger(value, in: (allowsZero ? 0 : 1)...maximumPlausibleBatteryCapacityMilliampHours)
     }
 
     static func plausibleVoltageMillivolts(_ value: Int?) -> Int? {
-        guard let value,
-              value > 0,
-              value <= maximumPlausibleBatteryVoltageMillivolts else {
-            return nil
-        }
-
-        return value
+        plausibleInteger(value, in: 1...maximumPlausibleBatteryVoltageMillivolts)
     }
 
     static func plausibleSignedCurrentMilliamps(_ value: Int?) -> Int? {
@@ -160,13 +148,7 @@ enum BatteryCalculations {
     }
 
     static func plausibleCurrentMagnitudeMilliamps(_ value: Int?) -> Int? {
-        guard let value,
-              value >= 0,
-              value <= maximumPlausibleBatteryCurrentMilliamps else {
-            return nil
-        }
-
-        return value
+        plausibleInteger(value, in: 0...maximumPlausibleBatteryCurrentMilliamps)
     }
 
     static func plausibleDischargeRateMilliamps(_ value: Int?) -> Int? {
@@ -304,23 +286,11 @@ enum BatteryCalculations {
     }
 
     static func plausibleAdapterWatts(_ value: Int?) -> Int? {
-        guard let value,
-              value > 0,
-              value <= maximumPlausibleAdapterWatts else {
-            return nil
-        }
-
-        return value
+        plausibleInteger(value, in: 1...maximumPlausibleAdapterWatts)
     }
 
     static func plausibleCycleCount(_ value: Int?) -> Int? {
-        guard let value,
-              value >= 0,
-              value <= maximumPlausibleCycleCount else {
-            return nil
-        }
-
-        return value
+        plausibleInteger(value, in: 0...maximumPlausibleCycleCount)
     }
 
     static func chargeRateWatts(voltageMillivolts: Int?, signedCurrentMilliamps: Int?) -> Double? {
@@ -465,12 +435,7 @@ enum BatteryCalculations {
     }
 
     static func plausibleDurationMinutes(_ value: Int?) -> Int? {
-        guard let value,
-              (0...maximumPlausibleDurationMinutes).contains(value) else {
-            return nil
-        }
-
-        return value
+        plausibleInteger(value, in: 0...maximumPlausibleDurationMinutes)
     }
 
     static func smoothedDischargeRate(_ samples: [Int], fallback: Int?) -> Int? {
@@ -683,6 +648,14 @@ enum BatteryCalculations {
 
     private static func normalizedPercent(_ value: Double) -> Double? {
         presentationPercent(value, maximumAllowed: 105)
+    }
+
+    private static func plausibleInteger(_ value: Int?, in range: ClosedRange<Int>) -> Int? {
+        guard let value, range.contains(value) else {
+            return nil
+        }
+
+        return value
     }
 
     private static func shouldPreferCapacityPercent(calculated: Double, publicPercentage: Double) -> Bool {
