@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import BatteryStats
 
@@ -91,7 +92,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(monitor.snapshot?.displayedTimeMinutes)
     }
 
-    func testRefreshRestoresRateBasedTimeForConnectedDischarging() async {
+    func testRefreshRequiresStableTimestampedSamplesBeforeRestoringRateBasedTime() async {
         let snapshot = BatterySnapshot(
             timestamp: Date(timeIntervalSince1970: 1_000),
             powerState: .connectedDischarging,
@@ -120,8 +121,25 @@ final class BatteryMonitorTests: XCTestCase {
             adapterMaxWatts: 70,
             notes: []
         )
-        let reader = StubBatteryReader(snapshots: [snapshot])
-        let monitor = makeMonitor(reader)
+        let reader = StubBatteryReader(snapshots: [snapshot, snapshot, snapshot])
+        var publicationDates = [
+            Date(timeIntervalSince1970: 1_000),
+            Date(timeIntervalSince1970: 1_030),
+            Date(timeIntervalSince1970: 1_060)
+        ]
+        let monitor = BatteryMonitor(
+            reader: makeClient(reader),
+            widgetTimelineReloader: {},
+            now: { publicationDates.removeFirst() }
+        )
+
+        monitor.refresh()
+        await monitor.waitForIdleForTesting()
+        XCTAssertNil(monitor.snapshot?.rateBasedTimeRemainingMinutes)
+
+        monitor.refresh()
+        await monitor.waitForIdleForTesting()
+        XCTAssertNil(monitor.snapshot?.rateBasedTimeRemainingMinutes)
 
         monitor.refresh()
         await monitor.waitForIdleForTesting()
@@ -129,6 +147,116 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.snapshot?.powerState, .connectedDischarging)
         XCTAssertEqual(monitor.snapshot?.rateBasedTimeRemainingMinutes, 150)
         XCTAssertEqual(monitor.snapshot?.displayedTimeMinutes, 150)
+    }
+
+    func testRefreshClearsDischargeConfidenceAcrossLargeSampleGap() async {
+        let snapshots = Array(repeating: makeWidgetReloadSnapshot(stateOfChargePercent: 60), count: 4)
+        let reader = StubBatteryReader(snapshots: snapshots)
+        var publicationDates = [
+            Date(timeIntervalSince1970: 1_000),
+            Date(timeIntervalSince1970: 1_030),
+            Date(timeIntervalSince1970: 1_400),
+            Date(timeIntervalSince1970: 1_430)
+        ]
+        let monitor = BatteryMonitor(
+            reader: makeClient(reader),
+            widgetTimelineReloader: {},
+            now: { publicationDates.removeFirst() }
+        )
+
+        for _ in snapshots {
+            monitor.refresh()
+            await monitor.waitForIdleForTesting()
+        }
+
+        XCTAssertNil(monitor.snapshot?.rateBasedTimeRemainingMinutes)
+    }
+
+    func testPowerSourceNotificationsPreserveConfidenceAtFiveMinuteCadence() async {
+        let snapshots = Array(repeating: makeWidgetReloadSnapshot(stateOfChargePercent: 60), count: 3)
+        let reader = StubBatteryReader(snapshots: snapshots)
+        var notificationHandler: (@Sendable () -> Void)?
+        var publicationDates = [
+            Date(timeIntervalSince1970: 1_000),
+            Date(timeIntervalSince1970: 1_300),
+            Date(timeIntervalSince1970: 1_600)
+        ]
+        let monitor = BatteryMonitor(
+            reader: BatteryReadingClient(
+                read: { date, options in
+                    await reader.read(at: date, options: options)
+                },
+                makeNotificationToken: { handler in
+                    notificationHandler = handler
+                    return nil
+                }
+            ),
+            widgetTimelineReloader: {},
+            now: { publicationDates.removeFirst() }
+        )
+
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+        notificationHandler?()
+        await Task.yield()
+        await monitor.waitForIdleForTesting()
+        notificationHandler?()
+        await Task.yield()
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertEqual(monitor.snapshot?.rateBasedTimeRemainingMinutes, 50)
+    }
+
+    func testStopClearsDischargeConfidenceBeforeRestart() async {
+        let snapshots = Array(repeating: makeWidgetReloadSnapshot(stateOfChargePercent: 60), count: 3)
+        let reader = StubBatteryReader(snapshots: snapshots)
+        var publicationDates = [
+            Date(timeIntervalSince1970: 1_000),
+            Date(timeIntervalSince1970: 1_030),
+            Date(timeIntervalSince1970: 1_060)
+        ]
+        let monitor = BatteryMonitor(
+            reader: makeClient(reader),
+            widgetTimelineReloader: {},
+            now: { publicationDates.removeFirst() }
+        )
+
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+        monitor.refresh()
+        await monitor.waitForIdleForTesting()
+        monitor.stop()
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+
+        XCTAssertNil(monitor.snapshot?.rateBasedTimeRemainingMinutes)
+    }
+
+    func testWakeClearsDischargeConfidenceBeforeRefreshing() async {
+        let snapshots = Array(repeating: makeWidgetReloadSnapshot(stateOfChargePercent: 60), count: 3)
+        let reader = StubBatteryReader(snapshots: snapshots)
+        var publicationDates = [
+            Date(timeIntervalSince1970: 1_000),
+            Date(timeIntervalSince1970: 1_030),
+            Date(timeIntervalSince1970: 1_060)
+        ]
+        let monitor = BatteryMonitor(
+            reader: makeClient(reader),
+            widgetTimelineReloader: {},
+            now: { publicationDates.removeFirst() }
+        )
+
+        monitor.start()
+        await monitor.waitForIdleForTesting()
+        monitor.refresh()
+        await monitor.waitForIdleForTesting()
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        await Task.yield()
+        await monitor.waitForIdleForTesting()
+
+        let requestCount = await reader.requestCount
+        XCTAssertEqual(requestCount, 3)
+        XCTAssertNil(monitor.snapshot?.rateBasedTimeRemainingMinutes)
     }
 
     func testStartIsIdempotent() async {
@@ -530,7 +658,7 @@ final class BatteryMonitorTests: XCTestCase {
 
         monitor.refresh()
         await reader.waitForRequestCount(2)
-        reader.resumeRequest(at: 1, snapshot: nil)
+        await completeUnsupportedRead(reader, startingAt: 1)
         await monitor.waitForIdleForTesting()
 
         monitor.copyParsedSnapshot()
@@ -572,7 +700,7 @@ final class BatteryMonitorTests: XCTestCase {
 
         monitor.refresh()
         await reader.waitForRequestCount(1)
-        reader.resumeRequest(at: 0, snapshot: nil)
+        await completeUnsupportedRead(reader, startingAt: 0)
         await monitor.waitForIdleForTesting()
 
         XCTAssertTrue(monitor.canCopyParsedSnapshot)
@@ -646,17 +774,17 @@ final class BatteryMonitorTests: XCTestCase {
         enableEnergyProbeDemand(on: monitor)
         monitor.start()
         await reader.waitForRequestCount(1)
-        reader.resumeRequest(at: 0, snapshot: nil)
+        await completeUnsupportedRead(reader, startingAt: 0)
         await monitor.waitForIdleForTesting()
 
         monitor.probeEnergyUseForTesting()
         await Task.yield()
 
-        XCTAssertEqual(reader.requests, [.standard])
+        XCTAssertEqual(reader.requests, [.standard, .standard, .standard])
         XCTAssertEqual(monitor.availabilityState, .unsupported)
     }
 
-    func testEnergyProbeMissingSnapshotClearsCurrentBatteryState() async throws {
+    func testEnergyProbeTransientMissingSnapshotRetainsStateAndRecovers() async throws {
         let reader = ControlledDiagnosticsReader()
         var reloadCount = 0
         let store = try makeWidgetSnapshotStore()
@@ -680,13 +808,21 @@ final class BatteryMonitorTests: XCTestCase {
         monitor.probeEnergyUseForTesting()
         await reader.waitForRequestCount(2)
         reader.resumeRequest(at: 1, snapshot: nil)
+        await reader.waitForRequestCount(3)
+
+        XCTAssertEqual(monitor.availabilityState, .available)
+        XCTAssertEqual(monitor.snapshot?.powerState, .onBattery)
+        XCTAssertNotNil(store.snapshot(now: publicationDate.addingTimeInterval(30), maximumAge: 60))
+        XCTAssertEqual(reloadCount, 1)
+
+        reader.resumeRequest(at: 2, snapshot: .previewDischarging)
         await monitor.waitForIdleForTesting()
 
-        XCTAssertEqual(reader.requests, [.standard, .standard])
-        XCTAssertEqual(monitor.availabilityState, .unsupported)
-        XCTAssertNil(monitor.snapshot)
-        XCTAssertNil(store.snapshot(now: publicationDate.addingTimeInterval(30), maximumAge: 60))
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reader.requests, [.standard, .standard, .standard])
+        XCTAssertEqual(monitor.availabilityState, .available)
+        XCTAssertEqual(monitor.snapshot?.powerState, .onBattery)
+        XCTAssertNotNil(store.snapshot(now: publicationDate.addingTimeInterval(30), maximumAge: 60))
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testDisablingEnergyProbeIgnoresInFlightProbeResult() async {
@@ -896,7 +1032,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertFalse(BatteryRefreshPolicy.isSignificantEnergyChange(previous: 14.4, current: 14.4, thresholdPercent: 35))
         XCTAssertEqual(reader.requests, [.standard, .standard])
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testEnergyProbePublishesWhenHighTemperatureAlertStateChangesWithoutEnergyChange() async {
@@ -1016,7 +1152,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reader.requests, [.standard, .standard])
         XCTAssertEqual(monitor.snapshot?.activePowerWatts, 14.8)
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testEnergyProbePublishesFreshnessWhenUpdateMinuteChangesWithoutValueChange() async throws {
@@ -1110,7 +1246,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: try XCTUnwrap(monitor.snapshot)).title, "Input Power")
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testEnergyProbePublishesConnectedDischargingInputPowerTitleChangeWhenWattsAreStable() async throws {
@@ -1156,7 +1292,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: try XCTUnwrap(monitor.snapshot)).title, "Input Power")
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testEnergyProbePublishesVisibleTimeRemainingChangeWithoutEnergyChange() async {
@@ -1206,10 +1342,10 @@ final class BatteryMonitorTests: XCTestCase {
                 displayMode: .iconAndTimeRemaining,
                 temperatureUnitPreference: .celsius
             ),
-            "2h"
+            "2h5m"
         )
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testEnergyProbePublishesVisibleCurrentChangeWithoutWattChange() async throws {
@@ -1468,7 +1604,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reader.requests, [.standard, .standard])
         XCTAssertEqual(monitor.snapshot?.presentationHealthPercent, 89.6)
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testRefreshCancelsInFlightEnergyProbeResult() async {
@@ -1689,7 +1825,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reloadCount, 2)
     }
 
-    func testWidgetTimelineReloadsWhenPublicationClockMovesBackwardInsideSameMinute() async {
+    func testWidgetTimelineCoalescesClockMovementInsideSameMinute() async {
         var publicationDates = [
             Date(timeIntervalSince1970: 1_000),
             Date(timeIntervalSince1970: 990)
@@ -1713,7 +1849,7 @@ final class BatteryMonitorTests: XCTestCase {
         monitor.refresh()
         await monitor.waitForIdleForTesting()
 
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
         XCTAssertEqual(monitor.snapshot?.timestamp, Date(timeIntervalSince1970: 990))
     }
 
@@ -1770,7 +1906,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reloadCount, 2)
     }
 
-    func testWidgetTimelineReloadsWhenChargingInputPowerTitleChangesInsideThrottleWindow() async {
+    func testWidgetTimelineCoalescesChargingInputPowerTitleChangeInsideThrottleWindow() async {
         var publicationDates = [
             Date(timeIntervalSince1970: 1_000),
             Date(timeIntervalSince1970: 1_015)
@@ -1805,7 +1941,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(firstSnapshot.activePowerWatts, secondSnapshot.activePowerWatts)
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: monitor.snapshot).title, "Input Power")
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testWidgetTimelineDoesNotReloadForInputPowerAboveAdapterCapabilityInsideThrottleWindow() async {
@@ -1845,7 +1981,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reloadCount, 1)
     }
 
-    func testWidgetTimelineReloadsWhenConnectedInputPowerTitleChangesInsideThrottleWindow() async {
+    func testWidgetTimelineCoalescesConnectedInputPowerTitleChangeInsideThrottleWindow() async {
         var publicationDates = [
             Date(timeIntervalSince1970: 1_000),
             Date(timeIntervalSince1970: 1_015)
@@ -1881,10 +2017,10 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(secondSnapshot.activePowerWatts, 14.4)
         XCTAssertEqual(monitor.snapshot?.inputPowerWatts, 14.4)
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: monitor.snapshot).title, "Input Power")
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
-    func testWidgetTimelineReloadsWhenHealthTintChangesInsideRoundedPercentBucket() async {
+    func testWidgetTimelineCoalescesHealthTintChangeInsideThrottleWindow() async {
         let firstSnapshot = makeWidgetReloadSnapshot(stateOfChargePercent: 55, healthPercent: 90.4)
         let secondSnapshot = makeWidgetReloadSnapshot(stateOfChargePercent: 55, healthPercent: 89.6)
         let reader = StubBatteryReader(snapshots: [firstSnapshot, secondSnapshot])
@@ -1910,7 +2046,7 @@ final class BatteryMonitorTests: XCTestCase {
             BatteryPresentationStyle.healthTintStyle(for: firstSnapshot),
             BatteryPresentationStyle.healthTintStyle(for: secondSnapshot)
         )
-        XCTAssertEqual(reloadCount, 2)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testWidgetTimelineReloadsWhenMediumBatteryIconChangesInsideRoundedPercentBucket() async {
@@ -2069,7 +2205,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertFalse(loadedSnapshot.isCharging)
         XCTAssertTrue(loadedSnapshot.isExternalPowerConnected)
         XCTAssertEqual(loadedSnapshot.dischargeRateMilliamps, 1_200)
-        XCTAssertEqual(loadedSnapshot.displayedTimeMinutes, 150)
+        XCTAssertEqual(loadedSnapshot.displayedTimeMinutes, 145)
     }
 
     func testWidgetSnapshotStorePreservesStoredFullACStateWhenExternalFlagIsStale() throws {
@@ -2271,7 +2407,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.dischargeRateWatts), 14.4, accuracy: 0.001)
         XCTAssertEqual(loadedSnapshot.rateBasedTimeRemainingMinutes, 150)
         XCTAssertEqual(loadedSnapshot.systemTimeRemainingMinutes, 145)
-        XCTAssertEqual(loadedSnapshot.displayedTimeMinutes, 150)
+        XCTAssertEqual(loadedSnapshot.displayedTimeMinutes, 145)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 14.4, accuracy: 0.001)
         XCTAssertEqual(loadedSnapshot.adapterMaxWatts, 70)
     }
@@ -2645,7 +2781,7 @@ final class BatteryMonitorTests: XCTestCase {
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: Date(timeIntervalSince1970: 1_030), maximumAge: 60))
         XCTAssertNil(loadedSnapshot.currentChargeMilliampHours)
         XCTAssertNil(loadedSnapshot.currentChargeWattHours)
-        XCTAssertEqual(loadedSnapshot.fullChargeCapacityWattHours, 60)
+        XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
     }
 
     func testWidgetSnapshotStoreSanitizesOutOfRangeValues() throws {
@@ -3006,7 +3142,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.adapterMaxWatts)
     }
 
-    func testWidgetSnapshotStoreRecomputesStaleZeroMaximumEnergyValues() throws {
+    func testWidgetSnapshotStoreDropsStaleZeroMaximumEnergyValues() throws {
         let store = try makeWidgetSnapshotStore()
         let snapshot = BatterySnapshot(
             timestamp: Date(timeIntervalSince1970: 1_000),
@@ -3041,8 +3177,8 @@ final class BatteryMonitorTests: XCTestCase {
 
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: Date(timeIntervalSince1970: 1_030), maximumAge: 60))
         XCTAssertEqual(loadedSnapshot.currentChargeWattHours, 0)
-        XCTAssertEqual(loadedSnapshot.fullChargeCapacityWattHours, 60)
-        XCTAssertEqual(loadedSnapshot.designCapacityWattHours, 72)
+        XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
+        XCTAssertNil(loadedSnapshot.designCapacityWattHours)
     }
 
     func testWidgetSnapshotStoreClampsSmallCurrentChargeOverage() throws {
@@ -3082,7 +3218,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.currentChargeMilliampHours, 5_000)
         XCTAssertEqual(loadedSnapshot.fullChargeCapacityMilliampHours, 5_000)
         XCTAssertEqual(loadedSnapshot.currentChargeWattHours, 60)
-        XCTAssertEqual(loadedSnapshot.fullChargeCapacityWattHours, 60)
+        XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
         XCTAssertEqual(loadedSnapshot.stateOfChargePercent, 100)
     }
 
@@ -4172,9 +4308,9 @@ final class BatteryMonitorTests: XCTestCase {
     }
 
     func testWidgetSnapshotStoreClearDoesNotSynchronizeWhenAlreadyEmpty() throws {
-        let suiteName = "BatteryStatsTests.BatteryWidgetSnapshotStore.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(TrackingWidgetUserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeIsolatedUserDefaults(
+            prefix: "BatteryMonitorTests.EmptyWidgetSnapshotStore"
+        ).defaults
         defaults.resetTracking()
         let store = BatteryWidgetSnapshotStore(defaults: defaults)
 
@@ -4292,7 +4428,7 @@ final class BatteryMonitorTests: XCTestCase {
         )
     }
 
-    func testUnsupportedRefreshClearsStaleActiveAlertState() async {
+    func testTransientMissingRefreshDoesNotResetActiveAlertState() async {
         let reader = ControlledDiagnosticsReader()
         let deliverer = MonitorFakeBatteryAlertNotificationDeliverer()
         let coordinator = BatteryAlertCoordinator(notificationDeliverer: deliverer)
@@ -4314,9 +4450,6 @@ final class BatteryMonitorTests: XCTestCase {
         monitor.refresh()
         await reader.waitForRequestCount(2)
         reader.resumeRequest(at: 1, snapshot: nil)
-        await monitor.waitForIdleForTesting()
-
-        monitor.refresh()
         await reader.waitForRequestCount(3)
         reader.resumeRequest(at: 2, snapshot: makeLowBatterySnapshot(timestamp: Date(timeIntervalSince1970: 1_060)))
         await monitor.waitForIdleForTesting()
@@ -4324,7 +4457,7 @@ final class BatteryMonitorTests: XCTestCase {
 
         XCTAssertEqual(
             deliverer.notifications.map(\.identifier),
-            ["BatteryStats.LowBattery", "BatteryStats.LowBattery"]
+            ["BatteryStats.LowBattery"]
         )
     }
 
@@ -4334,6 +4467,16 @@ final class BatteryMonitorTests: XCTestCase {
 
     private func enableEnergyProbeDemand(on monitor: BatteryMonitor) {
         monitor.updateMonitoringDemand(BatteryMonitoringDemand(needsEnergyChangeAwareness: true))
+    }
+
+    private func completeUnsupportedRead(
+        _ reader: ControlledDiagnosticsReader,
+        startingAt firstRequestIndex: Int
+    ) async {
+        for requestIndex in firstRequestIndex..<(firstRequestIndex + 3) {
+            await reader.waitForRequestCount(requestIndex + 1)
+            reader.resumeRequest(at: requestIndex, snapshot: nil)
+        }
     }
 
     private func makeClient(_ reader: StubBatteryReader) -> BatteryReadingClient {
@@ -4359,24 +4502,23 @@ final class BatteryMonitorTests: XCTestCase {
     }
 
     private func makeWidgetSnapshotStore() throws -> BatteryWidgetSnapshotStore {
-        let suiteName = "BatteryStatsTests.BatteryWidgetSnapshotStore.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeIsolatedUserDefaults(
+            prefix: "BatteryMonitorTests.WidgetSnapshotStore"
+        ).defaults
         return BatteryWidgetSnapshotStore(defaults: defaults)
     }
 
     private func makeHistoryStore() throws -> BatteryHistoryStore {
-        let suiteName = "BatteryStatsTests.BatteryHistoryStore.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
-        return BatteryHistoryStore(defaults: defaults)
+        BatteryHistoryStore(
+            defaults: makeIsolatedUserDefaults(prefix: "BatteryMonitorTests.HistoryStore").defaults
+        )
     }
 
     private func makePreferencesStore() throws -> PreferencesStore {
-        let suiteName = "BatteryStatsTests.PreferencesStore.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
-        return PreferencesStore(defaults: defaults, sync: MonitorNoopPreferencesSync())
+        PreferencesStore(
+            defaults: makeIsolatedUserDefaults(prefix: "BatteryMonitorTests.PreferencesStore").defaults,
+            sync: MonitorNoopPreferencesSync()
+        )
     }
 
     private func makeWidgetReloadSnapshot(
@@ -4638,26 +4780,6 @@ private final class MonitorNoopPreferencesSync: PreferencesSyncing {
     func removeValue(forKey key: String) {}
 
     func flush() {}
-}
-
-private final class TrackingWidgetUserDefaults: UserDefaults {
-    private(set) var removeObjectCallCount = 0
-    private(set) var synchronizeCallCount = 0
-
-    override func removeObject(forKey defaultName: String) {
-        removeObjectCallCount += 1
-        super.removeObject(forKey: defaultName)
-    }
-
-    override func synchronize() -> Bool {
-        synchronizeCallCount += 1
-        return super.synchronize()
-    }
-
-    func resetTracking() {
-        removeObjectCallCount = 0
-        synchronizeCallCount = 0
-    }
 }
 
 private actor StubBatteryReader {

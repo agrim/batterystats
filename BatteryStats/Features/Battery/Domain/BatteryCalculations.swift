@@ -1,5 +1,10 @@
 import Foundation
 
+struct BatteryDischargeRateSample: Equatable, Sendable {
+    let timestamp: Date
+    let milliamps: Int
+}
+
 enum BatteryCalculations {
     private static let maximumPlausibleBatteryCapacityMilliampHours = 1_000_000
     private static let maximumPlausibleBatteryCurrentMilliamps = 1_000_000
@@ -381,6 +386,15 @@ enum BatteryCalculations {
         }
 
         if currentChargeMilliampHours >= fullChargeCapacityMilliampHours {
+            if let reportedTimeToFullMinutes {
+                return reportedTimeToFullMinutes
+            }
+
+            if let chargeCurrentMilliamps = plausibleCurrentMagnitudeMilliamps(chargeCurrentMilliamps),
+               chargeCurrentMilliamps > 40 {
+                return nil
+            }
+
             return 0
         }
 
@@ -437,6 +451,65 @@ enum BatteryCalculations {
         }
 
         return Int((Double(total) / Double(count)).rounded())
+    }
+
+    static func confidentSmoothedDischargeRate(
+        _ samples: [BatteryDischargeRateSample],
+        now: Date,
+        minimumSampleCount: Int = 3,
+        minimumSampleDuration: TimeInterval = 30,
+        maximumSampleAge: TimeInterval = 180,
+        maximumRelativeSpread: Double = 0.25
+    ) -> Int? {
+        guard minimumSampleCount > 1,
+              minimumSampleDuration > 0,
+              maximumSampleAge >= minimumSampleDuration,
+              maximumRelativeSpread >= 0,
+              samples.count >= minimumSampleCount else {
+            return nil
+        }
+
+        var total = 0
+        var minimumRate = Int.max
+        var maximumRate = 0
+        var firstTimestamp: Date?
+        var previousTimestamp: Date?
+
+        for sample in samples.suffix(8) {
+            guard let rate = plausibleDischargeRateMilliamps(sample.milliamps),
+                  rate > 0 else {
+                return nil
+            }
+
+            let age = now.timeIntervalSince(sample.timestamp)
+            guard age >= 0,
+                  age <= maximumSampleAge,
+                  previousTimestamp.map({ sample.timestamp > $0 }) ?? true else {
+                return nil
+            }
+
+            firstTimestamp = firstTimestamp ?? sample.timestamp
+            previousTimestamp = sample.timestamp
+            total += rate
+            minimumRate = min(minimumRate, rate)
+            maximumRate = max(maximumRate, rate)
+        }
+
+        let consideredCount = min(samples.count, 8)
+        guard consideredCount >= minimumSampleCount,
+              let firstTimestamp,
+              let previousTimestamp,
+              previousTimestamp.timeIntervalSince(firstTimestamp) >= minimumSampleDuration else {
+            return nil
+        }
+
+        let average = Double(total) / Double(consideredCount)
+        guard average > 0,
+              Double(maximumRate - minimumRate) / average <= maximumRelativeSpread else {
+            return nil
+        }
+
+        return Int(average.rounded())
     }
 
     static func plausibleManufactureDate(_ manufactureDate: Date?, now: Date) -> Date? {

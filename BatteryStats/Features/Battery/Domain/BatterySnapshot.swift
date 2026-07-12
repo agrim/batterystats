@@ -209,8 +209,8 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     var displayedTimeMinutes: Int? {
         if powerState.isBatteryDischarging {
-            return BatteryCalculations.plausibleDurationMinutes(rateBasedTimeRemainingMinutes)
-                ?? BatteryCalculations.plausibleDurationMinutes(systemTimeRemainingMinutes)
+            return BatteryCalculations.plausibleDurationMinutes(systemTimeRemainingMinutes)
+                ?? BatteryCalculations.plausibleDurationMinutes(rateBasedTimeRemainingMinutes)
         } else if powerState == .charging {
             return BatteryCalculations.plausibleDurationMinutes(timeToFullMinutes)
         } else {
@@ -305,7 +305,8 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         lines.append("Full charge capacity: \(BatteryFormatting.milliampHours(fullChargeCapacityMilliampHours, allowsZero: false))")
         lines.append("Design capacity: \(BatteryFormatting.milliampHours(designCapacityMilliampHours, allowsZero: false))")
         lines.append("Current charge: \(BatteryFormatting.milliampHours(currentChargeMilliampHours))")
-        lines.append("Energy: \(BatteryFormatting.compactWattHourPair(current: currentChargeWattHours, maximum: fullChargeCapacityWattHours))")
+        let energyLabel = fullChargeCapacityWattHours == nil ? "Estimated Energy" : "Energy"
+        lines.append("\(energyLabel): \(BatteryFormatting.compactWattHourPair(current: currentChargeWattHours, maximum: fullChargeCapacityWattHours))")
         lines.append("Voltage: \(BatteryFormatting.millivolts(voltageMillivolts))")
         lines.append("Signed current: \(BatteryFormatting.signedMilliamps(currentMilliampsSigned))")
         lines.append("\(timeTitle): \(BatteryFormatting.duration(minutes: displayedTimeMinutes))")

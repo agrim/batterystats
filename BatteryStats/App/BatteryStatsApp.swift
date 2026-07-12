@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Observation
 import SwiftUI
 
@@ -20,6 +21,10 @@ struct BatteryStatsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     private let runtime = BatteryStatsAppRuntime.shared
+
+    init() {
+        SharedWidgetSnapshotRuntimeVerifier.exitIfRequested()
+    }
 
     var body: some Scene {
         WindowGroup("BatteryStats", id: "main") {
@@ -49,6 +54,74 @@ struct BatteryStatsApp: App {
         .commands {
             AppCommands()
         }
+    }
+}
+
+enum SharedWidgetSnapshotRuntimeVerifier {
+    static let argument = "--verify-shared-widget-snapshot"
+    static let expectedTimestampEnvironmentKey = "BATTERYSTATS_EXPECT_SNAPSHOT_AFTER"
+
+    static func exitIfRequested(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        now: Date = .now
+    ) {
+        guard arguments.contains(argument) else {
+            return
+        }
+
+        let expectedTimestamp: TimeInterval
+        if let rawExpectedTimestamp = environment[expectedTimestampEnvironmentKey] {
+            guard let parsedTimestamp = TimeInterval(rawExpectedTimestamp),
+                  parsedTimestamp.isFinite else {
+                finish(
+                    message: "error: \(expectedTimestampEnvironmentKey) must be a finite reference-date timestamp",
+                    exitCode: 2,
+                    toStandardError: true
+                )
+            }
+            expectedTimestamp = parsedTimestamp
+        } else {
+            expectedTimestamp = now.addingTimeInterval(-120).timeIntervalSinceReferenceDate
+        }
+
+        guard let snapshot = BatteryWidgetSnapshotStore.shared.snapshot(
+            now: now,
+            maximumAge: BatteryWidgetSnapshotStore.defaultRetentionAge
+        ) else {
+            finish(
+                message: "error: shared widget snapshot is unavailable or undecodable",
+                exitCode: 3,
+                toStandardError: true
+            )
+        }
+
+        let timestamp = snapshot.timestamp.timeIntervalSinceReferenceDate
+        guard timestamp >= expectedTimestamp else {
+            finish(
+                message: "error: shared widget snapshot timestamp \(timestamp) predates required timestamp \(expectedTimestamp)",
+                exitCode: 4,
+                toStandardError: true
+            )
+        }
+
+        let age = max(0, now.timeIntervalSince(snapshot.timestamp))
+        let charge = snapshot.presentationStateOfChargePercent
+            .map { "\(String(format: "%.1f", $0))%" }
+            ?? "unavailable"
+        let time = snapshot.displayedTimeMinutes.map { "\($0)m" } ?? "unavailable"
+        finish(
+            message: "verified shared widget snapshot: timestamp=\(timestamp) age=\(String(format: "%.1f", age))s state=\(snapshot.powerState.rawValue) charge=\(charge) time=\(time)",
+            exitCode: 0,
+            toStandardError: false
+        )
+    }
+
+    private static func finish(message: String, exitCode: Int32, toStandardError: Bool) -> Never {
+        let stream = toStandardError ? stderr : stdout
+        fputs("\(message)\n", stream)
+        fflush(stream)
+        Darwin.exit(exitCode)
     }
 }
 

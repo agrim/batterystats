@@ -569,36 +569,29 @@ final class SmartBatteryReader: @unchecked Sendable {
     }
 
     private func isDistinctFromNegotiatedInputPower(milliwatts: Double, in properties: [String: Any]) -> Bool {
-        guard let negotiatedMilliwatts = negotiatedInputMilliwatts(in: properties) else {
-            return true
-        }
-
-        return isDistinct(milliwatts, from: negotiatedMilliwatts, minimumTolerance: 1, relativeTolerance: 0.02)
+        isDistinct(milliwatts, from: negotiatedInputMilliwatts(in: properties), minimumTolerance: 1, relativeTolerance: 0.02)
     }
 
     private func isDistinctFromCounterBackedNegotiatedInputPower(milliwatts: Double, in properties: [String: Any]) -> Bool {
-        guard let negotiatedMilliwatts = negotiatedInputMilliwatts(in: properties) else {
-            return true
-        }
-
-        return isDistinct(milliwatts, from: negotiatedMilliwatts, minimumTolerance: 10, relativeTolerance: 0.001)
+        isDistinct(milliwatts, from: negotiatedInputMilliwatts(in: properties), minimumTolerance: 10, relativeTolerance: 0.001)
     }
 
     private func isDistinctFromAdapterCapability(milliwatts: Double, adapterMaxWatts: Int?) -> Bool {
-        guard let adapterMaxWatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts) else {
-            return true
-        }
-
-        let adapterMilliwatts = Double(adapterMaxWatts) * 1_000
+        let adapterMilliwatts = BatteryCalculations.plausibleAdapterWatts(adapterMaxWatts)
+            .map { Double($0) * 1_000 }
         return isDistinct(milliwatts, from: adapterMilliwatts, minimumTolerance: 1, relativeTolerance: 0.02)
     }
 
     private func isDistinct(
         _ milliwatts: Double,
-        from referenceMilliwatts: Double,
+        from referenceMilliwatts: Double?,
         minimumTolerance: Double,
         relativeTolerance: Double
     ) -> Bool {
+        guard let referenceMilliwatts else {
+            return true
+        }
+
         let toleranceMilliwatts = max(minimumTolerance, referenceMilliwatts * relativeTolerance)
         return abs(milliwatts - referenceMilliwatts) > toleranceMilliwatts
     }

@@ -934,11 +934,19 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertEqual(sync.removeObserverCallCount, 1)
     }
 
+    func testIsolatedUserDefaultsFixtureRemovesDomainAndSuitePlist() {
+        let fixture = makeIsolatedUserDefaults(prefix: "UserDefaultsCleanupTests")
+        fixture.defaults.set(true, forKey: "temporaryValue")
+        _ = fixture.defaults.synchronize()
+
+        fixture.cleanUp()
+
+        XCTAssertNil(fixture.defaults.object(forKey: "temporaryValue"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.preferencesFileURL.path))
+    }
+
     private func makeDefaults() -> UserDefaults {
-        let suiteName = "PreferencesStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        return defaults
+        makeIsolatedUserDefaults(prefix: "PreferencesStoreTests").defaults
     }
 }
 

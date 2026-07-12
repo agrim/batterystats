@@ -5,33 +5,46 @@ struct BatteryWidgetMetricTile: View {
     let size: CGFloat
 
     var body: some View {
-        Group {
-            if let progress = metric.progress {
-                Gauge(value: progress) {
-                    EmptyView()
-                } currentValueLabel: {
-                    BatteryWidgetMetricContent(metric: metric, size: size)
-                }
-                .gaugeStyle(.accessoryCircularCapacity)
-                .tint(metric.ringTint)
-            } else {
-                ZStack {
-                    Circle()
-                        .stroke(
-                            metric.ringTint.opacity(0.24),
-                            style: StrokeStyle(lineWidth: max(4, size * 0.065), lineCap: .round)
-                        )
+        let lineWidth = max(5, size * BatteryWidgetRingLayout.lineWidthRatio)
+        let progress = metric.progress.map { min(max($0, 0), 1) }
 
-                    BatteryWidgetMetricContent(metric: metric, size: size)
+        ZStack {
+            Circle()
+                .stroke(
+                    Color.secondary.opacity(BatteryWidgetRingLayout.trackOpacity),
+                    style: StrokeStyle(lineWidth: lineWidth)
+                )
+                .padding(lineWidth / 2)
+
+            if let progress, progress > 0 {
+                if progress >= 1 {
+                    Circle()
+                        .stroke(metric.ringTint, lineWidth: lineWidth)
+                        .padding(lineWidth / 2)
+                } else {
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(
+                            metric.ringTint,
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+                        )
+                        .padding(lineWidth / 2)
+                        .rotationEffect(.degrees(-90))
                 }
             }
+
+            BatteryWidgetMetricContent(metric: metric, size: size)
         }
         .frame(width: size, height: size)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(metric.accessibilityLabel))
+        .accessibilityValue(Text(metric.accessibilityValue))
     }
 }
 
 struct BatteryWidgetMetric {
     enum Content {
+        case empty
         case text(String)
         case symbol(String)
     }
@@ -40,11 +53,22 @@ struct BatteryWidgetMetric {
     let progress: Double?
     let ringTint: Color
     let contentTint: Color
+    let accessibilityLabel: String
+    let accessibilityValue: String
 
-    init(content: Content, progress: Double?, ringTint: Color, contentTint: Color = .primary) {
+    init(
+        content: Content,
+        progress: Double?,
+        ringTint: Color,
+        accessibilityLabel: String,
+        accessibilityValue: String,
+        contentTint: Color = .primary
+    ) {
         self.content = content
         self.progress = progress
         self.ringTint = ringTint
+        self.accessibilityLabel = accessibilityLabel
+        self.accessibilityValue = accessibilityValue
         self.contentTint = contentTint
     }
 }
@@ -55,129 +79,27 @@ private struct BatteryWidgetMetricContent: View {
 
     var body: some View {
         switch metric.content {
+        case .empty:
+            EmptyView()
         case let .text(value):
             Text(value)
-                .font(.system(size: max(16, size * 0.26), weight: .bold, design: .rounded))
+                .font(.system(size: max(14, size * 0.225), weight: .medium, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(metric.contentTint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
+                .allowsTightening(true)
                 .contentTransition(.numericText())
         case let .symbol(name):
             Image(systemName: name)
-                .font(.system(size: max(18, size * 0.30), weight: .semibold, design: .rounded))
+                .font(.system(size: max(17, size * 0.27), weight: .medium, design: .rounded))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(metric.contentTint)
         }
     }
 }
 
-struct BatteryMediumWidgetView: View {
-    let snapshot: BatterySnapshot?
-    let updatedAt: Date?
-    let now: Date
-
-    var body: some View {
-        let healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).color
-        let chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).color
-        let timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).color
-        let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
-
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: BatteryPresentationStyle.batterySymbolName(for: snapshot))
-                    .font(.system(size: 22, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(chargeTint)
-
-                Text(snapshot?.statusDisplayTitle ?? "Unavailable")
-                    .font(.headline)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Spacer(minLength: 8)
-
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent))
-                        .font(.title3.weight(.semibold))
-                        .monospacedDigit()
-                        .lineLimit(1)
-
-                    Text(BatteryWidgetUpdateFormatting.statusText(updatedAt: updatedAt, now: now))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                }
-            }
-
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 8) {
-                GridRow {
-                    BatteryMediumMetricView(
-                        title: "Health",
-                        value: BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent),
-                        symbolName: "heart.fill",
-                        tint: healthTint
-                    )
-
-                    BatteryMediumMetricView(
-                        title: "Charge",
-                        value: BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent),
-                        symbolName: "bolt.fill",
-                        tint: chargeTint
-                    )
-                }
-
-                GridRow {
-                    BatteryMediumMetricView(
-                        title: snapshot?.powerState.timeTitle(
-                            charging: "To Full",
-                            discharging: "Time Left"
-                        ) ?? "Time",
-                        value: BatteryWidgetMetricFormatting.timeText(for: snapshot),
-                        symbolName: "clock",
-                        tint: timeTint
-                    )
-
-                    BatteryMediumMetricView(
-                        title: BatteryPowerDisplayRole.role(for: snapshot).title,
-                        value: BatteryWidgetMetricFormatting.powerText(for: snapshot),
-                        symbolName: statusDescriptor.symbolName,
-                        tint: statusDescriptor.ringTint
-                    )
-                }
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-private struct BatteryMediumMetricView: View {
-    let title: String
-    let value: String
-    let symbolName: String
-    let tint: Color
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Image(systemName: symbolName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 14)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Text(value)
-                    .font(.callout.weight(.semibold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
+private enum BatteryWidgetRingLayout {
+    static let lineWidthRatio: CGFloat = 0.088
+    static let trackOpacity = 0.22
 }

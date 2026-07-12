@@ -1967,14 +1967,25 @@ final class BatteryReadingServiceTests: XCTestCase {
         )
     }
 
-    func testPreferredTimeToFullKeepsComputedFullBatteryZero() {
+    func testPreferredTimeToFullKeepsReportedTopOffTimeAheadOfComputedZero() {
         XCTAssertEqual(
             BatteryReadingService.preferredTimeToFullMinutes(
                 computedTimeToFullMinutes: 0,
                 reportedTimeToFullMinutes: 112
             ),
-            0
+            112
         )
+    }
+
+    func testDisplayableEnergyEstimatesDoNotDeriveCapacityEnergyFromLiveVoltage() {
+        let estimates = BatteryReadingService.displayableEnergyEstimates(
+            currentChargeMilliampHours: 3_000,
+            voltageMillivolts: 12_000
+        )
+
+        XCTAssertEqual(estimates.currentChargeWattHours, 36)
+        XCTAssertNil(estimates.fullChargeCapacityWattHours)
+        XCTAssertNil(estimates.designCapacityWattHours)
     }
 
     func testDiagnosticRendererPrintsBooleansAsBooleansAndNumbersAsNumbers() {

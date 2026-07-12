@@ -73,8 +73,11 @@ final class BatteryHistoryStoreTests: XCTestCase {
         XCTAssertEqual(stats.sampleCount, 3)
         XCTAssertEqual(stats.firstTimestamp, firstTimestamp)
         XCTAssertEqual(stats.latestTimestamp, firstTimestamp.addingTimeInterval(602))
-        XCTAssertEqual(try XCTUnwrap(stats.averagePowerWatts), 18.33, accuracy: 0.01)
-        XCTAssertEqual(try XCTUnwrap(stats.peakPowerWatts), 30, accuracy: 0.01)
+        let drainStats = try XCTUnwrap(stats.powerStats(for: .batteryDrain))
+        XCTAssertEqual(drainStats.sampleCount, 3)
+        XCTAssertEqual(drainStats.observedDuration, 602, accuracy: 0.01)
+        XCTAssertEqual(try XCTUnwrap(drainStats.timeWeightedAverageWatts), 12.5, accuracy: 0.01)
+        XCTAssertEqual(drainStats.peakWatts, 30, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(stats.minimumChargePercent), 72, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(stats.maximumChargePercent), 88, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(stats.minimumTemperatureCelsius), 29.5, accuracy: 0.01)
@@ -111,12 +114,187 @@ final class BatteryHistoryStoreTests: XCTestCase {
         let stats = try XCTUnwrap(BatteryHistoryStats(entries: entries))
 
         XCTAssertEqual(stats.sampleCount, 2)
-        XCTAssertEqual(try XCTUnwrap(stats.averagePowerWatts), 10, accuracy: 0.01)
-        XCTAssertEqual(try XCTUnwrap(stats.peakPowerWatts), 10, accuracy: 0.01)
+        let drainStats = try XCTUnwrap(stats.powerStats(for: .batteryDrain))
+        XCTAssertEqual(drainStats.sampleCount, 1)
+        XCTAssertNil(drainStats.timeWeightedAverageWatts)
+        XCTAssertEqual(drainStats.peakWatts, 10, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(stats.minimumChargePercent), 60, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(stats.maximumChargePercent), 100, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(stats.minimumTemperatureCelsius), 30, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(stats.maximumTemperatureCelsius), 30, accuracy: 0.01)
+    }
+
+    func testHistoryEntryAssignsComparablePowerRoleFromActiveSource() {
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let drainEntry = BatteryHistoryEntry(snapshot: makeSnapshot(
+            timestamp: timestamp,
+            chargePercent: 80,
+            powerWatts: 10,
+            temperatureCelsius: 30
+        ))
+        let chargeEntry = BatteryHistoryEntry(snapshot: makeSnapshot(
+            timestamp: timestamp,
+            chargePercent: 80,
+            powerWatts: 25,
+            temperatureCelsius: 30,
+            powerState: .charging
+        ))
+        let inputEntry = BatteryHistoryEntry(snapshot: makeSnapshot(
+            timestamp: timestamp,
+            chargePercent: 80,
+            powerWatts: 40,
+            temperatureCelsius: 30,
+            powerState: .connectedNotCharging,
+            inputPowerWatts: 40
+        ))
+
+        XCTAssertEqual(drainEntry.powerRole, .batteryDrain)
+        XCTAssertEqual(chargeEntry.powerRole, .batteryCharge)
+        XCTAssertEqual(inputEntry.powerRole, .inputPower)
+    }
+
+    func testStatsTimeWeightIrregularSamplesWithoutMixingPowerRoles() throws {
+        let firstTimestamp = Date(timeIntervalSince1970: 1_000)
+        let entries = [
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp,
+                chargePercent: 80,
+                powerWatts: 10,
+                temperatureCelsius: 30
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(10),
+                chargePercent: 80,
+                powerWatts: 20,
+                temperatureCelsius: 30
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(110),
+                chargePercent: 80,
+                powerWatts: 30,
+                temperatureCelsius: 30,
+                powerState: .charging
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(140),
+                chargePercent: 80,
+                powerWatts: 40,
+                temperatureCelsius: 30,
+                powerState: .connectedNotCharging,
+                inputPowerWatts: 40
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(200),
+                chargePercent: 80,
+                powerWatts: 20,
+                temperatureCelsius: 30,
+                powerState: .connectedNotCharging,
+                inputPowerWatts: 20
+            ))
+        ]
+
+        let stats = try XCTUnwrap(BatteryHistoryStats(entries: entries))
+
+        XCTAssertEqual(stats.powerStats.map(\.role), [.batteryDrain, .batteryCharge, .inputPower])
+
+        let drainStats = try XCTUnwrap(stats.powerStats(for: .batteryDrain))
+        XCTAssertEqual(drainStats.observedDuration, 110, accuracy: 0.01)
+        XCTAssertEqual(try XCTUnwrap(drainStats.timeWeightedAverageWatts), 19.09, accuracy: 0.01)
+        XCTAssertEqual(drainStats.peakWatts, 20, accuracy: 0.01)
+
+        let chargeStats = try XCTUnwrap(stats.powerStats(for: .batteryCharge))
+        XCTAssertEqual(chargeStats.observedDuration, 30, accuracy: 0.01)
+        XCTAssertEqual(try XCTUnwrap(chargeStats.timeWeightedAverageWatts), 30, accuracy: 0.01)
+        XCTAssertEqual(chargeStats.peakWatts, 30, accuracy: 0.01)
+
+        let inputStats = try XCTUnwrap(stats.powerStats(for: .inputPower))
+        XCTAssertEqual(inputStats.observedDuration, 60, accuracy: 0.01)
+        XCTAssertEqual(try XCTUnwrap(inputStats.timeWeightedAverageWatts), 40, accuracy: 0.01)
+        XCTAssertEqual(inputStats.peakWatts, 40, accuracy: 0.01)
+    }
+
+    func testStatsDoNotCarryPowerAcrossUnobservedOvernightGap() throws {
+        let firstTimestamp = Date(timeIntervalSince1970: 1_000)
+        let stats = try XCTUnwrap(BatteryHistoryStats(entries: [
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp,
+                chargePercent: 80,
+                powerWatts: 10,
+                temperatureCelsius: 30
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(5 * 60),
+                chargePercent: 79,
+                powerWatts: 20,
+                temperatureCelsius: 30
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(8 * 60 * 60),
+                chargePercent: 60,
+                powerWatts: 40,
+                temperatureCelsius: 30
+            ))
+        ]))
+
+        let drainStats = try XCTUnwrap(stats.powerStats(for: .batteryDrain))
+        XCTAssertEqual(drainStats.observedDuration, 5 * 60, accuracy: 0.01)
+        XCTAssertEqual(try XCTUnwrap(drainStats.timeWeightedAverageWatts), 10, accuracy: 0.01)
+        XCTAssertEqual(drainStats.peakWatts, 40, accuracy: 0.01)
+    }
+
+    func testLegacyAmbiguousChargingPowerIsNotPresentedAsComparable() throws {
+        let data = Data("""
+        [
+          {
+            "timestamp": 1000,
+            "powerState": "charging",
+            "healthPercent": 83,
+            "stateOfChargePercent": 60,
+            "displayedTimeMinutes": 90,
+            "activePowerWatts": 60,
+            "temperatureCelsius": 30,
+            "cycleCount": 2
+          }
+        ]
+        """.utf8)
+        let entries = try JSONDecoder().decode([BatteryHistoryEntry].self, from: data)
+
+        let stats = try XCTUnwrap(BatteryHistoryStats(entries: entries))
+
+        XCTAssertTrue(stats.powerStats.isEmpty)
+    }
+
+    func testPowerFormattingNamesRoleAndTimeWeightedAggregationTruthfully() throws {
+        let firstTimestamp = Date(timeIntervalSince1970: 1_000)
+        let stats = try XCTUnwrap(BatteryHistoryStats(entries: [
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp,
+                chargePercent: 80,
+                powerWatts: 10,
+                temperatureCelsius: 30
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(10),
+                chargePercent: 80,
+                powerWatts: 20,
+                temperatureCelsius: 30
+            )),
+            BatteryHistoryEntry(snapshot: makeSnapshot(
+                timestamp: firstTimestamp.addingTimeInterval(110),
+                chargePercent: 80,
+                powerWatts: 40,
+                temperatureCelsius: 30
+            ))
+        ]))
+        let drainStats = try XCTUnwrap(stats.powerStats(for: .batteryDrain))
+
+        XCTAssertEqual(HistoryStatsFormatting.powerTitle(for: .batteryDrain), "Battery drain")
+        XCTAssertEqual(HistoryStatsFormatting.powerTitle(for: .batteryCharge), "Battery charge")
+        XCTAssertEqual(HistoryStatsFormatting.powerTitle(for: .inputPower), "Input power")
+        XCTAssertEqual(
+            HistoryStatsFormatting.powerText(for: drainStats),
+            "Time-weighted avg 19.1 W, peak 40.0 W"
+        )
     }
 
     func testCapturedHistoryTextDoesNotCreateRangeForSingleSample() throws {
@@ -321,9 +499,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
 
     func testDisablingHistoryClearsLocalEntriesAndDisablesCSVExport() throws {
         var copiedStrings: [String] = []
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeHistoryDefaults()
         let store = BatteryHistoryStore(defaults: defaults, pasteboardCopy: { copiedStrings.append($0) })
         let timestamp = Date(timeIntervalSince1970: 1_000)
         store.updatePolicy(BatteryHistoryPolicy(isEnabled: true, syncsToICloud: false))
@@ -344,9 +520,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
     }
 
     func testDisabledHistoryPolicyClearsStoredEntriesLoadedFromPreviousRun() throws {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeHistoryDefaults()
         let timestamp = Date(timeIntervalSince1970: 1_000)
         let encodedEntries = try XCTUnwrap(String(
             data: JSONEncoder().encode([
@@ -368,9 +542,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
     }
 
     func testReapplyingDisabledHistoryPolicyDoesNotRewriteEmptyLocalHistory() {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = TrackingUserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeIsolatedUserDefaults(prefix: "BatteryHistoryStoreTests").defaults
         defaults.set("[]", forKey: "batteryHistoryEntries")
         let setCallCountAfterSeeding = defaults.setCallCount
         let store = BatteryHistoryStore(defaults: defaults)
@@ -700,9 +872,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
     }
 
     func testHistoryNormalizesPersistedEntriesOnLaunch() throws {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeHistoryDefaults()
         let earlierTimestamp = Date(timeIntervalSince1970: 1_000)
         let laterTimestamp = Date(timeIntervalSince1970: 1_600)
         let encodedEntries = try XCTUnwrap(String(
@@ -722,9 +892,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
     }
 
     func testHistoryDropsFutureDatedPersistedEntriesOnLaunch() throws {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeHistoryDefaults()
         let now = Date()
         let validTimestamp = now.addingTimeInterval(-300)
         let futureTimestamp = now.addingTimeInterval(120)
@@ -748,9 +916,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
     }
 
     func testHistoryRewritesNormalizedPersistedEntriesOnLaunch() throws {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeHistoryDefaults()
         let earlierTimestamp = Date(timeIntervalSince1970: 1_000)
         let laterTimestamp = Date(timeIntervalSince1970: 1_600)
         let encodedEntries = try XCTUnwrap(String(
@@ -804,9 +970,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
     }
 
     func testHistoryNormalizesOutOfRangePersistedEntriesOnLaunch() throws {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeHistoryDefaults()
         let timestamp = Date(timeIntervalSince1970: 1_000)
         let encodedEntries = try XCTUnwrap(String(
             data: JSONEncoder().encode([
@@ -841,9 +1005,7 @@ final class BatteryHistoryStoreTests: XCTestCase {
     }
 
     func testHistoryDropsStaleTimeAndKeepsLivePowerForPluggedInPersistedEntriesOnLaunch() throws {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = makeHistoryDefaults()
         let idleTimestamp = Date(timeIntervalSince1970: 1_000)
         let activeTimestamp = Date(timeIntervalSince1970: 1_301)
         let encodedEntries = try XCTUnwrap(String(
@@ -915,8 +1077,8 @@ final class BatteryHistoryStoreTests: XCTestCase {
         XCTAssertEqual(
             csv,
             """
-            timestamp,power_state,health_percent,charge_percent,time_minutes,active_power_watts,temperature_celsius,cycle_count
-            1970-01-01T00:16:40.000Z,onBattery,83.00,88.00,150,10.00,29.50,120
+            timestamp,power_state,health_percent,charge_percent,time_minutes,power_role,active_power_watts,temperature_celsius,cycle_count
+            1970-01-01T00:16:40.000Z,onBattery,83.00,88.00,150,batteryDrain,10.00,29.50,120
             """
         )
     }
@@ -1002,15 +1164,16 @@ final class BatteryHistoryStoreTests: XCTestCase {
         pasteboardCopy: @escaping @MainActor (String) -> Void = { _ in },
         cloudSynchronizeDelay: Duration = .milliseconds(750)
     ) -> BatteryHistoryStore {
-        let suiteName = "BatteryHistoryStoreTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
         return BatteryHistoryStore(
-            defaults: defaults,
+            defaults: makeHistoryDefaults(),
             cloudStore: cloudStore,
             pasteboardCopy: pasteboardCopy,
             cloudSynchronizeDelay: cloudSynchronizeDelay
         )
+    }
+
+    private func makeHistoryDefaults() -> UserDefaults {
+        makeIsolatedUserDefaults(prefix: "BatteryHistoryStoreTests").defaults
     }
 
     private func makeSnapshot(
@@ -1020,13 +1183,15 @@ final class BatteryHistoryStoreTests: XCTestCase {
         temperatureCelsius: Double,
         healthPercent: Double = 83,
         displayedTimeMinutes: Int? = 150,
-        cycleCount: Int? = 120
+        cycleCount: Int? = 120,
+        powerState: BatteryPowerState = .onBattery,
+        inputPowerWatts: Double? = nil
     ) -> BatterySnapshot {
         BatterySnapshot(
             timestamp: timestamp,
-            powerState: .onBattery,
-            isCharging: false,
-            isExternalPowerConnected: false,
+            powerState: powerState,
+            isCharging: powerState == .charging,
+            isExternalPowerConnected: powerState.isExternallyPowered,
             currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
             fullChargeCapacityMilliampHours: 5_000,
@@ -1036,13 +1201,15 @@ final class BatteryHistoryStoreTests: XCTestCase {
             healthPercent: healthPercent,
             stateOfChargePercent: chargePercent,
             voltageMillivolts: 12_000,
-            currentMilliampsSigned: -1_200,
-            dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
-            dischargeRateWatts: powerWatts,
-            rateBasedTimeRemainingMinutes: displayedTimeMinutes,
-            systemTimeRemainingMinutes: displayedTimeMinutes,
-            timeToFullMinutes: nil,
+            currentMilliampsSigned: powerState == .charging ? 1_200 : -1_200,
+            dischargeRateMilliamps: powerState.isBatteryDischarging ? 1_200 : nil,
+            chargeRateWatts: powerState == .charging ? powerWatts : nil,
+            inputPowerWatts: inputPowerWatts,
+            inputPowerEvidence: inputPowerWatts == nil ? nil : .counterBacked,
+            dischargeRateWatts: powerState.isBatteryDischarging ? powerWatts : nil,
+            rateBasedTimeRemainingMinutes: powerState.isBatteryDischarging ? displayedTimeMinutes : nil,
+            systemTimeRemainingMinutes: powerState.isBatteryDischarging ? displayedTimeMinutes : nil,
+            timeToFullMinutes: powerState == .charging ? displayedTimeMinutes : nil,
             cycleCount: cycleCount,
             manufactureDate: nil,
             batteryAgeComponents: nil,
@@ -1122,14 +1289,5 @@ private final class FakeBatteryHistoryCloudStore: BatteryHistoryCloudStoring {
 
     func sendChange(keys: [String]) {
         changeHandler?(keys)
-    }
-}
-
-private final class TrackingUserDefaults: UserDefaults {
-    private(set) var setCallCount = 0
-
-    override func set(_ value: Any?, forKey defaultName: String) {
-        setCallCount += 1
-        super.set(value, forKey: defaultName)
     }
 }

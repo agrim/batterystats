@@ -493,10 +493,10 @@ final class BatteryAlertSettingsModelTests: XCTestCase {
     }
 
     private func makePreferencesStore() -> PreferencesStore {
-        let suiteName = "BatteryAlertSettingsModelTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        return PreferencesStore(defaults: defaults, sync: NoopAlertPreferencesSync())
+        PreferencesStore(
+            defaults: makeIsolatedUserDefaults(prefix: "BatteryAlertSettingsModelTests").defaults,
+            sync: NoopAlertPreferencesSync()
+        )
     }
 
     private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async {

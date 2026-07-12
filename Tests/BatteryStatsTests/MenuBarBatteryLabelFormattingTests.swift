@@ -738,7 +738,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     @MainActor
     func testDisplayPreferenceInvalidationFromSameDefaultsSuiteForcesStatusItemRepaint() async {
         let fixture = makeStatusItemControllerFixture("MenuBarStatusItemSameSuiteInvalidationTests")
-        let settingsDefaults = UserDefaults(suiteName: fixture.suiteName)!
+        let settingsDefaults = fixture.defaultsFixture.makeSiblingDefaults()
         let runtimePreferences = fixture.preferences
         let settingsPreferences = PreferencesStore(defaults: settingsDefaults, sync: NoopPreferencesSync())
         let controller = fixture.controller
@@ -1237,6 +1237,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         return MenuBarStatusItemControllerFixture(
             suiteName: preferencesFixture.suiteName,
             defaults: preferencesFixture.defaults,
+            defaultsFixture: preferencesFixture.defaultsFixture,
             preferences: preferences,
             controller: controller
         )
@@ -1244,14 +1245,14 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
     @MainActor
     private func makePreferencesFixture(_ suitePrefix: String) -> PreferencesFixture {
-        let suiteName = "\(suitePrefix)-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaultsFixture = makeIsolatedUserDefaults(prefix: suitePrefix)
+        let defaults = defaultsFixture.defaults
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
 
         return PreferencesFixture(
-            suiteName: suiteName,
+            suiteName: defaultsFixture.suiteName,
             defaults: defaults,
+            defaultsFixture: defaultsFixture,
             preferences: preferences
         )
     }
@@ -1259,12 +1260,14 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     private struct PreferencesFixture {
         let suiteName: String
         let defaults: UserDefaults
+        let defaultsFixture: IsolatedUserDefaultsFixture<InMemoryUserDefaults>
         let preferences: PreferencesStore
     }
 
     private struct MenuBarStatusItemControllerFixture {
         let suiteName: String
         let defaults: UserDefaults
+        let defaultsFixture: IsolatedUserDefaultsFixture<InMemoryUserDefaults>
         let preferences: PreferencesStore
         let controller: MenuBarStatusItemController
     }

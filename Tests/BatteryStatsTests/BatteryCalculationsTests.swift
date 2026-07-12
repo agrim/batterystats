@@ -480,6 +480,46 @@ final class BatteryCalculationsTests: XCTestCase {
         XCTAssertNil(BatteryCalculations.smoothedDischargeRate([Int.max], fallback: Int.max))
     }
 
+    func testConfidentDischargeRateRequiresRecentStableTimestampedSamples() {
+        let now = Date(timeIntervalSince1970: 1_060)
+        let stableSamples = [
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_000), milliamps: 1_200),
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_030), milliamps: 1_180),
+            BatteryDischargeRateSample(timestamp: now, milliamps: 1_220)
+        ]
+
+        XCTAssertEqual(
+            BatteryCalculations.confidentSmoothedDischargeRate(stableSamples, now: now),
+            1_200
+        )
+        XCTAssertNil(
+            BatteryCalculations.confidentSmoothedDischargeRate(Array(stableSamples.prefix(2)), now: now)
+        )
+        XCTAssertNil(
+            BatteryCalculations.confidentSmoothedDischargeRate(
+                stableSamples,
+                now: now.addingTimeInterval(181)
+            )
+        )
+    }
+
+    func testConfidentDischargeRateRejectsUnstableOrCompressedSamples() {
+        let now = Date(timeIntervalSince1970: 1_060)
+        let unstableSamples = [
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_000), milliamps: 600),
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_030), milliamps: 1_200),
+            BatteryDischargeRateSample(timestamp: now, milliamps: 2_400)
+        ]
+        let compressedSamples = [
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_058), milliamps: 1_200),
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_059), milliamps: 1_190),
+            BatteryDischargeRateSample(timestamp: now, milliamps: 1_210)
+        ]
+
+        XCTAssertNil(BatteryCalculations.confidentSmoothedDischargeRate(unstableSamples, now: now))
+        XCTAssertNil(BatteryCalculations.confidentSmoothedDischargeRate(compressedSamples, now: now))
+    }
+
     func testEstimatedTimeToFullUsesChargeTaper() throws {
         let estimated = try XCTUnwrap(BatteryCalculations.estimatedTimeToFullMinutes(
             currentChargeMilliampHours: 4_031,
@@ -512,6 +552,29 @@ final class BatteryCalculationsTests: XCTestCase {
         )
 
         XCTAssertEqual(estimated, 0)
+    }
+
+    func testEstimatedTimeToFullKeepsReportedTopOffTimeAtFullCapacity() {
+        XCTAssertEqual(
+            BatteryCalculations.estimatedTimeToFullMinutes(
+                currentChargeMilliampHours: 5_338,
+                fullChargeCapacityMilliampHours: 5_338,
+                chargeCurrentMilliamps: nil,
+                reportedTimeToFullMinutes: 12
+            ),
+            12
+        )
+    }
+
+    func testEstimatedTimeToFullDoesNotClaimZeroDuringActiveTopOffCharging() {
+        XCTAssertNil(
+            BatteryCalculations.estimatedTimeToFullMinutes(
+                currentChargeMilliampHours: 5_338,
+                fullChargeCapacityMilliampHours: 5_338,
+                chargeCurrentMilliamps: 500,
+                reportedTimeToFullMinutes: nil
+            )
+        )
     }
 
     func testEstimatedTimeToFullRejectsInvalidCapacityBeforeReportingFull() {

@@ -1,26 +1,33 @@
 import XCTest
 
 final class WidgetSourceTests: XCTestCase {
-    func testMediumWidgetUsesLiveDisplaySnapshotForVisibleMetrics() throws {
+    func testSmallWidgetUsesRetainedTimelineProjection() throws {
         let source = try Self.loadSource(relativePath: "BatteryStatsWidgets/BatteryStatusWidgetView.swift")
         let componentSource = try Self.loadSource(relativePath: "BatteryStatsWidgets/BatteryWidgetComponents.swift")
+        let providerSource = try Self.loadSource(relativePath: "BatteryStatsWidgets/BatteryStatusWidget.swift")
 
-        XCTAssertTrue(source.contains("private var displaySnapshot: BatterySnapshot?"))
-        XCTAssertTrue(source.contains("guard let snapshot = entry.snapshot,"))
-        XCTAssertTrue(source.contains("let updatedAt = entry.updatedAt,"))
-        XCTAssertTrue(source.contains("BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: entry.date)"))
-        XCTAssertTrue(source.contains("let snapshot = displaySnapshot"))
-        XCTAssertTrue(source.contains("BatteryMediumWidgetView(\n                    snapshot: snapshot,\n                    updatedAt: entry.updatedAt,"))
-        XCTAssertTrue(source.contains("updatedAt: entry.updatedAt"))
-        XCTAssertFalse(source.contains("private var displayUpdatedAt: Date?"))
-        XCTAssertFalse(source.contains("displaySnapshot?.timestamp"))
-        XCTAssertFalse(source.contains("BatteryWidgetCompactDisplayPolicy.snapshotForMetrics("))
-        XCTAssertFalse(source.contains("healthTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color"))
-        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.healthTintStyle(for: snapshot).color"))
-        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.chargeTintStyle(for: snapshot).color"))
-        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.timeTintStyle(for: snapshot).color"))
-        XCTAssertTrue(componentSource.contains("BatteryPresentationStyle.statusDescriptor(for: snapshot)"))
-        XCTAssertFalse(source.contains("BatteryMediumWidgetView(\n                    snapshot: entry.snapshot"))
+        XCTAssertTrue(source.contains("let snapshot = entry.snapshotIsDisplayable ? entry.snapshot : nil"))
+        XCTAssertTrue(source.contains("let displayedTimeMinutes = snapshot == nil ? nil : entry.displayedTimeMinutes"))
+        XCTAssertFalse(source.contains("BatterySnapshotFreshnessPolicy.isLive"))
+        XCTAssertFalse(source.contains("BatteryMediumWidgetView"))
+        XCTAssertTrue(source.contains("BatteryPresentationStyle.healthTintStyle(for: snapshot).color"))
+        XCTAssertTrue(source.contains("BatteryPresentationStyle.chargeTintStyle(for: snapshot).color"))
+        XCTAssertTrue(source.contains("BatteryPresentationStyle.statusDescriptor(for: snapshot)"))
+        XCTAssertTrue(source.contains("BatteryWidgetMetricFormatting.timeText(minutes: displayedTimeMinutes)"))
+        XCTAssertFalse(componentSource.contains("BatteryMediumWidgetView"))
+        XCTAssertFalse(componentSource.contains("BatteryMediumMetricView"))
+        XCTAssertFalse(componentSource.contains("mediumTimeText"))
+        XCTAssertTrue(componentSource.contains(".trim(from: 0, to: progress)"))
+        XCTAssertTrue(componentSource.contains("case empty"))
+        XCTAssertTrue(componentSource.contains(".accessibilityLabel(Text(metric.accessibilityLabel))"))
+        XCTAssertFalse(componentSource.contains(".accessoryCircularCapacity"))
+        XCTAssertTrue(providerSource.contains("BatteryWidgetTimelinePlan.make(snapshot: snapshot, now: now)"))
+        XCTAssertTrue(providerSource.contains("snapshotIsDisplayable: projection.snapshotIsDisplayable"))
+        XCTAssertTrue(providerSource.contains("plan.reloadAfter.map { .after($0) } ?? .never"))
+        XCTAssertTrue(providerSource.contains(".supportedFamilies([.systemSmall])"))
+        XCTAssertFalse(providerSource.contains(".systemMedium"))
+        XCTAssertTrue(providerSource.contains(".contentMarginsDisabled()"))
+        XCTAssertFalse(providerSource.contains("BatteryWidgetUpdateFormatting.nextStatusChangeDate"))
     }
 
     func testMainSummarySeparatesAdapterCapabilityFromChargingSpeed() throws {

@@ -13,7 +13,12 @@ struct HistoryStatsView: View {
                     HistoryStatRow(title: "History", value: BatteryHistoryTextFormatting.sampleCountText(stats.sampleCount))
                     HistoryStatRow(title: "Latest", value: HistoryStatsFormatting.dateText(stats.latestTimestamp))
                     HistoryStatRow(title: "Captured", value: HistoryStatsFormatting.capturedText(for: stats))
-                    HistoryStatRow(title: "Power", value: powerText(for: stats))
+                    ForEach(stats.powerStats, id: \.role) { powerStats in
+                        HistoryStatRow(
+                            title: HistoryStatsFormatting.powerTitle(for: powerStats.role),
+                            value: HistoryStatsFormatting.powerText(for: powerStats)
+                        )
+                    }
                     HistoryStatRow(
                         title: "Charge",
                         value: rangeText(
@@ -63,18 +68,31 @@ enum HistoryStatsFormatting {
     static func timeText(_ date: Date) -> String {
         date.formatted(.dateTime.hour().minute())
     }
+
+    static func powerTitle(for role: BatteryHistoryPowerRole) -> String {
+        switch role {
+        case .batteryDrain:
+            return "Battery drain"
+        case .batteryCharge:
+            return "Battery charge"
+        case .inputPower:
+            return "Input power"
+        case .unknown:
+            return "Power"
+        }
+    }
+
+    static func powerText(for stats: BatteryHistoryPowerStats) -> String {
+        let peakText = BatteryFormatting.watts(stats.peakWatts)
+        guard let averageWatts = stats.timeWeightedAverageWatts else {
+            return stats.sampleCount == 1 ? "Observed \(peakText)" : "Observed peak \(peakText)"
+        }
+
+        return "Time-weighted avg \(BatteryFormatting.watts(averageWatts)), peak \(peakText)"
+    }
 }
 
 private extension HistoryStatsView {
-    private func powerText(for stats: BatteryHistoryStats) -> String {
-        let values = [
-            stats.averagePowerWatts.map { "Avg \(BatteryFormatting.watts($0))" },
-            stats.peakPowerWatts.map { "Peak \(BatteryFormatting.watts($0))" }
-        ].compactMap { $0 }
-
-        return values.isEmpty ? "Unavailable" : values.joined(separator: ", ")
-    }
-
     private func rangeText<Value>(
         minimum: Value?,
         maximum: Value?,

@@ -9,7 +9,7 @@ BatteryStats is a small native macOS battery utility for Apple Silicon Mac lapto
 - a main SwiftUI window
 - a menu bar extra
 - a settings window
-- a `systemSmall` widget extension
+- a `systemSmall` widget family
 - a Developer ID signed and notarized Apple-Silicon DMG release artifact
 
 The app is intentionally compact. It is not a hardware-control tool, fan controller, charging limiter, or general-purpose system monitor.
@@ -29,7 +29,7 @@ The app is intentionally compact. It is not a hardware-control tool, fan control
 - Optional local alerts for low battery, charge complete, and high temperature
 - Optional local battery history with iCloud key-value sync when enabled
 - Copy raw and parsed battery snapshots for debugging
-- Widget with four circular battery indicators and a labeled medium layout
+- Widget with four circular battery indicators
 
 ## Architecture
 
@@ -74,7 +74,10 @@ Runtime battery data flows through:
      - app activation
      - the selected fixed timer or the dynamic cadence from `BatteryRefreshPolicy`
      - an energy-shift probe when the selected cadence is slower than the probe interval
-   - Smooths discharge samples before computing a rate-based remaining time
+   - Prefers a valid system remaining-time estimate
+   - Uses a rate-based fallback only after recent timestamped samples pass count, duration, and stability checks
+   - Resets discharge confidence on wake, stop, large gaps, notifications, and power-state changes
+   - Retains the last good snapshot through brief read failures and retries before declaring the battery unsupported
    - Records history and evaluates alert policy after published refreshes
 
 ### Domain Model
@@ -133,7 +136,7 @@ Persisted preferences:
 - `BatteryStats/Features/Battery/Data/BatteryHistoryStore.swift`
 - `BatteryStats/Features/Battery/Data/BatteryAlertCoordinator.swift`
 
-History is opt-in and keeps a capped local set of lightweight samples. If history iCloud sync is enabled, it mirrors the compact encoded sample set through `NSUbiquitousKeyValueStore`; avoid large or high-frequency payloads.
+History is opt-in and keeps a capped local set of lightweight samples. Power samples carry an explicit battery-drain, battery-charge, or adapter-input role; statistics must remain separated by role and time-weighted across irregular observation intervals. If history iCloud sync is enabled, it mirrors the compact encoded sample set through `NSUbiquitousKeyValueStore`; avoid large or high-frequency payloads.
 
 Alerts are opt-in local notifications. Keep them threshold-based and avoid repeated notifications while the same condition remains active.
 
@@ -144,17 +147,20 @@ Alerts are opt-in local notifications. Keep them threshold-based and avoid repea
 
 Current widget behavior:
 
-- families: `systemSmall`, `systemMedium`
-- refresh cadence: roughly every 5 minutes
+- family: `systemSmall`
+- data source: the app-published `BatteryWidgetSnapshotStore` in the shared App Group
+- timeline cadence: future entries are at least five minutes apart
+- retention: projected entries keep a valid last-known snapshot visible until the six-hour retention boundary
+- time: a snapshot timestamp plus its estimate defines a deadline, and projected entries decay the displayed duration
 - metric rings:
   - health
   - charge
   - time
   - power state
 
-The small widget keeps symbol-centered rings. The medium widget can use labels and text values.
+The widget keeps four compact, symbol-centered rings.
 
-The widget reads battery state through `BatteryReadingService` and reuses shared battery domain and data files directly.
+The widget does not read IOKit directly. `BatteryMonitor` sanitizes and publishes the latest snapshot, requests hard-coalesced timeline reloads for ordinary changes, and bypasses that budget only for critical availability, power-state, or battery-band transitions.
 
 ## Design Constraints
 
@@ -190,6 +196,8 @@ Current bundle identifiers:
 - widget: `io.github.agrim.batterystats.widgets`
 - tests: `io.github.agrim.batterystats.tests`
 
+The app and widget App Group is `Q293G85PG5.io.github.agrim.batterystats`. This Team-ID-prefixed macOS form is valid for notarized direct distribution without registering a `group.*` identifier. Keep the store constant and both entitlement files identical.
+
 If these change, keep `project.yml`, generated project output, logging fallbacks, and any release docs aligned.
 
 ## Build And Test
@@ -197,20 +205,24 @@ If these change, keep `project.yml`, generated project output, logging fallbacks
 Debug run:
 
 ```bash
-./script/build_and_run.sh
+BATTERYSTATS_ALLOW_PROVISIONING_UPDATES=1 ./script/build_and_run.sh
 ```
 
-Release build:
+Install and verify the signed app/widget:
 
 ```bash
-xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStats -configuration Release -derivedDataPath .build/DerivedDataRelease build
+BATTERYSTATS_ALLOW_PROVISIONING_UPDATES=1 ./script/build_and_run.sh install
 ```
 
 Tests:
 
 ```bash
-xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStatsTests test
+./script/build_and_run.sh test
 ```
+
+Unsigned builds are an explicit compile/test fallback only. Do not use them as WidgetKit, App Group, iCloud, launch-at-login, or runtime proof.
+
+`BATTERYSTATS_ALLOW_PROVISIONING_UPDATES=1` passes both Xcode profile updates and Mac device registration. This is needed on a maintainer Mac that has not yet been registered for the development profile.
 
 Current test coverage is focused on battery math and parsing:
 
@@ -230,16 +242,18 @@ The app icon is authored in Icon Composer and stored as a `.icon` package. The r
 
 ## Packaging Notes
 
-Current release packaging approach:
+Current release packaging approach is encoded in `script/package_release.sh`:
 
-1. Build the release app with Developer ID settings
-2. Verify signatures, hardened runtime, and nested widget signing
-3. Copy the app plus an `Applications` alias into a staging folder
-4. Create `dist/BatteryStats-arm64.dmg` with `hdiutil`
+1. Archive and export the arm64 app with Developer ID settings
+2. Verify Developer ID authorities, trusted timestamps, hardened runtime, effective entitlements, provisioning authorization, and nested widget signing
+3. Copy the app plus an `Applications` symlink into a staging folder
+4. Create the versioned `dist/BatteryStats-arm64-1.0.4.dmg` candidate with `hdiutil`
 5. Sign the DMG with the Developer ID Application identity
 6. Submit the DMG with `xcrun notarytool submit --wait`
 7. Staple and validate the ticket with `xcrun stapler`
-8. Publish `dist/BatteryStats-arm64.dmg.sha256` beside the DMG
+8. Write a portable checksum beside the versioned candidate; publishing/replacing the tracked public artifact remains a separate explicit action
+
+The script writes a versioned candidate (`BatteryStats-arm64-1.0.4.dmg` by default), verifies effective app and widget entitlements after Developer ID export, and does not overwrite the published `v1.0.3` artifact.
 
 The DMG currently targets Apple Silicon release builds.
 
@@ -252,12 +266,13 @@ Notarization requires:
 
 If the machine only has `Sign to Run Locally` or no valid signing identities, you cannot complete notarization from this repo alone.
 
-Current maintainer-machine status during the `v1.0.3` release pass:
+Current maintainer-machine status during the `v1.0.4` corrective pass:
 
 - Developer ID Application identity exists for team `Q293G85PG5`
 - `notarytool` profile `BatteryStats` is stored in Keychain
 - `dist/BatteryStats-arm64.dmg` is Developer ID signed, notarized, and stapled
 - `spctl -a -t open --context context:primary-signature -vv dist/BatteryStats-arm64.dmg` should report `accepted`
+- the public artifact remains `v1.0.3`; do not describe local `v1.0.4` validation as a published release
 
 ## Practical Agent Guidance
 
@@ -266,4 +281,6 @@ Current maintainer-machine status during the `v1.0.3` release pass:
 - Preserve widget access to shared battery code
 - When changing resources or targets, regenerate the project
 - When changing release packaging, validate the built bundle contents and `codesign --verify --deep --strict`
+- Inspect effective signed entitlements and embedded provisioning authorization; source plist tests are not release proof
+- After installation, verify `pluginkit` resolves `io.github.agrim.batterystats.widgets` to the current app path and build
 - Prefer small, deliberate edits over broad architectural churn

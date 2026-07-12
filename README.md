@@ -8,6 +8,20 @@ SHA-256 checksum: [`BatteryStats-arm64.dmg.sha256`](https://github.com/agrim/bat
 
 The public download is Developer ID signed, Apple-notarized, and stapled. Non-notarized DMG artifacts are not tracked or distributed.
 
+The repository currently targets the corrective `1.0.4 (5)` build. The public download remains `v1.0.3` until a new Developer ID build has been exported, verified, notarized, and published. The `v1.0.3` signature does not contain the iCloud KVS entitlement, so iCloud sync is unavailable in that binary; the current source and release verifier correct that signing drift.
+
+## Current Source Corrections
+
+- The app and widget share snapshots through the notarization-safe Team-ID App Group `Q293G85PG5.io.github.agrim.batterystats`
+- Widget timelines project remaining-time decay and an explicit stale transition with entries at least five minutes apart
+- Valid macOS remaining-time estimates take precedence; custom discharge estimates require recent, stable samples
+- Wake, power transitions, large sampling gaps, and monitor restarts reset discharge-rate confidence
+- Brief IOKit read gaps retain the last snapshot while retrying instead of immediately blanking every surface
+- Charging top-off preserves a valid system time instead of forcing `0m`
+- Current-charge energy is labeled as an estimate; full/design Wh are not derived from instantaneous terminal voltage
+- History separates battery drain, battery charge, and adapter input and uses time-weighted averages
+- Signed-product validation checks effective entitlements, the iCloud profile, nested signatures, version coherence, and the active installed widget
+
 ## What Ships In v1.0.3
 
 - Native macOS app built with SwiftUI and Apple frameworks only
@@ -15,7 +29,6 @@ The public download is Developer ID signed, Apple-notarized, and stapled. Non-no
 - Compact battery window with health, charge, time, status, cycle count, and temperature
 - Menu bar extra with multiple display modes, including remaining-time display
 - Launch at login support through `SMAppService`
-- Optional iCloud preference sync through `NSUbiquitousKeyValueStore`
 - Configurable or dynamic refresh cadence with out-of-cycle refreshes for large energy-use shifts
 - Optional local battery history with a history summary in Settings
 - Optional local alerts for low battery, charge complete, and high temperature
@@ -35,7 +48,7 @@ BatteryStats currently focuses on:
 
 When the underlying system exposes more data, BatteryStats also calculates:
 
-- watt-hour values
+- an estimated current-charge watt-hour value
 - signed current and discharge rate
 - charge wattage
 - manufacture date
@@ -84,16 +97,16 @@ The settings window supports:
 - copy parsed snapshot
 - reset settings
 
-### Widgets
+### Widget
 
-The widgets are named **Battery Circles**. They show:
+The `systemSmall` widget is named **Battery Circles**. It shows:
 
 - health ring
 - charge ring
 - time ring
 - power-state ring
 
-The small widget keeps the four-ring compact layout. The medium widget adds labels and text values.
+The widget keeps the four-ring compact layout. If the host app quits, it continues showing the last valid snapshot for up to six hours instead of replacing retained values with an unavailable state.
 
 ## Platform Notes
 
@@ -107,9 +120,11 @@ The small widget keeps the four-ring compact layout. The medium widget adds labe
 
 Requirements:
 
-- Xcode 17+
-- `xcodegen`
-- macOS 15+ for the current project and Icon Composer workflow
+- Xcode 26 or newer (the current validation environment is Xcode 27)
+- XcodeGen 2.39 or newer
+- macOS 26 or newer
+- an Apple Development identity for signed local App Group/widget validation
+- a provisioning profile authorizing iCloud KVS for the app target
 
 Generate the project:
 
@@ -117,22 +132,36 @@ Generate the project:
 xcodegen generate
 ```
 
-Debug build and run:
+Signed debug build and run:
 
 ```bash
-./script/build_and_run.sh
+BATTERYSTATS_ALLOW_PROVISIONING_UPDATES=1 ./script/build_and_run.sh
+```
+
+The provisioning-update flag is normally only needed for the first build or after capabilities change. It also lets Xcode register the current Mac when a development profile needs the device. Runtime modes reject unsigned products because an unsigned launch cannot validate WidgetKit, App Groups, iCloud KVS, or launch at login.
+
+Install the signed build in `/Applications`, register the embedded widget, and verify the shared snapshot:
+
+```bash
+BATTERYSTATS_ALLOW_PROVISIONING_UPDATES=1 ./script/build_and_run.sh install
 ```
 
 Run tests:
 
 ```bash
-xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStatsTests test
+./script/build_and_run.sh test
 ```
 
-Release build:
+An explicit unsigned compile/test fallback remains available when signing is intentionally out of scope:
 
 ```bash
-xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStats -configuration Release -derivedDataPath .build/DerivedDataRelease build
+BATTERYSTATS_SIGNING_MODE=unsigned ./script/build_and_run.sh test
+```
+
+Create a versioned Developer ID, notarized, stapled release candidate without overwriting the currently published DMG:
+
+```bash
+BATTERYSTATS_ALLOW_PROVISIONING_UPDATES=1 ./script/package_release.sh
 ```
 
 ## Repository Layout
@@ -146,4 +175,4 @@ xcodebuild -project BatteryStats.xcodeproj -scheme BatteryStats -configuration R
 
 ## Release Notes
 
-See [CHANGELOG.md](CHANGELOG.md) for the release summary for `v1.0.3`.
+See [CHANGELOG.md](CHANGELOG.md) for the unreleased `v1.0.4` corrective notes and the published `v1.0.3` summary.

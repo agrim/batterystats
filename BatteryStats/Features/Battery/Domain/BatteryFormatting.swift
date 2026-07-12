@@ -88,12 +88,14 @@ enum BatteryFormatting {
             return "—"
         }
 
-        if minutes < 60 {
-            return "\(minutes)m"
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+
+        guard hours > 0 else {
+            return "\(remainingMinutes)m"
         }
 
-        let roundedHours = max(1, Int((Double(minutes) / 60).rounded(.toNearestOrAwayFromZero)))
-        return "\(roundedHours)h"
+        return remainingMinutes == 0 ? "\(hours)h" : "\(hours)h\(remainingMinutes)m"
     }
 
     static func temperature(_ celsiusValue: Double?, unitPreference: TemperatureUnitPreference) -> String {

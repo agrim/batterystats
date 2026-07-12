@@ -113,7 +113,7 @@ struct BatterySummaryGridView: View {
             rowDivider
 
             BatteryDetailRowView(
-                title: "Energy",
+                title: maximumEnergy == nil ? "Estimated Energy" : "Energy",
                 value: BatteryFormatting.compactWattHourPair(current: currentEnergy, maximum: maximumEnergy)
             )
         }
