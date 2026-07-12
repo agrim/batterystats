@@ -30,10 +30,6 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: BatteryStats
-        excludes:
-          - Resources/IconLayers/background.png
-          - Resources/IconLayers/battery.png
-          - Resources/IconLayers/heart.png
     dependencies:
       - target: BatteryStatsWidgetsExtension
         embed: true

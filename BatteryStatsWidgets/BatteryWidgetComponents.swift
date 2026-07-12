@@ -52,25 +52,9 @@ struct BatteryWidgetMetric {
     let content: Content
     let progress: Double?
     let ringTint: Color
-    let contentTint: Color
     let accessibilityLabel: String
     let accessibilityValue: String
-
-    init(
-        content: Content,
-        progress: Double?,
-        ringTint: Color,
-        accessibilityLabel: String,
-        accessibilityValue: String,
-        contentTint: Color = .primary
-    ) {
-        self.content = content
-        self.progress = progress
-        self.ringTint = ringTint
-        self.accessibilityLabel = accessibilityLabel
-        self.accessibilityValue = accessibilityValue
-        self.contentTint = contentTint
-    }
+    var contentTint: Color = .primary
 }
 
 private struct BatteryWidgetMetricContent: View {

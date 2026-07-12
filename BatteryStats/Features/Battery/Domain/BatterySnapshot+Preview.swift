@@ -14,7 +14,6 @@ extension BatterySnapshot {
             fullChargeCapacityMilliampHours: 5_338,
             fullChargeCapacityWattHours: 68.3,
             designCapacityMilliampHours: 6_559,
-            designCapacityWattHours: 83.8,
             healthPercent: 81.4,
             stateOfChargePercent: 92.0,
             voltageMillivolts: 12_780,
@@ -27,7 +26,6 @@ extension BatterySnapshot {
             timeToFullMinutes: nil,
             cycleCount: 247,
             manufactureDate: manufactureDate,
-            batteryAgeComponents: BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: now),
             temperatureCelsius: 34.2,
             adapterMaxWatts: nil,
             notes: []
@@ -47,7 +45,6 @@ extension BatterySnapshot {
             fullChargeCapacityMilliampHours: 5_338,
             fullChargeCapacityWattHours: 68.3,
             designCapacityMilliampHours: 6_559,
-            designCapacityWattHours: 83.8,
             healthPercent: 81.4,
             stateOfChargePercent: 75.5,
             voltageMillivolts: 12_910,
@@ -60,7 +57,6 @@ extension BatterySnapshot {
             timeToFullMinutes: 52,
             cycleCount: 247,
             manufactureDate: manufactureDate,
-            batteryAgeComponents: BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: now),
             temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
             notes: []

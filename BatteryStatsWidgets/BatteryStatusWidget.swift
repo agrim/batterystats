@@ -19,6 +19,17 @@ struct BatteryStatusEntry: TimelineEntry {
     }
 }
 
+private extension BatteryStatusEntry {
+    init(snapshot: BatterySnapshot?, projection: BatteryWidgetTimelinePlan.Entry, date: Date? = nil) {
+        self.init(
+            date: date ?? projection.date,
+            snapshot: snapshot,
+            snapshotIsDisplayable: projection.snapshotIsDisplayable,
+            displayedTimeMinutes: projection.displayedTimeMinutes
+        )
+    }
+}
+
 struct BatteryStatusProvider: TimelineProvider {
     private let snapshotStore: BatteryWidgetSnapshotStore = .shared
 
@@ -35,15 +46,7 @@ struct BatteryStatusProvider: TimelineProvider {
         let now = Date.now
         let snapshot = storedSnapshot(at: now)
         let plan = BatteryWidgetTimelinePlan.make(snapshot: snapshot, now: now)
-        let projection = plan.entries[0]
-        completion(
-            BatteryStatusEntry(
-                date: now,
-                snapshot: snapshot,
-                snapshotIsDisplayable: projection.snapshotIsDisplayable,
-                displayedTimeMinutes: projection.displayedTimeMinutes
-            )
-        )
+        completion(BatteryStatusEntry(snapshot: snapshot, projection: plan.entries[0], date: now))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BatteryStatusEntry>) -> Void) {
@@ -56,12 +59,7 @@ struct BatteryStatusProvider: TimelineProvider {
         let snapshot = storedSnapshot(at: now)
         let plan = BatteryWidgetTimelinePlan.make(snapshot: snapshot, now: now)
         let entries = plan.entries.map { projection in
-            BatteryStatusEntry(
-                date: projection.date,
-                snapshot: snapshot,
-                snapshotIsDisplayable: projection.snapshotIsDisplayable,
-                displayedTimeMinutes: projection.displayedTimeMinutes
-            )
+            BatteryStatusEntry(snapshot: snapshot, projection: projection)
         }
         let reloadPolicy: TimelineReloadPolicy = plan.reloadAfter.map { .after($0) } ?? .never
         completion(Timeline(entries: entries, policy: reloadPolicy))

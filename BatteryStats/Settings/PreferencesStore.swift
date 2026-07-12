@@ -105,7 +105,6 @@ final class PreferencesStore {
     static let temperatureUnitPreferenceDefaultsKey = Key.temperatureUnitPreference
 
     private enum Key {
-        static let launchAtLoginEnabled = "launchAtLoginEnabled"
         static let menuBarDisplayMode = "menuBarDisplayMode"
         static let temperatureUnitPreference = "temperatureUnitPreference"
         static let showAdvancedValues = "showAdvancedValues"
@@ -132,10 +131,6 @@ final class PreferencesStore {
         Key.isHistoryEnabled,
         Key.isHistoryICloudSyncEnabled
     ]
-
-    var launchAtLoginEnabled: Bool {
-        didSet { persist(launchAtLoginEnabled, forKey: Key.launchAtLoginEnabled, syncToCloud: false) }
-    }
 
     var menuBarDisplayMode: MenuBarDisplayMode {
         didSet {
@@ -219,7 +214,6 @@ final class PreferencesStore {
         self.sync = sync
         defaultsNotificationIdentifier = Self.defaultsNotificationIdentifier(defaults)
 
-        launchAtLoginEnabled = Self.boolPreference(defaults: defaults, key: Key.launchAtLoginEnabled, defaultValue: false)
         let initialMenuBarDisplayMode = Self.enumPreference(
             defaults: defaults,
             key: Key.menuBarDisplayMode,
@@ -274,7 +268,7 @@ final class PreferencesStore {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 self?.handleLocaleChange()
             }
         }
@@ -380,7 +374,6 @@ final class PreferencesStore {
             clearSyncedValues()
         }
 
-        launchAtLoginEnabled = false
         menuBarDisplayMode = .iconAndPercentage
         temperatureUnitPreference = .system
         showAdvancedValues = false
@@ -393,7 +386,6 @@ final class PreferencesStore {
         isHistoryICloudSyncEnabled = false
         isICloudSyncEnabled = false
 
-        syncStatusMessage = sync.availabilityDescription
         invalidateMenuBarDisplayPreferences()
     }
 
@@ -417,7 +409,6 @@ final class PreferencesStore {
         if resolvedValue, shouldMergeRemoteValues {
             pullRemoteValues(defaultMissingValues: false)
             pushLocalValues()
-            sync.flush()
         }
 
         resolveHistoryICloudSyncState()
@@ -571,9 +562,9 @@ final class PreferencesStore {
         defaultValue: Value,
         defaultMissing: Bool
     ) -> Value? where Value: RawRepresentable, Value.RawValue == String {
-        let hasRemoteValue = sync.hasValue(forKey: key)
-        guard let rawValue = sync.string(forKey: key) else {
-            if hasRemoteValue {
+        let rawValue = sync.object(forKey: key)
+        guard let rawValue = rawValue as? String else {
+            if rawValue != nil {
                 sync.set(defaultValue.rawValue, forKey: key)
                 return defaultValue
             }
@@ -594,12 +585,12 @@ final class PreferencesStore {
         defaultValue: Bool,
         defaultMissing: Bool
     ) -> Bool? {
-        let hasRemoteValue = sync.hasValue(forKey: key)
-        if let value = sync.bool(forKey: key) {
+        let rawValue = sync.object(forKey: key)
+        if let value = ICloudPreferencesSync.strictBool(rawValue) {
             return value
         }
 
-        if hasRemoteValue {
+        if rawValue != nil {
             sync.set(defaultValue, forKey: key)
             return defaultValue
         }
@@ -863,7 +854,7 @@ final class PreferencesStore {
     }
 
     private func repairRemoteHistoryICloudSyncIfNeeded(afterApplyingRemoteKeys changedKeys: [String]) {
-        guard sync.bool(forKey: Key.isHistoryICloudSyncEnabled) == true else {
+        guard ICloudPreferencesSync.strictBool(sync.object(forKey: Key.isHistoryICloudSyncEnabled)) == true else {
             return
         }
 
@@ -873,7 +864,7 @@ final class PreferencesStore {
         }
 
         if changedKeys.isEmpty,
-           sync.bool(forKey: Key.isHistoryEnabled) == false {
+           ICloudPreferencesSync.strictBool(sync.object(forKey: Key.isHistoryEnabled)) == false {
             sync.set(false, forKey: Key.isHistoryICloudSyncEnabled)
         }
     }

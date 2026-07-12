@@ -314,17 +314,13 @@ final class BatteryAlertEvaluatorTests: XCTestCase {
         stateOfChargePercent: Double?,
         temperatureCelsius: Double = 32
     ) -> BatterySnapshot {
-        BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        makeBatterySnapshot(
             powerState: powerState,
             isCharging: isCharging,
             isExternalPowerConnected: isExternalPowerConnected,
             currentChargeMilliampHours: 4_950,
             currentChargeWattHours: 63.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78.0,
             healthPercent: 83.3,
             stateOfChargePercent: stateOfChargePercent,
             voltageMillivolts: 12_800,
@@ -336,11 +332,8 @@ final class BatteryAlertEvaluatorTests: XCTestCase {
             systemTimeRemainingMinutes: isCharging ? nil : 590,
             timeToFullMinutes: isCharging ? 5 : nil,
             cycleCount: 100,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
             temperatureCelsius: temperatureCelsius,
             adapterMaxWatts: 70,
-            notes: []
         )
     }
 

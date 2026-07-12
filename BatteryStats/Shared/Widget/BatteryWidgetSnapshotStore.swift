@@ -107,7 +107,6 @@ struct BatteryWidgetSnapshotStore {
         let timestamp = now.map { min(snapshot.timestamp, $0) } ?? snapshot.timestamp
         let ageReferenceDate = now ?? timestamp
         let manufactureDate = BatteryCalculations.plausibleManufactureDate(snapshot.manufactureDate, now: ageReferenceDate)
-        let batteryAgeComponents = BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: ageReferenceDate)
         let fullChargeCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.fullChargeCapacityMilliampHours, allowsZero: false)
         let designCapacityMilliampHours = BatteryCalculations.plausibleCapacityMilliampHours(snapshot.designCapacityMilliampHours, allowsZero: false)
         let storedHealthPercent = BatteryCalculations.presentationPercent(snapshot.healthPercent, maximumAllowed: 120)
@@ -236,7 +235,6 @@ struct BatteryWidgetSnapshotStore {
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             fullChargeCapacityWattHours: nil,
             designCapacityMilliampHours: designCapacityMilliampHours,
-            designCapacityWattHours: nil,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
             voltageMillivolts: voltageMillivolts,
@@ -251,7 +249,6 @@ struct BatteryWidgetSnapshotStore {
             timeToFullMinutes: timing.timeToFullMinutes,
             cycleCount: BatteryCalculations.plausibleCycleCount(snapshot.cycleCount),
             manufactureDate: manufactureDate,
-            batteryAgeComponents: batteryAgeComponents,
             temperatureCelsius: BatteryCalculations.plausibleTemperatureCelsius(snapshot.temperatureCelsius),
             adapterMaxWatts: adapterMaxWatts,
             notes: snapshot.notes
@@ -530,16 +527,15 @@ struct BatteryWidgetTimelinePlan: Equatable, Sendable {
     static let minimumEntryInterval: TimeInterval = 5 * 60
 
     let entries: [Entry]
-    let countdownDeadline: Date?
     let reloadAfter: Date?
 
     static func make(snapshot: BatterySnapshot?, now: Date) -> BatteryWidgetTimelinePlan {
         guard let snapshot else {
-            return singleEntryPlan(snapshot: nil, now: now)
+            return singleEntryPlan(now: now)
         }
 
         guard BatteryWidgetSnapshotDisplayPolicy.isDisplayable(updatedAt: snapshot.timestamp, now: now) else {
-            return singleEntryPlan(snapshot: snapshot, now: now)
+            return singleEntryPlan(now: now)
         }
 
         let countdown = BatteryWidgetCountdown(snapshot: snapshot)
@@ -565,27 +561,20 @@ struct BatteryWidgetTimelinePlan: Equatable, Sendable {
 
         return BatteryWidgetTimelinePlan(
             entries: entries,
-            countdownDeadline: countdown?.deadline,
             reloadAfter: finalDate.addingTimeInterval(minimumEntryInterval)
         )
     }
 
-    private static func singleEntryPlan(snapshot: BatterySnapshot?, now: Date) -> BatteryWidgetTimelinePlan {
-        let snapshotIsDisplayable = snapshot.map {
-            BatteryWidgetSnapshotDisplayPolicy.isDisplayable(updatedAt: $0.timestamp, now: now)
-        } ?? false
-        let countdown = snapshotIsDisplayable ? snapshot.flatMap(BatteryWidgetCountdown.init) : nil
-
+    private static func singleEntryPlan(now: Date) -> BatteryWidgetTimelinePlan {
         return BatteryWidgetTimelinePlan(
             entries: [
                 Entry(
                     date: now,
                     evaluationDate: now,
-                    snapshotIsDisplayable: snapshotIsDisplayable,
-                    displayedTimeMinutes: snapshotIsDisplayable ? countdown?.remainingMinutes(at: now) : nil
+                    snapshotIsDisplayable: false,
+                    displayedTimeMinutes: nil
                 )
             ],
-            countdownDeadline: countdown?.deadline,
             reloadAfter: nil
         )
     }
@@ -629,10 +618,6 @@ enum BatteryWidgetMetricFormatting {
         return "\(percent.formatted(.number.precision(.fractionLength(0))))%"
     }
 
-    static func timeText(for snapshot: BatterySnapshot?) -> String {
-        timeText(minutes: snapshot?.displayedTimeMinutes)
-    }
-
     static func timeText(minutes: Int?) -> String {
         guard let displayedMinutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
             return "—"
@@ -644,10 +629,6 @@ enum BatteryWidgetMetricFormatting {
         return "\(hours):\(minuteText)"
     }
 
-    static func timeProgress(for snapshot: BatterySnapshot?) -> Double? {
-        timeProgress(minutes: snapshot?.displayedTimeMinutes)
-    }
-
     static func timeProgress(minutes: Int?) -> Double? {
         guard let displayedMinutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
             return nil
@@ -655,10 +636,6 @@ enum BatteryWidgetMetricFormatting {
 
         let normalizedHours = Double(displayedMinutes) / (24 * 60)
         return displayedMinutes > 0 ? max(0.15, min(1, normalizedHours)) : 0
-    }
-
-    static func powerText(for snapshot: BatterySnapshot?) -> String {
-        snapshot?.activePowerWatts.map { BatteryFormatting.watts($0) } ?? "—"
     }
 
     static func clampedProgress(_ value: Double?) -> Double? {
@@ -715,22 +692,6 @@ enum BatteryPowerDisplayRole {
         case .connectedNotCharging, .fullOnAC, .onBattery, .unknown:
             return .power
         }
-    }
-}
-
-enum BatteryWidgetUpdateFormatting {
-    static func statusText(updatedAt: Date?, now: Date = .now) -> String {
-        guard let updatedAt else {
-            return "No update"
-        }
-
-        guard BatterySnapshotFreshnessPolicy.isWithinFutureSkew(updatedAt: updatedAt, now: now) else {
-            return "Waiting for update"
-        }
-
-        let relativeText = BatterySnapshotFreshnessPolicy.relativeUpdateText(updatedAt: updatedAt, now: now)
-        let prefix = BatterySnapshotFreshnessPolicy.isLive(updatedAt: updatedAt, now: now) ? "Updated" : "Stale"
-        return "\(prefix) \(relativeText)"
     }
 }
 

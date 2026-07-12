@@ -169,7 +169,7 @@ BATTERYSTATS_ALLOW_PROVISIONING_UPDATES=1 ./script/package_release.sh
 - `BatteryStats/` — main app source
 - `BatteryStatsWidgets/` — widget extension
 - `Tests/BatteryStatsTests/` — unit tests
-- `BatteryStats/Resources/IconLayers/AppIcon.icon` — saved Icon Composer app icon source
+- `BatteryStats/Resources/IconLayers/AppIcon.icon` — editable Icon Composer source, including its layer assets
 - `dist/BatteryStats-arm64.dmg` — tracked notarized release artifact
 - `dist/BatteryStats-arm64.dmg.sha256` — SHA-256 checksum for the tracked release artifact
 

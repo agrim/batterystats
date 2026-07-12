@@ -53,33 +53,14 @@ final class BatteryMonitorTests: XCTestCase {
     }
 
     func testRefreshDoesNotRestoreRateBasedTimeForIdlePowerStates() async {
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 39,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
         let reader = StubBatteryReader(snapshots: [snapshot])
         let monitor = makeMonitor(reader)
@@ -93,33 +74,16 @@ final class BatteryMonitorTests: XCTestCase {
     }
 
     func testRefreshRequiresStableTimestampedSamplesBeforeRestoringRateBasedTime() async {
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .connectedDischarging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 39,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
         let reader = StubBatteryReader(snapshots: [snapshot, snapshot, snapshot])
         var publicationDates = [
@@ -1337,7 +1301,7 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reader.requests, [.standard, .standard])
         XCTAssertEqual(monitor.snapshot?.displayedTimeMinutes, 125)
         XCTAssertEqual(
-            MenuBarBatteryLabelFormatting.displayValue(
+            menuBarPresentationValue(
                 snapshot: monitor.snapshot,
                 displayMode: .iconAndTimeRemaining,
                 temperatureUnitPreference: .celsius
@@ -2133,10 +2097,11 @@ final class BatteryMonitorTests: XCTestCase {
 
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: now))
         XCTAssertEqual(loadedSnapshot.timestamp, snapshot.timestamp)
-        XCTAssertEqual(
-            BatteryWidgetUpdateFormatting.statusText(updatedAt: loadedSnapshot.timestamp, now: now),
-            "Stale 12m ago"
-        )
+        XCTAssertFalse(BatterySnapshotFreshnessPolicy.isLive(updatedAt: loadedSnapshot.timestamp, now: now))
+        XCTAssertEqual(BatterySnapshotFreshnessPolicy.relativeUpdateText(
+            updatedAt: loadedSnapshot.timestamp,
+            now: now
+        ), "12m ago")
     }
 
     func testWidgetSnapshotStoreDropsSnapshotBeyondDefaultRetentionWindow() throws {
@@ -2169,33 +2134,18 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreNormalizesContradictoryPersistedPowerState() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 39,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2210,33 +2160,15 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesStoredFullACStateWhenExternalFlagIsStale() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .fullOnAC,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_000,
             currentChargeWattHours: 65,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 100,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2249,33 +2181,15 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreShowsFullChargeWhenStoredFullACCurrentIsTransientlyEmpty() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .fullOnAC,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
             currentChargeWattHours: 0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: nil,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2289,33 +2203,15 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreDoesNotForceFullACWhenStoredPercentContradictsChargedState() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .fullOnAC,
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 1_000,
             currentChargeWattHours: 12,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 20,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2329,33 +2225,15 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesStoredConnectedStateWhenExternalFlagIsStale() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 4_000,
             currentChargeWattHours: 52,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 80,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2368,33 +2246,16 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesConnectedDischargingRatesAndTime() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .connectedDischarging,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2414,33 +2275,20 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesStoredConnectedStateWhenSignedCurrentIsStale() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 4_000,
             currentChargeWattHours: 52,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 80,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2461,33 +2309,17 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesStoredOnBatteryStateWhenExternalFlagIsStale() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 4_000,
             currentChargeWattHours: 52,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 80,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2501,33 +2333,18 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesUnknownStateWithoutPowerEvidence() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .unknown,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 4_000,
             currentChargeWattHours: 52,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 80,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
             timeToFullMinutes: 20,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2543,33 +2360,15 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreResolvesUnknownStateWhenExternalPowerIsKnown() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .unknown,
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 4_000,
             currentChargeWattHours: 52,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 80,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2594,33 +2393,19 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreDerivesMissingHealthFromValidCapacity() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
             healthPercent: nil,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2632,33 +2417,22 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePrefersCapacityDerivedHealthOverStaleStoredHealth() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
             fullChargeCapacityMilliampHours: 4_000,
             fullChargeCapacityWattHours: 52,
             designCapacityMilliampHours: 5_000,
-            designCapacityWattHours: 65,
             healthPercent: 100,
             stateOfChargePercent: 75,
             voltageMillivolts: 13_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 15.6,
             rateBasedTimeRemainingMinutes: 200,
             systemTimeRemainingMinutes: 195,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
-            adapterMaxWatts: nil,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2670,33 +2444,19 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreDerivesMissingStateOfChargeFromValidCapacity() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: nil,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2708,33 +2468,20 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreReconcilesCurrentChargeWithTrustedPercent() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: 92,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2747,33 +2494,20 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreDropsCurrentEnergyWhenCurrentChargeIsRejected() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 6_000,
             currentChargeWattHours: 72,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: nil,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2810,33 +2544,19 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreRejectsAbsurdDurationValues() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 39.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: Int.max,
             systemTimeRemainingMinutes: 1_441,
             timeToFullMinutes: Int.max,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2850,33 +2570,16 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreRecomputesFalseZeroTimeToEmptyWhenBatteryHasCharge() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 0,
             systemTimeRemainingMinutes: 0,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2889,33 +2592,19 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreKeepsZeroTimeToEmptyWhenBatteryIsEmpty() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
             currentChargeWattHours: 0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72,
-            healthPercent: 83,
             stateOfChargePercent: 0,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 0,
             systemTimeRemainingMinutes: 0,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2928,8 +2617,7 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreRecomputesFalseZeroTimeToFullWhenChargingBelowFull() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
@@ -2938,23 +2626,12 @@ final class BatteryMonitorTests: XCTestCase {
             fullChargeCapacityMilliampHours: 4_525,
             fullChargeCapacityWattHours: 54.3,
             designCapacityMilliampHours: 5_000,
-            designCapacityWattHours: 60,
             healthPercent: 90.5,
             stateOfChargePercent: 16,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 4_387,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 52.6,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 0,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -2967,33 +2644,14 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesValidStoredTimeToFullValue() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 2_000,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 24,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 240,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
         let expectedMinutes = try XCTUnwrap(BatteryCalculations.estimatedTimeToFullMinutes(
             currentChargeMilliampHours: 3_000,
@@ -3012,33 +2670,13 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreDerivesMissingTimeToFullFromChargeCurrent() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 2_000,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 24,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
         let expectedMinutes = try XCTUnwrap(BatteryCalculations.estimatedTimeToFullMinutes(
             currentChargeMilliampHours: 3_000,
@@ -3056,33 +2694,15 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreKeepsZeroTimeToFullWhenBatteryIsFull() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 5_000,
             currentChargeWattHours: 60,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72,
-            healthPercent: 83,
             stateOfChargePercent: 100,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 0,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3095,8 +2715,7 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreRejectsAbsurdPhysicalValues() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
@@ -3105,9 +2724,6 @@ final class BatteryMonitorTests: XCTestCase {
             fullChargeCapacityMilliampHours: Int.max,
             fullChargeCapacityWattHours: .greatestFiniteMagnitude,
             designCapacityMilliampHours: Int.max,
-            designCapacityWattHours: .greatestFiniteMagnitude,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
             voltageMillivolts: Int.max,
             currentMilliampsSigned: Int.max,
             dischargeRateMilliamps: Int.max,
@@ -3115,13 +2731,8 @@ final class BatteryMonitorTests: XCTestCase {
             dischargeRateWatts: .greatestFiniteMagnitude,
             rateBasedTimeRemainingMinutes: 120,
             systemTimeRemainingMinutes: 120,
-            timeToFullMinutes: nil,
             cycleCount: Int.max,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: Int.max,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3132,7 +2743,6 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.fullChargeCapacityMilliampHours)
         XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
         XCTAssertNil(loadedSnapshot.designCapacityMilliampHours)
-        XCTAssertNil(loadedSnapshot.designCapacityWattHours)
         XCTAssertNil(loadedSnapshot.voltageMillivolts)
         XCTAssertNil(loadedSnapshot.currentMilliampsSigned)
         XCTAssertNil(loadedSnapshot.dischargeRateMilliamps)
@@ -3144,33 +2754,18 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreDropsStaleZeroMaximumEnergyValues() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
             currentChargeWattHours: 0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 0,
-            healthPercent: 83,
             stateOfChargePercent: 0,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3178,38 +2773,21 @@ final class BatteryMonitorTests: XCTestCase {
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: Date(timeIntervalSince1970: 1_030), maximumAge: 60))
         XCTAssertEqual(loadedSnapshot.currentChargeWattHours, 0)
         XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
-        XCTAssertNil(loadedSnapshot.designCapacityWattHours)
     }
 
     func testWidgetSnapshotStoreClampsSmallCurrentChargeOverage() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_050,
             currentChargeWattHours: 60.6,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72,
-            healthPercent: 83,
             stateOfChargePercent: nil,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3234,33 +2812,13 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStorePreservesAdapterWattageWhenPluggedIn() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 39.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3272,33 +2830,14 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreRecomputesStaleStoredChargeRateFromCurrentAndVoltage() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 5_500,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 100,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 100,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3308,39 +2847,19 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.adapterMaxWatts, 100)
         XCTAssertEqual(loadedSnapshot.chargeRateWatts, 66)
         XCTAssertEqual(loadedSnapshot.activePowerWatts, 66)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "66.0 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "66.0 W")
     }
 
     func testWidgetSnapshotStoreRejectsChargeRateAboveAdapterContract() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 8_333,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 100,
-            inputPowerWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3350,39 +2869,19 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.adapterMaxWatts, 70)
         XCTAssertNil(loadedSnapshot.chargeRateWatts)
         XCTAssertNil(loadedSnapshot.activePowerWatts)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "—")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "—")
     }
 
     func testWidgetSnapshotStoreRejectsStoredChargeRateThatMirrorsAdapterCapability() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 8_333,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 100,
-            inputPowerWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 100,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3392,39 +2891,18 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.adapterMaxWatts, 100)
         XCTAssertNil(loadedSnapshot.chargeRateWatts)
         XCTAssertNil(loadedSnapshot.activePowerWatts)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "—")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "—")
     }
 
     func testWidgetSnapshotStoreRejectsUnverifiedHighStoredChargeRateWithoutAdapterCapability() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 8_333,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 100,
-            inputPowerWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
-            adapterMaxWatts: nil,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3433,39 +2911,18 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.adapterMaxWatts)
         XCTAssertNil(loadedSnapshot.chargeRateWatts)
         XCTAssertNil(loadedSnapshot.activePowerWatts)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "—")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "—")
     }
 
     func testWidgetSnapshotStoreDropsLegacyChargeRateWithoutCurrentEvidence() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 100,
-            inputPowerWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3475,39 +2932,21 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.adapterMaxWatts, 70)
         XCTAssertNil(loadedSnapshot.chargeRateWatts)
         XCTAssertNil(loadedSnapshot.activePowerWatts)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "—")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "—")
     }
 
     func testWidgetSnapshotStorePreservesInputPowerButDisplaysChargeRateWhileCharging() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
             voltageMillivolts: 12_044,
             currentMilliampsSigned: 2_111,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 25.424884,
             inputPowerWatts: 39.8,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3517,40 +2956,22 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.chargeRateWatts), 25.424884, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.inputPowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 39.8, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "39.8 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "39.8 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Input Power")
     }
 
     func testWidgetSnapshotStoreRejectsInputPowerAboveAdapterCapability() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
             voltageMillivolts: 12_044,
             currentMilliampsSigned: 2_111,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 25.424884,
             inputPowerWatts: 100,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3559,38 +2980,18 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.powerState, .charging)
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 25.424884, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "25.4 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "25.4 W")
     }
 
     func testWidgetSnapshotStoreDerivesMissingStoredChargeRateFromCurrentAndVoltage() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 5_500,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3599,38 +3000,18 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.powerState, .charging)
         XCTAssertEqual(loadedSnapshot.chargeRateWatts, 66)
         XCTAssertEqual(loadedSnapshot.activePowerWatts, 66)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "66.0 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "66.0 W")
     }
 
     func testWidgetSnapshotStoreDerivesMissingStoredDischargeRateFromCurrentAndVoltage() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
             rateBasedTimeRemainingMinutes: 150,
-            systemTimeRemainingMinutes: nil,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
-            adapterMaxWatts: nil,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3639,38 +3020,23 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.powerState, .onBattery)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.dischargeRateWatts), 14.4, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 14.4, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "14.4 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "14.4 W")
     }
 
     func testWidgetSnapshotStoreDropsStaleTimingAndPowerForIdleStates() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 39.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
-            currentMilliampsSigned: nil,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 18,
             dischargeRateWatts: 14,
             rateBasedTimeRemainingMinutes: 25,
             systemTimeRemainingMinutes: 24,
             timeToFullMinutes: 20,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3707,34 +3073,15 @@ final class BatteryMonitorTests: XCTestCase {
     func testWidgetSnapshotStoreReadsLegacySnapshotWithoutInputPowerField() throws {
         let store = try makeWidgetSnapshotStore()
         let defaults = try XCTUnwrap(store.defaults)
-        let rawSnapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let rawSnapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 1_500,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 18,
             inputPowerWatts: 39.8,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
         let encodedData = try JSONEncoder().encode(rawSnapshot)
         var dictionary = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedData) as? [String: Any])
@@ -3753,35 +3100,16 @@ final class BatteryMonitorTests: XCTestCase {
     func testWidgetSnapshotStoreTreatsLegacyInputPowerWithoutEvidenceAsUntrusted() throws {
         let store = try makeWidgetSnapshotStore()
         let defaults = try XCTUnwrap(store.defaults)
-        let rawSnapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let rawSnapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 2_111,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 25.424884,
             inputPowerWatts: 100,
             inputPowerEvidence: .counterBacked,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 100,
-            notes: []
         )
         let encodedData = try JSONEncoder().encode(rawSnapshot)
         var dictionary = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedData) as? [String: Any])
@@ -3794,41 +3122,20 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.inputPowerEvidence)
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 25.332, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "25.3 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "25.3 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStorePreservesCurrentDerivedChargeRateNearAdapterCapability() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 5_785,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 69.42,
-            inputPowerWatts: nil,
-            inputPowerEvidence: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 18,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3837,41 +3144,22 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.chargeRateWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 69.42, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "69.4 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "69.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStorePreservesCounterBackedInputPowerNearAdapterCapability() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 2_111,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 25.424884,
             inputPowerWatts: 69.42,
             inputPowerEvidence: .counterBacked,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3880,41 +3168,22 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.inputPowerEvidence, .counterBacked)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.inputPowerWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 69.42, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "69.4 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "69.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Input Power")
     }
 
     func testWidgetSnapshotStoreRejectsCounterBackedInputPowerThatExactlyMirrorsAdapterCapability() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 2_111,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 25.332,
             inputPowerWatts: 100,
             inputPowerEvidence: .counterBacked,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 100,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3923,41 +3192,22 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.inputPowerEvidence)
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 25.332, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "25.3 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "25.3 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStoreRejectsCounterBackedInputPowerThatNearlyMirrorsAdapterCapability() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 2_111,
-            dischargeRateMilliamps: nil,
             chargeRateWatts: 25.332,
             inputPowerWatts: 99.8,
             inputPowerEvidence: .counterBacked,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 100,
-            notes: []
         )
 
         store.save(snapshot)
@@ -3966,40 +3216,21 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.inputPowerEvidence)
         XCTAssertNil(loadedSnapshot.inputPowerWatts)
         XCTAssertEqual(try XCTUnwrap(loadedSnapshot.activePowerWatts), 25.332, accuracy: 0.001)
-        XCTAssertEqual(BatteryWidgetMetricFormatting.powerText(for: loadedSnapshot), "25.3 W")
+        XCTAssertEqual(formattedActivePower(for: loadedSnapshot), "25.3 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: loadedSnapshot).title, "Charge Rate")
     }
 
     func testWidgetSnapshotStorePreservesExplicitMissingChargeRateMarkerWhenSanitizing() throws {
         let store = try makeWidgetSnapshotStore()
         let defaults = try XCTUnwrap(store.defaults)
-        let rawSnapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let rawSnapshot = makeBatterySnapshot(
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
             healthPercent: 150,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: 5_500,
-            dischargeRateMilliamps: nil,
-            chargeRateWatts: nil,
-            dischargeRateWatts: nil,
-            rateBasedTimeRemainingMinutes: nil,
-            systemTimeRemainingMinutes: nil,
             timeToFullMinutes: 60,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
         let encodedData = try JSONEncoder().encode(rawSnapshot)
         var dictionary = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedData) as? [String: Any])
@@ -4023,33 +3254,22 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreClampsSmallPercentOverages() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_000,
             currentChargeWattHours: 65.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
             designCapacityMilliampHours: 4_900,
-            designCapacityWattHours: 63.7,
             healthPercent: 100.2,
             stateOfChargePercent: 105,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 25,
             systemTimeRemainingMinutes: 24,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -4061,33 +3281,22 @@ final class BatteryMonitorTests: XCTestCase {
 
     func testWidgetSnapshotStoreDerivesImpossibleChargeOverageFromValidCapacity() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_000,
             currentChargeWattHours: 65.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
             designCapacityMilliampHours: 4_900,
-            designCapacityWattHours: 63.7,
             healthPercent: 119,
             stateOfChargePercent: 119,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 25,
             systemTimeRemainingMinutes: 24,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
@@ -4101,44 +3310,31 @@ final class BatteryMonitorTests: XCTestCase {
         let store = try makeWidgetSnapshotStore()
         let manufactureDate = try XCTUnwrap(Calendar(identifier: .gregorian).date(from: DateComponents(year: 2023, month: 9, day: 12)))
         let snapshotDate = Date(timeIntervalSince1970: 1_735_689_600)
-        let snapshot = BatterySnapshot(
+        let snapshot = makeBatterySnapshot(
             timestamp: snapshotDate,
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
             manufactureDate: manufactureDate,
-            batteryAgeComponents: DateComponents(year: 99, month: 99),
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
 
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: snapshot.timestamp.addingTimeInterval(30), maximumAge: 60))
         XCTAssertEqual(loadedSnapshot.manufactureDate, snapshot.manufactureDate)
-        XCTAssertEqual(loadedSnapshot.batteryAgeComponents?.year, 1)
-        XCTAssertEqual(loadedSnapshot.batteryAgeComponents?.month, 3)
+        XCTAssertEqual(loadedSnapshot.validatedBatteryAgeComponents?.year, 1)
+        XCTAssertEqual(loadedSnapshot.validatedBatteryAgeComponents?.month, 3)
     }
 
-    func testWidgetSnapshotStoreRefreshesStoredBatteryAgeAgainstReadDate() throws {
+    func testWidgetSnapshotStoreDerivesAgeFromTimestampWithoutPersistingAgeComponents() throws {
         let store = try makeWidgetSnapshotStore()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
@@ -4157,33 +3353,19 @@ final class BatteryMonitorTests: XCTestCase {
             hour: 0,
             minute: 30
         )))
-        let snapshot = BatterySnapshot(
+        let snapshot = makeBatterySnapshot(
             timestamp: snapshotDate,
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
             manufactureDate: manufactureDate,
-            batteryAgeComponents: DateComponents(year: 99, month: 99),
-            temperatureCelsius: 32,
-            adapterMaxWatts: nil,
-            notes: []
         )
 
         store.save(snapshot)
@@ -4191,51 +3373,39 @@ final class BatteryMonitorTests: XCTestCase {
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: readDate, maximumAge: 2 * 60 * 60))
         XCTAssertEqual(loadedSnapshot.timestamp, snapshotDate)
         XCTAssertEqual(loadedSnapshot.manufactureDate, manufactureDate)
-        XCTAssertEqual(loadedSnapshot.batteryAgeComponents?.year, 0)
-        XCTAssertEqual(loadedSnapshot.batteryAgeComponents?.month, 1)
+        XCTAssertEqual(loadedSnapshot.validatedBatteryAgeComponents?.year, 0)
+        XCTAssertEqual(loadedSnapshot.validatedBatteryAgeComponents?.month, 0)
 
         let storedData = try XCTUnwrap(store.defaults?.data(forKey: "latestBatteryWidgetSnapshot"))
+        let storedObject = try XCTUnwrap(JSONSerialization.jsonObject(with: storedData) as? [String: Any])
+        XCTAssertNil(storedObject["batteryAgeComponents"])
         let storedSnapshot = try JSONDecoder().decode(BatterySnapshot.self, from: storedData)
-        XCTAssertEqual(storedSnapshot.batteryAgeComponents?.year, 0)
-        XCTAssertEqual(storedSnapshot.batteryAgeComponents?.month, 1)
+        XCTAssertEqual(storedSnapshot.validatedBatteryAgeComponents?.year, 0)
+        XCTAssertEqual(storedSnapshot.validatedBatteryAgeComponents?.month, 0)
     }
 
     func testWidgetSnapshotStoreRejectsFutureManufactureDateAndOrphanAge() throws {
         let store = try makeWidgetSnapshotStore()
-        let snapshot = BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
             manufactureDate: Date(timeIntervalSince1970: 2_000),
-            batteryAgeComponents: DateComponents(year: 2, month: 3),
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
 
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: Date(timeIntervalSince1970: 1_030), maximumAge: 60))
         XCTAssertNil(loadedSnapshot.manufactureDate)
-        XCTAssertNil(loadedSnapshot.batteryAgeComponents)
+        XCTAssertNil(loadedSnapshot.validatedBatteryAgeComponents)
     }
 
     func testWidgetSnapshotStoreRejectsImplausiblyOldManufactureDateAndOrphanAge() throws {
@@ -4243,40 +3413,27 @@ final class BatteryMonitorTests: XCTestCase {
         let calendar = Calendar(identifier: .gregorian)
         let snapshotDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 6, day: 28)))
         let oldManufactureDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2005, month: 12, day: 31)))
-        let snapshot = BatterySnapshot(
+        let snapshot = makeBatterySnapshot(
             timestamp: snapshotDate,
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
             manufactureDate: oldManufactureDate,
-            batteryAgeComponents: DateComponents(year: 6, month: 6),
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
 
         store.save(snapshot)
 
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: snapshotDate.addingTimeInterval(30), maximumAge: 60))
         XCTAssertNil(loadedSnapshot.manufactureDate)
-        XCTAssertNil(loadedSnapshot.batteryAgeComponents)
+        XCTAssertNil(loadedSnapshot.validatedBatteryAgeComponents)
     }
 
     func testWidgetSnapshotStoreClearsUndecodableSnapshot() throws {
@@ -4517,7 +3674,7 @@ final class BatteryMonitorTests: XCTestCase {
     private func makePreferencesStore() throws -> PreferencesStore {
         PreferencesStore(
             defaults: makeIsolatedUserDefaults(prefix: "BatteryMonitorTests.PreferencesStore").defaults,
-            sync: MonitorNoopPreferencesSync()
+            sync: NoopPreferencesSync()
         )
     }
 
@@ -4525,33 +3682,21 @@ final class BatteryMonitorTests: XCTestCase {
         stateOfChargePercent: Double,
         healthPercent: Double = 83
     ) -> BatterySnapshot {
-        return BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        return makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 1_000,
             currentChargeWattHours: 12.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78.0,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 50,
             systemTimeRemainingMinutes: 50,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
     }
 
@@ -4570,13 +3715,11 @@ final class BatteryMonitorTests: XCTestCase {
         fullChargeCapacityMilliampHours: Int = 5_000,
         fullChargeCapacityWattHours: Double = 65.0,
         designCapacityMilliampHours: Int = 6_000,
-        designCapacityWattHours: Double = 78.0,
         inputPowerWatts: Double? = nil
     ) -> BatterySnapshot {
         let isDischarging = powerState == .onBattery || powerState == .connectedDischarging
 
-        return BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        return makeBatterySnapshot(
             powerState: powerState,
             isCharging: powerState == .charging,
             isExternalPowerConnected: powerState != .onBattery,
@@ -4585,7 +3728,6 @@ final class BatteryMonitorTests: XCTestCase {
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             fullChargeCapacityWattHours: fullChargeCapacityWattHours,
             designCapacityMilliampHours: designCapacityMilliampHours,
-            designCapacityWattHours: designCapacityWattHours,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
             voltageMillivolts: voltageMillivolts,
@@ -4598,48 +3740,31 @@ final class BatteryMonitorTests: XCTestCase {
             systemTimeRemainingMinutes: isDischarging ? 150 : nil,
             timeToFullMinutes: powerState == .charging ? timeToFullMinutes : nil,
             cycleCount: cycleCount,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
             temperatureCelsius: temperatureCelsius,
             adapterMaxWatts: powerState == .onBattery ? nil : 70,
-            notes: []
         )
     }
 
     private func makeNonFiniteSnapshot() -> BatterySnapshot {
-        BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78.0,
             healthPercent: .infinity,
             stateOfChargePercent: .nan,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: .infinity,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
     }
 
     private func makeOutOfRangeSnapshot() -> BatterySnapshot {
-        BatterySnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_000),
+        makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
@@ -4648,7 +3773,6 @@ final class BatteryMonitorTests: XCTestCase {
             fullChargeCapacityMilliampHours: 0,
             fullChargeCapacityWattHours: -65.0,
             designCapacityMilliampHours: -6_000,
-            designCapacityWattHours: -78.0,
             healthPercent: 150,
             stateOfChargePercent: -4,
             voltageMillivolts: 250_000,
@@ -4660,42 +3784,27 @@ final class BatteryMonitorTests: XCTestCase {
             systemTimeRemainingMinutes: -24,
             timeToFullMinutes: -1,
             cycleCount: -120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
             temperatureCelsius: 180,
             adapterMaxWatts: -70,
-            notes: []
         )
     }
 
     private func makeLowBatterySnapshot(timestamp: Date = Date(timeIntervalSince1970: 1_000)) -> BatterySnapshot {
-        BatterySnapshot(
+        makeBatterySnapshot(
             timestamp: timestamp,
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 500,
             currentChargeWattHours: 6.0,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78.0,
-            healthPercent: 83,
             stateOfChargePercent: 10,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: 14.4,
             rateBasedTimeRemainingMinutes: 25,
             systemTimeRemainingMinutes: 24,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32.0,
             adapterMaxWatts: 70,
-            notes: []
         )
     }
 
@@ -4704,33 +3813,17 @@ final class BatteryMonitorTests: XCTestCase {
         powerWatts: Double,
         timestamp: Date = Date(timeIntervalSince1970: 1_000)
     ) -> BatterySnapshot {
-        BatterySnapshot(
+        makeBatterySnapshot(
             timestamp: timestamp,
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeMilliampHours: 3_000,
-            currentChargeWattHours: 36.0,
-            fullChargeCapacityMilliampHours: 5_000,
-            fullChargeCapacityWattHours: 60.0,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 72.0,
-            healthPercent: 83,
-            stateOfChargePercent: 60,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
-            chargeRateWatts: nil,
             dischargeRateWatts: powerWatts,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
-            timeToFullMinutes: nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
             temperatureCelsius: celsius,
-            adapterMaxWatts: nil,
-            notes: []
         )
     }
 }
@@ -4743,43 +3836,6 @@ private final class MonitorFakeBatteryAlertNotificationDeliverer: BatteryAlertNo
         notifications.append(notification)
         return true
     }
-}
-
-@MainActor
-private final class MonitorNoopPreferencesSync: PreferencesSyncing {
-    var isEnabled = false
-    var isAvailable = true
-    var availabilityDescription = "iCloud is available for tests."
-
-    func setEnabled(_ enabled: Bool) {
-        isEnabled = enabled
-    }
-
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
-        NSObject()
-    }
-
-    func removeObserver(_ token: NSObjectProtocol) {}
-
-    func hasValue(forKey key: String) -> Bool {
-        false
-    }
-
-    func bool(forKey key: String) -> Bool? {
-        nil
-    }
-
-    func string(forKey key: String) -> String? {
-        nil
-    }
-
-    func set(_ value: Bool, forKey key: String) {}
-
-    func set(_ value: String, forKey key: String) {}
-
-    func removeValue(forKey key: String) {}
-
-    func flush() {}
 }
 
 private actor StubBatteryReader {

@@ -41,7 +41,7 @@ struct SettingsView: View {
                 "Launch at Login",
                 isOn: Binding(
                     get: { launchAtLoginState.isEnabled },
-                    set: { updateLaunchAtLogin($0) }
+                    set: { launchAtLoginState.setEnabled($0) }
                 )
             )
             .disabled(launchAtLoginState.isUpdating)
@@ -171,26 +171,15 @@ struct SettingsView: View {
         }
     }
 
-    private func updateLaunchAtLogin(_ enabled: Bool) {
-        launchAtLoginState.setEnabled(enabled)
-        preferences.launchAtLoginEnabled = launchAtLoginState.isEnabled
-    }
-
     private func resetSettings() {
-        launchAtLoginState.disableForReset()
+        launchAtLoginState.setEnabled(false)
         alertSettings.cancelPendingAlertEnables()
         preferences.reset()
-        preferences.launchAtLoginEnabled = launchAtLoginState.isEnabled
-    }
-
-    private func refreshLaunchAtLoginState() {
-        launchAtLoginState.refresh()
-        preferences.launchAtLoginEnabled = launchAtLoginState.isEnabled
     }
 
     private func refreshExternalSettingsState() {
         preferences.refreshICloudSyncAvailability()
-        refreshLaunchAtLoginState()
+        launchAtLoginState.refresh()
         alertSettings.refreshAuthorizationStatus(preferences: preferences)
     }
 

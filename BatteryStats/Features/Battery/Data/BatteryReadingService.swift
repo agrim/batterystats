@@ -95,19 +95,19 @@ struct BatteryReadingService: Sendable {
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
         )
         let powerFlags = BatteryCalculations.normalizedPowerFlags(for: powerState)
-        let adapterMaxWatts = Self.displayableAdapterMaxWatts(
+        let adapterMaxWatts = BatteryTelemetrySanitization.displayableAdapterMaxWatts(
             smartBattery?.adapterMaxWatts,
             powerState: powerState
         )
-        let inputPowerWatts = Self.displayableInputPowerWatts(
+        let inputPowerWatts = BatteryTelemetrySanitization.displayableInputPowerWatts(
             smartBattery?.inputPowerWatts,
             evidence: smartBattery?.inputPowerEvidence,
             adapterMaxWatts: adapterMaxWatts,
             powerState: powerState
         )
-        let powerRates = Self.displayablePowerRates(
+        let powerRates = BatteryTelemetrySanitization.displayablePowerRates(
             powerState: powerState,
-            chargeRateWatts: Self.chargeRateWattsWithinAdapterContract(
+            chargeRateWatts: BatteryTelemetrySanitization.chargeRateWattsWithinAdapterContract(
                 voltageMillivolts: voltageMillivolts,
                 signedCurrentMilliamps: signedCurrentMilliamps,
                 adapterMaxWatts: adapterMaxWatts
@@ -117,14 +117,14 @@ struct BatteryReadingService: Sendable {
                 signedCurrentMilliamps: signedCurrentMilliamps
             )
         )
-        let timing = Self.displayableTiming(
+        let timing = BatteryTelemetrySanitization.displayableTiming(
             powerState: powerState,
             rateBasedTimeRemainingMinutes: nil,
             systemTimeRemainingMinutes: Self.reportedSystemTimeRemainingMinutes(
                 publicSnapshot: publicSnapshot,
                 smartBattery: smartBattery
             ),
-            timeToFullMinutes: Self.preferredTimeToFullMinutes(
+            timeToFullMinutes: BatteryTelemetrySanitization.preferredTimeToFullMinutes(
                 computedTimeToFullMinutes: computedTimeToFullMinutes,
                 reportedTimeToFullMinutes: reportedTimeToFullMinutes
             )
@@ -136,11 +136,6 @@ struct BatteryReadingService: Sendable {
         }
 
         let manufactureDate = BatteryCalculations.plausibleManufactureDate(smartBattery?.manufactureDate, now: now)
-        let batteryAgeComponents = BatteryCalculations.batteryAgeComponents(from: manufactureDate, now: now)
-        let energyEstimates = Self.displayableEnergyEstimates(
-            currentChargeMilliampHours: currentChargeMilliampHours,
-            voltageMillivolts: voltageMillivolts
-        )
 
         let snapshot = BatterySnapshot(
             timestamp: now,
@@ -148,11 +143,13 @@ struct BatteryReadingService: Sendable {
             isCharging: powerFlags.isCharging,
             isExternalPowerConnected: powerFlags.isExternalPowerConnected,
             currentChargeMilliampHours: currentChargeMilliampHours,
-            currentChargeWattHours: energyEstimates.currentChargeWattHours,
+            currentChargeWattHours: BatteryCalculations.wattHours(
+                milliampHours: currentChargeMilliampHours,
+                voltageMillivolts: voltageMillivolts
+            ),
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-            fullChargeCapacityWattHours: energyEstimates.fullChargeCapacityWattHours,
+            fullChargeCapacityWattHours: nil,
             designCapacityMilliampHours: designCapacityMilliampHours,
-            designCapacityWattHours: energyEstimates.designCapacityWattHours,
             healthPercent: BatteryCalculations.healthPercent(
                 fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
                 designCapacityMilliampHours: designCapacityMilliampHours
@@ -174,7 +171,6 @@ struct BatteryReadingService: Sendable {
             timeToFullMinutes: timing.timeToFullMinutes,
             cycleCount: smartBattery?.cycleCount,
             manufactureDate: manufactureDate,
-            batteryAgeComponents: batteryAgeComponents,
             temperatureCelsius: smartBattery?.temperatureCelsius,
             adapterMaxWatts: adapterMaxWatts,
             notes: notes
@@ -395,78 +391,6 @@ struct BatteryReadingService: Sendable {
         )
     }
 
-    static func displayableAdapterMaxWatts(_ adapterMaxWatts: Int?, powerState: BatteryPowerState) -> Int? {
-        BatteryTelemetrySanitization.displayableAdapterMaxWatts(adapterMaxWatts, powerState: powerState)
-    }
-
-    static func displayableInputPowerWatts(
-        _ inputPowerWatts: Double?,
-        evidence: BatteryInputPowerEvidence? = nil,
-        adapterMaxWatts: Int? = nil,
-        powerState: BatteryPowerState
-    ) -> Double? {
-        BatteryTelemetrySanitization.displayableInputPowerWatts(
-            inputPowerWatts,
-            evidence: evidence,
-            adapterMaxWatts: adapterMaxWatts,
-            powerState: powerState
-        )
-    }
-
-    static func displayablePowerRates(
-        powerState: BatteryPowerState,
-        chargeRateWatts: Double?,
-        dischargeRateWatts: Double?
-    ) -> (chargeRateWatts: Double?, dischargeRateWatts: Double?) {
-        BatteryTelemetrySanitization.displayablePowerRates(
-            powerState: powerState,
-            chargeRateWatts: chargeRateWatts,
-            dischargeRateWatts: dischargeRateWatts
-        )
-    }
-
-    static func displayableTiming(
-        powerState: BatteryPowerState,
-        rateBasedTimeRemainingMinutes: Int?,
-        systemTimeRemainingMinutes: Int?,
-        timeToFullMinutes: Int?
-    ) -> (rateBasedTimeRemainingMinutes: Int?, systemTimeRemainingMinutes: Int?, timeToFullMinutes: Int?) {
-        BatteryTelemetrySanitization.displayableTiming(
-            powerState: powerState,
-            rateBasedTimeRemainingMinutes: rateBasedTimeRemainingMinutes,
-            systemTimeRemainingMinutes: systemTimeRemainingMinutes,
-            timeToFullMinutes: timeToFullMinutes
-        )
-    }
-
-    static func preferredTimeToFullMinutes(
-        computedTimeToFullMinutes: Int?,
-        reportedTimeToFullMinutes: Int?
-    ) -> Int? {
-        BatteryTelemetrySanitization.preferredTimeToFullMinutes(
-            computedTimeToFullMinutes: computedTimeToFullMinutes,
-            reportedTimeToFullMinutes: reportedTimeToFullMinutes
-        )
-    }
-
-    static func displayableEnergyEstimates(
-        currentChargeMilliampHours: Int?,
-        voltageMillivolts: Int?
-    ) -> (
-        currentChargeWattHours: Double?,
-        fullChargeCapacityWattHours: Double?,
-        designCapacityWattHours: Double?
-    ) {
-        (
-            BatteryCalculations.wattHours(
-                milliampHours: currentChargeMilliampHours,
-                voltageMillivolts: voltageMillivolts
-            ),
-            nil,
-            nil
-        )
-    }
-
     private static func reconciledExternalPowerConnected(
         publicSnapshot: PublicPowerSourceSnapshot,
         smartBattery: SmartBatteryDetails?,
@@ -502,18 +426,6 @@ struct BatteryReadingService: Sendable {
     ) -> Bool {
         publicSnapshot.explicitlyReportsBatteryPower
             || smartBattery?.isExternalPowerConnected == false
-    }
-
-    static func chargeRateWattsWithinAdapterContract(
-        voltageMillivolts: Int?,
-        signedCurrentMilliamps: Int?,
-        adapterMaxWatts: Int?
-    ) -> Double? {
-        BatteryTelemetrySanitization.chargeRateWattsWithinAdapterContract(
-            voltageMillivolts: voltageMillivolts,
-            signedCurrentMilliamps: signedCurrentMilliamps,
-            adapterMaxWatts: adapterMaxWatts
-        )
     }
 
     private static func isEffectivelyFullForZeroTimeToFull(

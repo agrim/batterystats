@@ -29,13 +29,10 @@ struct BatteryStatsApp: App {
     var body: some Scene {
         WindowGroup("BatteryStats", id: "main") {
             BatteryDashboardView(monitor: runtime.monitor, preferences: runtime.preferences)
-                .environment(runtime.monitor)
-                .environment(runtime.preferences)
                 .monitorConfiguration(
                     monitor: runtime.monitor,
                     preferences: runtime.preferences,
-                    historyStore: runtime.historyStore,
-                    startsMonitor: true
+                    historyStore: runtime.historyStore
                 )
         }
         .windowResizability(.contentSize)
@@ -47,9 +44,6 @@ struct BatteryStatsApp: App {
 
         Settings {
             SettingsView(preferences: runtime.preferences, monitor: runtime.monitor, historyStore: runtime.historyStore)
-                .environment(runtime.preferences)
-                .environment(runtime.monitor)
-                .monitorConfiguration(monitor: runtime.monitor, preferences: runtime.preferences, historyStore: runtime.historyStore, startsMonitor: false)
         }
         .commands {
             AppCommands()
@@ -76,8 +70,7 @@ enum SharedWidgetSnapshotRuntimeVerifier {
                   parsedTimestamp.isFinite else {
                 finish(
                     message: "error: \(expectedTimestampEnvironmentKey) must be a finite reference-date timestamp",
-                    exitCode: 2,
-                    toStandardError: true
+                    exitCode: 2
                 )
             }
             expectedTimestamp = parsedTimestamp
@@ -91,8 +84,7 @@ enum SharedWidgetSnapshotRuntimeVerifier {
         ) else {
             finish(
                 message: "error: shared widget snapshot is unavailable or undecodable",
-                exitCode: 3,
-                toStandardError: true
+                exitCode: 3
             )
         }
 
@@ -100,8 +92,7 @@ enum SharedWidgetSnapshotRuntimeVerifier {
         guard timestamp >= expectedTimestamp else {
             finish(
                 message: "error: shared widget snapshot timestamp \(timestamp) predates required timestamp \(expectedTimestamp)",
-                exitCode: 4,
-                toStandardError: true
+                exitCode: 4
             )
         }
 
@@ -112,13 +103,12 @@ enum SharedWidgetSnapshotRuntimeVerifier {
         let time = snapshot.displayedTimeMinutes.map { "\($0)m" } ?? "unavailable"
         finish(
             message: "verified shared widget snapshot: timestamp=\(timestamp) age=\(String(format: "%.1f", age))s state=\(snapshot.powerState.rawValue) charge=\(charge) time=\(time)",
-            exitCode: 0,
-            toStandardError: false
+            exitCode: 0
         )
     }
 
-    private static func finish(message: String, exitCode: Int32, toStandardError: Bool) -> Never {
-        let stream = toStandardError ? stderr : stdout
+    private static func finish(message: String, exitCode: Int32) -> Never {
+        let stream = exitCode == 0 ? stdout : stderr
         fputs("\(message)\n", stream)
         fflush(stream)
         Darwin.exit(exitCode)
@@ -155,7 +145,7 @@ private final class BatteryStatsAppRuntime {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 self?.showSettingsWindow()
             }
         }
@@ -207,7 +197,6 @@ private final class SettingsWindowController {
         monitor: BatteryMonitor,
         historyStore: BatteryHistoryStore
     ) {
-        NSApp.setActivationPolicy(.regular)
         let window = window ?? makeWindow(
             preferences: preferences,
             monitor: monitor,
@@ -227,14 +216,6 @@ private final class SettingsWindowController {
     ) -> NSWindow {
         let contentView = NSHostingView(rootView:
             SettingsView(preferences: preferences, monitor: monitor, historyStore: historyStore)
-                .environment(preferences)
-                .environment(monitor)
-                .monitorConfiguration(
-                    monitor: monitor,
-                    preferences: preferences,
-                    historyStore: historyStore,
-                    startsMonitor: false
-                )
         )
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: SettingsLayout.minimumWindowWidth, height: 640),
@@ -301,27 +282,23 @@ private struct MonitorConfigurationModifier: ViewModifier {
     let monitor: BatteryMonitor
     let preferences: PreferencesStore
     let historyStore: BatteryHistoryStore
-    let startsMonitor: Bool
     @State private var isVisibleSurfaceMonitoringActive = false
 
     func body(content: Content) -> some View {
         content
             .onAppear {
                 monitor.applyConfiguration(preferences: preferences, historyStore: historyStore)
-                if startsMonitor {
-                    if isVisibleSurfaceMonitoringActive == false {
-                        isVisibleSurfaceMonitoringActive = true
-                        monitor.beginVisibleSurfaceMonitoring()
-                    }
+                if isVisibleSurfaceMonitoringActive == false {
+                    isVisibleSurfaceMonitoringActive = true
+                    monitor.beginVisibleSurfaceMonitoring()
+                }
 
-                    if monitor.start() == false {
-                        monitor.refreshForVisibleSurface()
-                    }
+                if monitor.start() == false {
+                    monitor.refreshForVisibleSurface()
                 }
             }
             .onDisappear {
-                if startsMonitor,
-                   isVisibleSurfaceMonitoringActive {
+                if isVisibleSurfaceMonitoringActive {
                     isVisibleSurfaceMonitoringActive = false
                     monitor.endVisibleSurfaceMonitoring()
                 }
@@ -342,15 +319,13 @@ extension View {
     func monitorConfiguration(
         monitor: BatteryMonitor,
         preferences: PreferencesStore,
-        historyStore: BatteryHistoryStore,
-        startsMonitor: Bool
+        historyStore: BatteryHistoryStore
     ) -> some View {
         modifier(
             MonitorConfigurationModifier(
                 monitor: monitor,
                 preferences: preferences,
-                historyStore: historyStore,
-                startsMonitor: startsMonitor
+                historyStore: historyStore
             )
         )
     }

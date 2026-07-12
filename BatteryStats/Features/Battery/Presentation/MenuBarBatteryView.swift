@@ -105,7 +105,7 @@ final class MenuBarStatusItemController: NSObject {
     private let statusBar: NSStatusBar
     private var statusItem: NSStatusItem
     private var panel: NSPanel?
-    private var appliedIdentity: String?
+    private var appliedState: MenuBarBatteryLabelState?
     private var installedDisplayPreferences: MenuBarDisplayPreferences?
     private var displayPreferenceObserver: NSObjectProtocol?
     private var deferredDisplayPreferenceRefreshTask: Task<Void, Never>?
@@ -215,21 +215,18 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     private func apply(_ state: MenuBarBatteryLabelState, force: Bool = false) {
-        guard force || state.identity != appliedIdentity else {
+        guard force || state != appliedState else {
             return
         }
 
         if MenuBarStatusItemRenderer.apply(state, to: statusItem) {
-            appliedIdentity = state.identity
+            appliedState = state
         }
     }
 
     private func observeStatusItemInputs() {
         withObservationTracking {
             _ = monitor.snapshot
-            _ = preferences.menuBarDisplayMode
-            _ = preferences.temperatureUnitPreference
-            _ = preferences.temperatureUnitResolutionToken
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else {
@@ -292,7 +289,7 @@ final class MenuBarStatusItemController: NSObject {
         closePanel()
         statusBar.removeStatusItem(statusItem)
         statusItem = statusBar.statusItem(withLength: NSStatusItem.variableLength)
-        appliedIdentity = nil
+        appliedState = nil
         configureButton()
         installedDisplayPreferences = currentDisplayPreferences
     }
@@ -391,13 +388,10 @@ final class MenuBarStatusItemController: NSObject {
                 self?.closePanel()
             }
         )
-        .environment(monitor)
-        .environment(preferences)
         .monitorConfiguration(
             monitor: monitor,
             preferences: preferences,
-            historyStore: historyStore,
-            startsMonitor: true
+            historyStore: historyStore
         )
 
         let contentView = makePanelContentView(rootView: rootView)
@@ -822,11 +816,10 @@ struct MenuBarStatusItemButtonSnapshot: Equatable {
 }
 #endif
 
-struct MenuBarBatteryLabelState {
+struct MenuBarBatteryLabelState: Equatable {
     let symbolName: String
     let value: String?
     let accessibilityLabel: String
-    let identity: String
 
     var statusItemTitle: String {
         value ?? ""
@@ -846,74 +839,53 @@ struct MenuBarBatteryLabelState {
         displayMode: MenuBarDisplayMode,
         temperatureUnitPreference: TemperatureUnitPreference
     ) {
-        let symbolTintStyle = BatteryPresentationStyle.chargeTintStyle(for: snapshot)
+        let presentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: snapshot,
+            displayMode: displayMode,
+            temperatureUnitPreference: temperatureUnitPreference
+        )
         symbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
-        value = MenuBarBatteryLabelFormatting.displayValue(
-            snapshot: snapshot,
-            displayMode: displayMode,
-            temperatureUnitPreference: temperatureUnitPreference
-        )
-        accessibilityLabel = MenuBarBatteryLabelFormatting.accessibilityLabel(
-            snapshot: snapshot,
-            displayMode: displayMode,
-            temperatureUnitPreference: temperatureUnitPreference
-        )
-        identity = [
-            displayMode.rawValue,
-            temperatureUnitPreference.rawValue,
-            snapshot?.powerState.rawValue ?? "missingPowerState",
-            symbolName,
-            symbolTintStyle.rawValue,
-            value ?? "iconOnly",
-            accessibilityLabel
-        ].joined(separator: "|")
+        value = presentation.value
+        accessibilityLabel = presentation.accessibilityLabel
     }
 }
 
 enum MenuBarBatteryLabelFormatting {
-    static func displayValue(
+    static func presentation(
         snapshot: BatterySnapshot?,
         displayMode: MenuBarDisplayMode,
         temperatureUnitPreference: TemperatureUnitPreference
-    ) -> String? {
+    ) -> (value: String?, accessibilityLabel: String) {
         switch displayMode {
         case .iconOnly:
-            return nil
+            return (nil, snapshot?.statusDisplayTitle ?? "Battery status unavailable")
         case .iconAndPercentage:
-            return BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)
+            return (
+                BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent),
+                "Battery \(BatteryFormatting.percent(snapshot?.presentationStateOfChargePercent))"
+            )
         case .iconAndTimeRemaining:
-            return BatteryFormatting.compactWidgetDuration(minutes: snapshot?.displayedTimeMinutes)
+            return (
+                BatteryFormatting.compactWidgetDuration(minutes: snapshot?.displayedTimeMinutes),
+                "Battery time \(BatteryFormatting.duration(minutes: snapshot?.displayedTimeMinutes))"
+            )
         case .iconAndHealth:
-            return BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent)
+            return (
+                BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent),
+                "Battery health \(BatteryFormatting.percent(snapshot?.presentationHealthPercent, decimals: 0))"
+            )
         case .iconAndFullCharge:
-            return abbreviatedCapacity(snapshot?.fullChargeCapacityMilliampHours)
+            return (
+                abbreviatedCapacity(snapshot?.fullChargeCapacityMilliampHours),
+                "Battery full charge capacity \(BatteryFormatting.milliampHours(snapshot?.fullChargeCapacityMilliampHours, allowsZero: false))"
+            )
         case .iconAndTemperature:
-            return abbreviatedTemperature(snapshot?.presentationTemperatureCelsius, unitPreference: temperatureUnitPreference)
+            return (
+                abbreviatedTemperature(snapshot?.presentationTemperatureCelsius, unitPreference: temperatureUnitPreference),
+                "Battery temperature \(BatteryFormatting.temperature(snapshot?.presentationTemperatureCelsius, unitPreference: temperatureUnitPreference))"
+            )
         case .iconAndPower:
-            return abbreviatedPower(for: snapshot)
-        }
-    }
-
-    static func accessibilityLabel(
-        snapshot: BatterySnapshot?,
-        displayMode: MenuBarDisplayMode,
-        temperatureUnitPreference: TemperatureUnitPreference
-    ) -> String {
-        switch displayMode {
-        case .iconOnly:
-            return snapshot?.statusDisplayTitle ?? "Battery status unavailable"
-        case .iconAndPercentage:
-            return "Battery \(BatteryFormatting.percent(snapshot?.presentationStateOfChargePercent))"
-        case .iconAndTimeRemaining:
-            return "Battery time \(BatteryFormatting.duration(minutes: snapshot?.displayedTimeMinutes))"
-        case .iconAndHealth:
-            return "Battery health \(BatteryFormatting.percent(snapshot?.presentationHealthPercent, decimals: 0))"
-        case .iconAndFullCharge:
-            return "Battery full charge capacity \(BatteryFormatting.milliampHours(snapshot?.fullChargeCapacityMilliampHours, allowsZero: false))"
-        case .iconAndTemperature:
-            return "Battery temperature \(BatteryFormatting.temperature(snapshot?.presentationTemperatureCelsius, unitPreference: temperatureUnitPreference))"
-        case .iconAndPower:
-            return powerAccessibilityLabel(for: snapshot)
+            return (abbreviatedPower(for: snapshot), powerAccessibilityLabel(for: snapshot))
         }
     }
 

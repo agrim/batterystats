@@ -433,26 +433,6 @@ enum BatteryCalculations {
         plausibleInteger(value, in: 0...maximumPlausibleDurationMinutes)
     }
 
-    static func smoothedDischargeRate(_ samples: [Int], fallback: Int?) -> Int? {
-        var total = 0
-        var count = 0
-
-        for sample in samples.suffix(8) {
-            guard let sample = plausibleDischargeRateMilliamps(sample) else {
-                continue
-            }
-
-            total += sample
-            count += 1
-        }
-
-        guard count > 0 else {
-            return plausibleDischargeRateMilliamps(fallback)
-        }
-
-        return Int((Double(total) / Double(count)).rounded())
-    }
-
     static func confidentSmoothedDischargeRate(
         _ samples: [BatteryDischargeRateSample],
         now: Date,
@@ -678,7 +658,7 @@ enum BatteryCalculations {
             return .fullOnAC
         }
 
-        return isExternalPowerConnected ? .connectedNotCharging : .unknown
+        return .connectedNotCharging
     }
 
     static func normalizedPowerFlags(for powerState: BatteryPowerState) -> (isCharging: Bool, isExternalPowerConnected: Bool) {

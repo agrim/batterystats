@@ -19,7 +19,7 @@ final class PreferencesStoreTests: XCTestCase {
             defaults.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey),
             MenuBarDisplayMode.iconAndPercentage.rawValue
         )
-        XCTAssertNil(sync.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey))
+        XCTAssertNil(sync.object(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey) as? String)
     }
 
     func testUnknownRemoteChangeAppliesPresentRemoteValuesWithoutResettingMissingPreferences() async {
@@ -94,10 +94,10 @@ final class PreferencesStoreTests: XCTestCase {
         )
         XCTAssertFalse(defaults.bool(forKey: "showAdvancedValues"))
         XCTAssertEqual(defaults.string(forKey: "refreshCadencePreference"), RefreshCadencePreference.fiveMinutes.rawValue)
-        XCTAssertEqual(sync.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey), MenuBarDisplayMode.iconAndPercentage.rawValue)
-        XCTAssertEqual(sync.string(forKey: PreferencesStore.temperatureUnitPreferenceDefaultsKey), TemperatureUnitPreference.system.rawValue)
-        XCTAssertEqual(sync.bool(forKey: "showAdvancedValues"), false)
-        XCTAssertNil(sync.string(forKey: "refreshCadencePreference"))
+        XCTAssertEqual(sync.object(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey) as? String, MenuBarDisplayMode.iconAndPercentage.rawValue)
+        XCTAssertEqual(sync.object(forKey: PreferencesStore.temperatureUnitPreferenceDefaultsKey) as? String, TemperatureUnitPreference.system.rawValue)
+        XCTAssertEqual(sync.object(forKey: "showAdvancedValues") as? Bool, false)
+        XCTAssertNil(sync.object(forKey: "refreshCadencePreference") as? String)
     }
 
     func testEnablingICloudSyncPreservesLocalPreferencesWhenRemoteStoreIsEmpty() {
@@ -111,8 +111,8 @@ final class PreferencesStoreTests: XCTestCase {
 
         XCTAssertEqual(store.menuBarDisplayMode, .iconAndPower)
         XCTAssertEqual(store.temperatureUnitPreference, .fahrenheit)
-        XCTAssertEqual(sync.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey), MenuBarDisplayMode.iconAndPower.rawValue)
-        XCTAssertEqual(sync.string(forKey: PreferencesStore.temperatureUnitPreferenceDefaultsKey), TemperatureUnitPreference.fahrenheit.rawValue)
+        XCTAssertEqual(sync.object(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey) as? String, MenuBarDisplayMode.iconAndPower.rawValue)
+        XCTAssertEqual(sync.object(forKey: PreferencesStore.temperatureUnitPreferenceDefaultsKey) as? String, TemperatureUnitPreference.fahrenheit.rawValue)
         XCTAssertEqual(sync.flushCallCount, 1)
     }
 
@@ -130,8 +130,8 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertEqual(store.temperatureUnitPreference, .system)
         XCTAssertTrue(sync.removedKeys.contains(PreferencesStore.menuBarDisplayModeDefaultsKey))
         XCTAssertTrue(sync.removedKeys.contains(PreferencesStore.temperatureUnitPreferenceDefaultsKey))
-        XCTAssertNil(sync.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey))
-        XCTAssertNil(sync.string(forKey: PreferencesStore.temperatureUnitPreferenceDefaultsKey))
+        XCTAssertNil(sync.object(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey) as? String)
+        XCTAssertNil(sync.object(forKey: PreferencesStore.temperatureUnitPreferenceDefaultsKey) as? String)
     }
 
     func testResetLeavesDefaultValuesAvailableForLiveDefaultsObservers() {
@@ -449,8 +449,8 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertFalse(store.isHistoryICloudSyncEnabled)
         XCTAssertFalse(defaults.bool(forKey: "isHistoryEnabled"))
         XCTAssertFalse(defaults.bool(forKey: "isHistoryICloudSyncEnabled"))
-        XCTAssertEqual(sync.bool(forKey: "isHistoryEnabled"), false)
-        XCTAssertEqual(sync.bool(forKey: "isHistoryICloudSyncEnabled"), false)
+        XCTAssertEqual(sync.object(forKey: "isHistoryEnabled") as? Bool, false)
+        XCTAssertEqual(sync.object(forKey: "isHistoryICloudSyncEnabled") as? Bool, false)
     }
 
     func testHistoryICloudSyncCannotEnableWhenHistoryIsOff() {
@@ -464,7 +464,7 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertFalse(store.isHistoryEnabled)
         XCTAssertFalse(store.isHistoryICloudSyncEnabled)
         XCTAssertFalse(defaults.bool(forKey: "isHistoryICloudSyncEnabled"))
-        XCTAssertEqual(sync.bool(forKey: "isHistoryICloudSyncEnabled"), false)
+        XCTAssertEqual(sync.object(forKey: "isHistoryICloudSyncEnabled") as? Bool, false)
     }
 
     func testHistoryICloudSyncCannotEnableWhenGlobalICloudSyncIsOff() {
@@ -582,7 +582,7 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertFalse(store.isHistoryICloudSyncEnabled)
         XCTAssertFalse(defaults.bool(forKey: "isHistoryEnabled"))
         XCTAssertFalse(defaults.bool(forKey: "isHistoryICloudSyncEnabled"))
-        XCTAssertEqual(sync.bool(forKey: "isHistoryICloudSyncEnabled"), false)
+        XCTAssertEqual(sync.object(forKey: "isHistoryICloudSyncEnabled") as? Bool, false)
     }
 
     func testRemoteMixedHistoryStateDoesNotLeaveHistoryICloudSyncEnabled() async {
@@ -604,7 +604,7 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertFalse(defaults.bool(forKey: "isHistoryICloudSyncEnabled"))
         XCTAssertFalse(store.historyPolicy.isEnabled)
         XCTAssertFalse(store.historyPolicy.syncsToICloud)
-        XCTAssertEqual(sync.bool(forKey: "isHistoryICloudSyncEnabled"), false)
+        XCTAssertEqual(sync.object(forKey: "isHistoryICloudSyncEnabled") as? Bool, false)
     }
 
     func testUnknownRemoteMixedHistoryStateDoesNotLeaveHistoryICloudSyncEnabled() async {
@@ -626,7 +626,7 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertFalse(defaults.bool(forKey: "isHistoryICloudSyncEnabled"))
         XCTAssertFalse(store.historyPolicy.isEnabled)
         XCTAssertFalse(store.historyPolicy.syncsToICloud)
-        XCTAssertEqual(sync.bool(forKey: "isHistoryICloudSyncEnabled"), false)
+        XCTAssertEqual(sync.object(forKey: "isHistoryICloudSyncEnabled") as? Bool, false)
     }
 
     func testOutOfOrderRemoteHistorySyncEnablesAfterHistoryPreferenceArrives() async {
@@ -668,7 +668,7 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertTrue(store.isHistoryEnabled)
         XCTAssertFalse(store.isHistoryICloudSyncEnabled)
         XCTAssertFalse(store.historyPolicy.syncsToICloud)
-        XCTAssertEqual(sync.bool(forKey: "isHistoryICloudSyncEnabled"), false)
+        XCTAssertEqual(sync.object(forKey: "isHistoryICloudSyncEnabled") as? Bool, false)
         XCTAssertFalse(defaults.bool(forKey: "isHistoryICloudSyncEnabled"))
     }
 
@@ -732,7 +732,7 @@ final class PreferencesStoreTests: XCTestCase {
 
         XCTAssertFalse(store.showAdvancedValues)
         XCTAssertFalse(defaults.bool(forKey: "showAdvancedValues"))
-        XCTAssertEqual(sync.bool(forKey: "showAdvancedValues"), false)
+        XCTAssertEqual(sync.object(forKey: "showAdvancedValues") as? Bool, false)
     }
 
     func testMalformedRemoteEnumChangeRepairsCloudValue() async {
@@ -752,7 +752,7 @@ final class PreferencesStoreTests: XCTestCase {
             MenuBarDisplayMode.iconAndPercentage.rawValue
         )
         XCTAssertEqual(
-            sync.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey),
+            sync.object(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey) as? String,
             MenuBarDisplayMode.iconAndPercentage.rawValue
         )
     }
@@ -791,9 +791,9 @@ final class PreferencesStoreTests: XCTestCase {
 
         sync.setEnabled(true)
         XCTAssertFalse(sync.isEnabled)
-        XCTAssertFalse(sync.hasValue(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey))
-        XCTAssertNil(sync.string(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey))
-        XCTAssertNil(sync.bool(forKey: "showAdvancedValues"))
+        XCTAssertFalse(sync.object(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey) != nil)
+        XCTAssertNil(sync.object(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey) as? String)
+        XCTAssertNil(sync.object(forKey: "showAdvancedValues") as? Bool)
         sync.set(MenuBarDisplayMode.iconOnly.rawValue, forKey: PreferencesStore.menuBarDisplayModeDefaultsKey)
         sync.set(true, forKey: "showAdvancedValues")
         sync.removeValue(forKey: PreferencesStore.menuBarDisplayModeDefaultsKey)
@@ -992,16 +992,8 @@ private final class FakePreferencesSync: PreferencesSyncing {
         removeObserverCallCount += 1
     }
 
-    func bool(forKey key: String) -> Bool? {
-        ICloudPreferencesSync.strictBool(values[key])
-    }
-
-    func hasValue(forKey key: String) -> Bool {
-        values[key] != nil
-    }
-
-    func string(forKey key: String) -> String? {
-        values[key] as? String
+    func object(forKey key: String) -> Any? {
+        values[key]
     }
 
     func set(_ value: Bool, forKey key: String) {
@@ -1063,10 +1055,6 @@ private final class FakeICloudKeyValueStore: ICloudPreferencesKeyValueStoring {
 
     func object(forKey aKey: String) -> Any? {
         values[aKey]
-    }
-
-    func string(forKey aKey: String) -> String? {
-        values[aKey] as? String
     }
 
     func set(_ value: Any?, forKey aKey: String) {

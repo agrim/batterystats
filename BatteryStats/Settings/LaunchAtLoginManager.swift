@@ -90,13 +90,4 @@ final class LaunchAtLoginSettingsModel {
             errorMessage = error.localizedDescription
         }
     }
-
-    func disableForReset() {
-        guard manager.isEnabled else {
-            refresh()
-            return
-        }
-
-        setEnabled(false)
-    }
 }

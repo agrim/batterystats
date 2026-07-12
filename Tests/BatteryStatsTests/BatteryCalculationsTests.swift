@@ -467,17 +467,26 @@ final class BatteryCalculationsTests: XCTestCase {
     }
 
     func testSmoothedDischargeRateUsesRecentSamples() {
-        let smoothedRate = BatteryCalculations.smoothedDischargeRate([1_200, 1_100, 1_050, 980], fallback: nil)
+        let now = Date(timeIntervalSince1970: 1_060)
+        let samples = [
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_000), milliamps: 1_200),
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_020), milliamps: 1_100),
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_040), milliamps: 1_050),
+            BatteryDischargeRateSample(timestamp: now, milliamps: 980)
+        ]
 
-        XCTAssertEqual(smoothedRate, 1_083)
+        XCTAssertEqual(BatteryCalculations.confidentSmoothedDischargeRate(samples, now: now), 1_083)
     }
 
     func testSmoothedDischargeRateIgnoresAbsurdSamples() {
-        let smoothedRate = BatteryCalculations.smoothedDischargeRate([Int.max, 1_000], fallback: 900)
+        let now = Date(timeIntervalSince1970: 1_060)
+        let samples = [
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_000), milliamps: Int.max),
+            BatteryDischargeRateSample(timestamp: Date(timeIntervalSince1970: 1_030), milliamps: 1_000),
+            BatteryDischargeRateSample(timestamp: now, milliamps: 900)
+        ]
 
-        XCTAssertEqual(smoothedRate, 1_000)
-        XCTAssertEqual(BatteryCalculations.smoothedDischargeRate([Int.max], fallback: 900), 900)
-        XCTAssertNil(BatteryCalculations.smoothedDischargeRate([Int.max], fallback: Int.max))
+        XCTAssertNil(BatteryCalculations.confidentSmoothedDischargeRate(samples, now: now))
     }
 
     func testConfidentDischargeRateRequiresRecentStableTimestampedSamples() {

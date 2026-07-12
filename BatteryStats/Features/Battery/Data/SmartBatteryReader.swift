@@ -291,9 +291,9 @@ final class SmartBatteryReader: @unchecked Sendable {
 
     private func adapterWatts(from adapterDetails: [String: Any]) -> AdapterWattsReading? {
         reconciledAdapterWatts(
-            reportedWatts: SignedIntegerNormalizer.normalize(adapterDetails["Watts"]).flatMap {
-                BatteryCalculations.plausibleAdapterWatts($0)
-            },
+            reportedWatts: BatteryCalculations.plausibleAdapterWatts(
+                SignedIntegerNormalizer.normalize(adapterDetails["Watts"])
+            ),
             derivedWatts: derivedAdapterWatts(from: adapterDetails)
         )
     }
@@ -358,27 +358,26 @@ final class SmartBatteryReader: @unchecked Sendable {
         rawWatts: AdapterWattsReading?,
         adapterDetailsWatts: AdapterWattsReading?
     ) -> AdapterWattsReading? {
-        switch (rawWatts, adapterDetailsWatts) {
-        case let (.some(rawWatts), .some(adapterDetailsWatts)):
-            guard rawWatts.watts != adapterDetailsWatts.watts else {
-                return AdapterWattsReading(
-                    watts: rawWatts.watts,
-                    hasDerivedEvidence: rawWatts.hasDerivedEvidence || adapterDetailsWatts.hasDerivedEvidence
-                )
-            }
-
-            if rawWatts.hasDerivedEvidence != adapterDetailsWatts.hasDerivedEvidence {
-                return rawWatts.hasDerivedEvidence ? rawWatts : adapterDetailsWatts
-            }
-
-            return rawWatts.watts < adapterDetailsWatts.watts ? rawWatts : adapterDetailsWatts
-        case let (.some(rawWatts), .none):
-            return rawWatts
-        case let (.none, .some(adapterDetailsWatts)):
+        guard let rawWatts else {
             return adapterDetailsWatts
-        case (.none, .none):
-            return nil
         }
+
+        guard let adapterDetailsWatts else {
+            return rawWatts
+        }
+
+        guard rawWatts.watts != adapterDetailsWatts.watts else {
+            return AdapterWattsReading(
+                watts: rawWatts.watts,
+                hasDerivedEvidence: rawWatts.hasDerivedEvidence || adapterDetailsWatts.hasDerivedEvidence
+            )
+        }
+
+        if rawWatts.hasDerivedEvidence != adapterDetailsWatts.hasDerivedEvidence {
+            return rawWatts.hasDerivedEvidence ? rawWatts : adapterDetailsWatts
+        }
+
+        return rawWatts.watts < adapterDetailsWatts.watts ? rawWatts : adapterDetailsWatts
     }
 
     private func reconciledAdapterWatts(reportedWatts: Int?, derivedWatts: Int?) -> AdapterWattsReading? {
@@ -411,14 +410,7 @@ final class SmartBatteryReader: @unchecked Sendable {
               let currentMilliamps = plausibleInteger(
                   for: [.root("Current"), .root("AdapterCurrent")],
                   in: adapterDetails,
-                  transform: {
-                      guard let current = Self.plausibleInputCurrentMagnitudeMilliamps($0),
-                            current > 0 else {
-                          return nil
-                      }
-
-                      return current
-                  }
+                  transform: { Self.plausibleInputCurrentMagnitudeMilliamps($0).flatMap { $0 > 0 ? $0 : nil } }
               ) else {
             return nil
         }
@@ -685,25 +677,26 @@ final class SmartBatteryReader: @unchecked Sendable {
         minimumValue: Int,
         allowsZero: Bool
     ) -> Int? {
-        var zeroFallback: Int?
-        for candidate in candidates {
-            for rawValue in values(for: candidate, in: properties) {
-                guard let parsed = SignedIntegerNormalizer.normalize(rawValue),
-                      parsed >= minimumValue,
-                      let capacity = BatteryCalculations.plausibleCapacityMilliampHours(parsed, allowsZero: allowsZero) else {
-                    continue
-                }
-
-                if allowsZero, capacity == 0 {
-                    zeroFallback = zeroFallback ?? capacity
-                    continue
-                }
-
-                return capacity
+        let positiveMinimum = max(1, minimumValue)
+        let positiveCapacity: Int? = firstValue(for: candidates, in: properties, transform: { rawValue in
+            guard let parsed = SignedIntegerNormalizer.normalize(rawValue),
+                  parsed >= positiveMinimum else {
+                return nil
             }
+
+            return BatteryCalculations.plausibleCapacityMilliampHours(parsed, allowsZero: false)
+        })
+        if let positiveCapacity {
+            return positiveCapacity
         }
 
-        return zeroFallback
+        guard allowsZero, minimumValue == 0 else {
+            return nil
+        }
+
+        return firstValue(for: candidates, in: properties) { rawValue in
+            SignedIntegerNormalizer.normalize(rawValue) == 0 ? 0 : nil
+        }
     }
 
     private func firstValue<Result>(
@@ -712,40 +705,33 @@ final class SmartBatteryReader: @unchecked Sendable {
         transform: (Any) -> Result?
     ) -> Result? {
         for candidate in candidates {
-            for rawValue in values(for: candidate, in: properties) {
-                if let value = transform(rawValue) {
+            switch candidate {
+            case let .root(key):
+                if let rawValue = properties[key],
+                   let value = transform(rawValue) {
+                    return value
+                }
+            case let .nestedRootOnly(parentKey, childKey):
+                if let rawValue = Self.stringDictionary(from: properties[parentKey])?[childKey],
+                   let value = transform(rawValue) {
+                    return value
+                }
+            case let .nested(parentKey, childKey):
+                if let rawValue = Self.stringDictionary(from: properties[parentKey])?[childKey],
+                   let value = transform(rawValue) {
+                    return value
+                }
+
+                if parentKey == "BatteryData",
+                   let packProperties = Self.stringDictionary(from: properties["AppleSmartBatteryPack"]),
+                   let rawValue = Self.stringDictionary(from: packProperties["BatteryData"])?[childKey],
+                   let value = transform(rawValue) {
                     return value
                 }
             }
         }
 
         return nil
-    }
-
-    private func values(for candidate: PropertyCandidate, in properties: [String: Any]) -> [Any] {
-        switch candidate {
-        case let .root(key):
-            return properties[key].map { [$0] } ?? []
-        case let .nestedRootOnly(parentKey, childKey):
-            guard let dictionary = Self.stringDictionary(from: properties[parentKey]) else {
-                return []
-            }
-
-            return dictionary[childKey].map { [$0] } ?? []
-        case let .nested(parentKey, childKey):
-            var values: [Any] = []
-            if let dictionary = Self.stringDictionary(from: properties[parentKey]) {
-                values.append(contentsOf: dictionary[childKey].map { [$0] } ?? [])
-            }
-
-            if parentKey == "BatteryData",
-               let packProperties = Self.stringDictionary(from: properties["AppleSmartBatteryPack"]),
-               let packBatteryData = Self.stringDictionary(from: packProperties["BatteryData"]) {
-                values.append(contentsOf: packBatteryData[childKey].map { [$0] } ?? [])
-            }
-
-            return values
-        }
     }
 
     private func childPackProperties(from service: io_registry_entry_t) -> [String: Any]? {

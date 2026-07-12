@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+@testable import BatteryStats
 
 final class InMemoryUserDefaultsBacking: @unchecked Sendable {
     private final class WeakDefaults {
@@ -214,4 +215,153 @@ extension XCTestCase {
         }
         return fixture
     }
+}
+
+func makeBatterySnapshot(
+    timestamp: Date = Date(timeIntervalSince1970: 1_000),
+    powerState: BatteryPowerState,
+    isCharging: Bool,
+    isExternalPowerConnected: Bool,
+    currentChargeMilliampHours: Int? = 3_000,
+    currentChargeWattHours: Double? = 36,
+    fullChargeCapacityMilliampHours: Int? = 5_000,
+    fullChargeCapacityWattHours: Double? = 60,
+    designCapacityMilliampHours: Int? = 6_000,
+    healthPercent: Double? = 83,
+    stateOfChargePercent: Double? = 60,
+    voltageMillivolts: Int? = 12_000,
+    currentMilliampsSigned: Int? = nil,
+    dischargeRateMilliamps: Int? = nil,
+    chargeRateWatts: Double? = nil,
+    inputPowerWatts: Double? = nil,
+    inputPowerEvidence: BatteryInputPowerEvidence? = nil,
+    dischargeRateWatts: Double? = nil,
+    rateBasedTimeRemainingMinutes: Int? = nil,
+    systemTimeRemainingMinutes: Int? = nil,
+    timeToFullMinutes: Int? = nil,
+    cycleCount: Int? = 120,
+    manufactureDate: Date? = nil,
+    temperatureCelsius: Double? = 32,
+    adapterMaxWatts: Int? = nil,
+    notes: [String] = []
+) -> BatterySnapshot {
+    BatterySnapshot(
+        timestamp: timestamp,
+        powerState: powerState,
+        isCharging: isCharging,
+        isExternalPowerConnected: isExternalPowerConnected,
+        currentChargeMilliampHours: currentChargeMilliampHours,
+        currentChargeWattHours: currentChargeWattHours,
+        fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+        fullChargeCapacityWattHours: fullChargeCapacityWattHours,
+        designCapacityMilliampHours: designCapacityMilliampHours,
+        healthPercent: healthPercent,
+        stateOfChargePercent: stateOfChargePercent,
+        voltageMillivolts: voltageMillivolts,
+        currentMilliampsSigned: currentMilliampsSigned,
+        dischargeRateMilliamps: dischargeRateMilliamps,
+        chargeRateWatts: chargeRateWatts,
+        inputPowerWatts: inputPowerWatts,
+        inputPowerEvidence: inputPowerEvidence,
+        dischargeRateWatts: dischargeRateWatts,
+        rateBasedTimeRemainingMinutes: rateBasedTimeRemainingMinutes,
+        systemTimeRemainingMinutes: systemTimeRemainingMinutes,
+        timeToFullMinutes: timeToFullMinutes,
+        cycleCount: cycleCount,
+        manufactureDate: manufactureDate,
+        temperatureCelsius: temperatureCelsius,
+        adapterMaxWatts: adapterMaxWatts,
+        notes: notes
+    )
+}
+
+func makePublicPowerSourceSnapshot(
+    isPresent: Bool,
+    isCharging: Bool,
+    isCharged: Bool,
+    isExternalPowerConnected: Bool,
+    isInternalBattery: Bool,
+    stateOfChargePercent: Double?,
+    systemTimeRemainingMinutes: Int? = nil,
+    timeToFullMinutes: Int? = nil,
+    powerSourceState: String?,
+    rawDescription: [String: Any] = [:]
+) -> PublicPowerSourceSnapshot {
+    PublicPowerSourceSnapshot(
+        isPresent: isPresent,
+        isCharging: isCharging,
+        isCharged: isCharged,
+        isExternalPowerConnected: isExternalPowerConnected,
+        isInternalBattery: isInternalBattery,
+        stateOfChargePercent: stateOfChargePercent,
+        systemTimeRemainingMinutes: systemTimeRemainingMinutes,
+        timeToFullMinutes: timeToFullMinutes,
+        powerSourceState: powerSourceState,
+        rawDescription: rawDescription
+    )
+}
+
+@MainActor
+final class NoopPreferencesSync: PreferencesSyncing {
+    var isEnabled = false
+    var isAvailable = true
+    var availabilityDescription = "iCloud is available for tests."
+
+    func setEnabled(_ enabled: Bool) {
+        isEnabled = enabled
+    }
+
+    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
+        NSObject()
+    }
+
+    func removeObserver(_ token: NSObjectProtocol) {}
+    func object(forKey key: String) -> Any? { nil }
+    func set(_ value: Bool, forKey key: String) {}
+    func set(_ value: String, forKey key: String) {}
+    func removeValue(forKey key: String) {}
+    func flush() {}
+}
+
+func XCTAssertSource(
+    _ source: String,
+    contains requiredFragments: [String] = [],
+    excludes forbiddenFragments: [String] = [],
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    for fragment in requiredFragments {
+        XCTAssertTrue(source.contains(fragment), "Missing source fragment: \(fragment)", file: file, line: line)
+    }
+    for fragment in forbiddenFragments {
+        XCTAssertFalse(source.contains(fragment), "Unexpected source fragment: \(fragment)", file: file, line: line)
+    }
+}
+
+func formattedActivePower(for snapshot: BatterySnapshot?) -> String {
+    snapshot?.activePowerWatts.map(BatteryFormatting.watts) ?? "—"
+}
+
+func menuBarPresentationValue(
+    snapshot: BatterySnapshot?,
+    displayMode: MenuBarDisplayMode,
+    temperatureUnitPreference: TemperatureUnitPreference
+) -> String? {
+    MenuBarBatteryLabelFormatting.presentation(
+        snapshot: snapshot,
+        displayMode: displayMode,
+        temperatureUnitPreference: temperatureUnitPreference
+    ).value
+}
+
+func menuBarPresentationAccessibilityLabel(
+    snapshot: BatterySnapshot?,
+    displayMode: MenuBarDisplayMode,
+    temperatureUnitPreference: TemperatureUnitPreference
+) -> String {
+    MenuBarBatteryLabelFormatting.presentation(
+        snapshot: snapshot,
+        displayMode: displayMode,
+        temperatureUnitPreference: temperatureUnitPreference
+    ).accessibilityLabel
 }

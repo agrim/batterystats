@@ -51,20 +51,14 @@ final class RefreshPolicyTests: XCTestCase {
     }
 
     private func makeSnapshot(powerState: BatteryPowerState, chargePercent: Double) -> BatterySnapshot {
-        BatterySnapshot(
+        makeBatterySnapshot(
             timestamp: .now,
             powerState: powerState,
             isCharging: powerState == .charging,
             isExternalPowerConnected: powerState != .onBattery && powerState != .unknown,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
-            healthPercent: 83,
             stateOfChargePercent: chargePercent,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: powerState == .charging ? 1_200 : -1_200,
             dischargeRateMilliamps: (powerState == .onBattery || powerState == .connectedDischarging) ? 1_200 : nil,
             chargeRateWatts: powerState == .charging ? 14.4 : nil,
@@ -72,12 +66,7 @@ final class RefreshPolicyTests: XCTestCase {
             rateBasedTimeRemainingMinutes: (powerState == .onBattery || powerState == .connectedDischarging) ? 150 : nil,
             systemTimeRemainingMinutes: (powerState == .onBattery || powerState == .connectedDischarging) ? 145 : nil,
             timeToFullMinutes: powerState == .charging ? 50 : nil,
-            cycleCount: 120,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
-            temperatureCelsius: 32,
             adapterMaxWatts: 70,
-            notes: []
         )
     }
 }

@@ -495,7 +495,7 @@ final class BatteryAlertSettingsModelTests: XCTestCase {
     private func makePreferencesStore() -> PreferencesStore {
         PreferencesStore(
             defaults: makeIsolatedUserDefaults(prefix: "BatteryAlertSettingsModelTests").defaults,
-            sync: NoopAlertPreferencesSync()
+            sync: NoopPreferencesSync()
         )
     }
 
@@ -645,39 +645,4 @@ private final class MultiRequestBatteryAlertAuthorizer: BatteryAlertAuthorizing 
         continuations[index]?.resume(returning: status)
         continuations[index] = nil
     }
-}
-
-@MainActor
-private final class NoopAlertPreferencesSync: PreferencesSyncing {
-    let isEnabled = false
-    let isAvailable = true
-    let availabilityDescription = "iCloud sync is not used in these tests."
-
-    func setEnabled(_ enabled: Bool) {}
-
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
-        NSObject()
-    }
-
-    func removeObserver(_ token: NSObjectProtocol) {}
-
-    func hasValue(forKey key: String) -> Bool {
-        false
-    }
-
-    func bool(forKey key: String) -> Bool? {
-        nil
-    }
-
-    func string(forKey key: String) -> String? {
-        nil
-    }
-
-    func set(_ value: Bool, forKey key: String) {}
-
-    func set(_ value: String, forKey key: String) {}
-
-    func removeValue(forKey key: String) {}
-
-    func flush() {}
 }

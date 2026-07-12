@@ -1187,20 +1187,15 @@ final class BatteryHistoryStoreTests: XCTestCase {
         powerState: BatteryPowerState = .onBattery,
         inputPowerWatts: Double? = nil
     ) -> BatterySnapshot {
-        BatterySnapshot(
+        makeBatterySnapshot(
             timestamp: timestamp,
             powerState: powerState,
             isCharging: powerState == .charging,
             isExternalPowerConnected: powerState.isExternallyPowered,
-            currentChargeMilliampHours: 3_000,
             currentChargeWattHours: 40,
-            fullChargeCapacityMilliampHours: 5_000,
             fullChargeCapacityWattHours: 65,
-            designCapacityMilliampHours: 6_000,
-            designCapacityWattHours: 78,
             healthPercent: healthPercent,
             stateOfChargePercent: chargePercent,
-            voltageMillivolts: 12_000,
             currentMilliampsSigned: powerState == .charging ? 1_200 : -1_200,
             dischargeRateMilliamps: powerState.isBatteryDischarging ? 1_200 : nil,
             chargeRateWatts: powerState == .charging ? powerWatts : nil,
@@ -1211,11 +1206,8 @@ final class BatteryHistoryStoreTests: XCTestCase {
             systemTimeRemainingMinutes: powerState.isBatteryDischarging ? displayedTimeMinutes : nil,
             timeToFullMinutes: powerState == .charging ? displayedTimeMinutes : nil,
             cycleCount: cycleCount,
-            manufactureDate: nil,
-            batteryAgeComponents: nil,
             temperatureCelsius: temperatureCelsius,
             adapterMaxWatts: 70,
-            notes: []
         )
     }
 }

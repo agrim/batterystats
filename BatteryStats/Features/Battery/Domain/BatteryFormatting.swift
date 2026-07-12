@@ -69,21 +69,14 @@ enum BatteryFormatting {
     }
 
     static func compactDuration(minutes: Int?) -> String {
-        guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
-            return "—"
-        }
-
-        let hours = minutes / 60
-        let remainingMinutes = minutes % 60
-
-        guard hours > 0 else {
-            return "\(remainingMinutes)m"
-        }
-
-        return remainingMinutes == 0 ? "\(hours)h" : "\(hours)h \(remainingMinutes)m"
+        compactDuration(minutes: minutes, separator: " ")
     }
 
     static func compactWidgetDuration(minutes: Int?) -> String {
+        compactDuration(minutes: minutes, separator: "")
+    }
+
+    private static func compactDuration(minutes: Int?, separator: String) -> String {
         guard let minutes = BatteryCalculations.plausibleDurationMinutes(minutes) else {
             return "—"
         }
@@ -95,7 +88,7 @@ enum BatteryFormatting {
             return "\(remainingMinutes)m"
         }
 
-        return remainingMinutes == 0 ? "\(hours)h" : "\(hours)h\(remainingMinutes)m"
+        return remainingMinutes == 0 ? "\(hours)h" : "\(hours)h\(separator)\(remainingMinutes)m"
     }
 
     static func temperature(_ celsiusValue: Double?, unitPreference: TemperatureUnitPreference) -> String {

@@ -10,38 +10,29 @@ enum RefreshCadencePreference: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    private var metadata: (title: String, fixedInterval: TimeInterval?) {
         switch self {
         case .dynamic:
-            return "Dynamic"
+            return ("Dynamic", nil)
         case .fiveSeconds:
-            return "Every 5 Seconds"
+            return ("Every 5 Seconds", 5)
         case .fifteenSeconds:
-            return "Every 15 Seconds"
+            return ("Every 15 Seconds", 15)
         case .thirtySeconds:
-            return "Every 30 Seconds"
+            return ("Every 30 Seconds", 30)
         case .oneMinute:
-            return "Every 1 Minute"
+            return ("Every 1 Minute", 60)
         case .fiveMinutes:
-            return "Every 5 Minutes"
+            return ("Every 5 Minutes", 300)
         }
     }
 
+    var title: String {
+        metadata.title
+    }
+
     var fixedInterval: TimeInterval? {
-        switch self {
-        case .dynamic:
-            return nil
-        case .fiveSeconds:
-            return 5
-        case .fifteenSeconds:
-            return 15
-        case .thirtySeconds:
-            return 30
-        case .oneMinute:
-            return 60
-        case .fiveMinutes:
-            return 300
-        }
+        metadata.fixedInterval
     }
 }
 
@@ -52,26 +43,23 @@ enum EnergyChangeSensitivity: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    private var metadata: (title: String, thresholdPercent: Double) {
         switch self {
         case .subtle:
-            return "20%"
+            return ("20%", 20)
         case .balanced:
-            return "35%"
+            return ("35%", 35)
         case .large:
-            return "50%"
+            return ("50%", 50)
         }
     }
 
+    var title: String {
+        metadata.title
+    }
+
     var thresholdPercent: Double {
-        switch self {
-        case .subtle:
-            return 20
-        case .balanced:
-            return 35
-        case .large:
-            return 50
-        }
+        metadata.thresholdPercent
     }
 }
 

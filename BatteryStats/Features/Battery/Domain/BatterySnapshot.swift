@@ -49,7 +49,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     let fullChargeCapacityMilliampHours: Int?
     let fullChargeCapacityWattHours: Double?
     let designCapacityMilliampHours: Int?
-    let designCapacityWattHours: Double?
     let healthPercent: Double?
     let stateOfChargePercent: Double?
 
@@ -57,8 +56,8 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     let currentMilliampsSigned: Int?
     let dischargeRateMilliamps: Int?
     let chargeRateWatts: Double?
-    let inputPowerWatts: Double?
-    let inputPowerEvidence: BatteryInputPowerEvidence?
+    private(set) var inputPowerWatts: Double? = nil
+    private(set) var inputPowerEvidence: BatteryInputPowerEvidence? = nil
     let dischargeRateWatts: Double?
 
     let rateBasedTimeRemainingMinutes: Int?
@@ -67,71 +66,10 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     let cycleCount: Int?
     let manufactureDate: Date?
-    let batteryAgeComponents: DateComponents?
     let temperatureCelsius: Double?
 
     let adapterMaxWatts: Int?
     let notes: [String]
-
-    init(
-        timestamp: Date,
-        powerState: BatteryPowerState,
-        isCharging: Bool,
-        isExternalPowerConnected: Bool,
-        currentChargeMilliampHours: Int?,
-        currentChargeWattHours: Double?,
-        fullChargeCapacityMilliampHours: Int?,
-        fullChargeCapacityWattHours: Double?,
-        designCapacityMilliampHours: Int?,
-        designCapacityWattHours: Double?,
-        healthPercent: Double?,
-        stateOfChargePercent: Double?,
-        voltageMillivolts: Int?,
-        currentMilliampsSigned: Int?,
-        dischargeRateMilliamps: Int?,
-        chargeRateWatts: Double?,
-        inputPowerWatts: Double? = nil,
-        inputPowerEvidence: BatteryInputPowerEvidence? = nil,
-        dischargeRateWatts: Double?,
-        rateBasedTimeRemainingMinutes: Int?,
-        systemTimeRemainingMinutes: Int?,
-        timeToFullMinutes: Int?,
-        cycleCount: Int?,
-        manufactureDate: Date?,
-        batteryAgeComponents: DateComponents?,
-        temperatureCelsius: Double?,
-        adapterMaxWatts: Int?,
-        notes: [String]
-    ) {
-        self.timestamp = timestamp
-        self.powerState = powerState
-        self.isCharging = isCharging
-        self.isExternalPowerConnected = isExternalPowerConnected
-        self.currentChargeMilliampHours = currentChargeMilliampHours
-        self.currentChargeWattHours = currentChargeWattHours
-        self.fullChargeCapacityMilliampHours = fullChargeCapacityMilliampHours
-        self.fullChargeCapacityWattHours = fullChargeCapacityWattHours
-        self.designCapacityMilliampHours = designCapacityMilliampHours
-        self.designCapacityWattHours = designCapacityWattHours
-        self.healthPercent = healthPercent
-        self.stateOfChargePercent = stateOfChargePercent
-        self.voltageMillivolts = voltageMillivolts
-        self.currentMilliampsSigned = currentMilliampsSigned
-        self.dischargeRateMilliamps = dischargeRateMilliamps
-        self.chargeRateWatts = chargeRateWatts
-        self.inputPowerWatts = inputPowerWatts
-        self.inputPowerEvidence = inputPowerEvidence
-        self.dischargeRateWatts = dischargeRateWatts
-        self.rateBasedTimeRemainingMinutes = rateBasedTimeRemainingMinutes
-        self.systemTimeRemainingMinutes = systemTimeRemainingMinutes
-        self.timeToFullMinutes = timeToFullMinutes
-        self.cycleCount = cycleCount
-        self.manufactureDate = manufactureDate
-        self.batteryAgeComponents = batteryAgeComponents
-        self.temperatureCelsius = temperatureCelsius
-        self.adapterMaxWatts = adapterMaxWatts
-        self.notes = notes
-    }
 
     var presentationHealthPercent: Double? {
         BatteryCalculations.presentationPercent(healthPercent, maximumAllowed: 120)
@@ -219,19 +157,17 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     var statusDisplayTitle: String {
+        guard isLowCharge else {
+            return powerState.displayTitle
+        }
+
         switch powerState {
         case .onBattery:
-            return isLowCharge ? "On Battery Low Power" : "On Battery"
-        case .charging:
-            return "Charging"
+            return "On Battery Low Power"
         case .connectedDischarging:
-            return isLowCharge ? "Connected, Discharging Low Power" : "Connected, Discharging"
-        case .connectedNotCharging:
-            return "Connected, Not Charging"
-        case .fullOnAC:
-            return "Fully Charged"
-        case .unknown:
-            return "Unknown"
+            return "Connected, Discharging Low Power"
+        case .charging, .connectedNotCharging, .fullOnAC, .unknown:
+            return powerState.displayTitle
         }
     }
 
@@ -334,10 +270,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     func updating(rateBasedTimeRemainingMinutes: Int?, timestamp: Date? = nil) -> BatterySnapshot {
         let nextTimestamp = timestamp ?? self.timestamp
         let nextManufactureDate = BatteryCalculations.plausibleManufactureDate(manufactureDate, now: nextTimestamp)
-        let nextBatteryAgeComponents = BatteryCalculations.batteryAgeComponents(
-            from: nextManufactureDate,
-            now: nextTimestamp
-        )
 
         return BatterySnapshot(
             timestamp: nextTimestamp,
@@ -349,7 +281,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             fullChargeCapacityWattHours: fullChargeCapacityWattHours,
             designCapacityMilliampHours: designCapacityMilliampHours,
-            designCapacityWattHours: designCapacityWattHours,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
             voltageMillivolts: voltageMillivolts,
@@ -364,7 +295,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
             timeToFullMinutes: timeToFullMinutes,
             cycleCount: cycleCount,
             manufactureDate: nextManufactureDate,
-            batteryAgeComponents: nextBatteryAgeComponents,
             temperatureCelsius: temperatureCelsius,
             adapterMaxWatts: adapterMaxWatts,
             notes: notes

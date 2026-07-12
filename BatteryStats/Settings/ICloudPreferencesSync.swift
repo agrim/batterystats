@@ -9,9 +9,7 @@ protocol PreferencesSyncing: AnyObject {
     func setEnabled(_ enabled: Bool)
     func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol
     func removeObserver(_ token: NSObjectProtocol)
-    func hasValue(forKey key: String) -> Bool
-    func bool(forKey key: String) -> Bool?
-    func string(forKey key: String) -> String?
+    func object(forKey key: String) -> Any?
     func set(_ value: Bool, forKey key: String)
     func set(_ value: String, forKey key: String)
     func removeValue(forKey key: String)
@@ -21,7 +19,6 @@ protocol PreferencesSyncing: AnyObject {
 @MainActor
 protocol ICloudPreferencesKeyValueStoring: AnyObject {
     func object(forKey aKey: String) -> Any?
-    func string(forKey aKey: String) -> String?
     func set(_ value: Any?, forKey aKey: String)
     func removeObject(forKey aKey: String)
     func synchronize() -> Bool
@@ -122,16 +119,8 @@ final class ICloudPreferencesSync: PreferencesSyncing {
         notificationCenter.removeObserver(token)
     }
 
-    func hasValue(forKey key: String) -> Bool {
-        enabledStore()?.object(forKey: key) != nil
-    }
-
-    func bool(forKey key: String) -> Bool? {
-        enabledStore().flatMap { Self.strictBool($0.object(forKey: key)) }
-    }
-
-    func string(forKey key: String) -> String? {
-        enabledStore()?.string(forKey: key)
+    func object(forKey key: String) -> Any? {
+        enabledStore()?.object(forKey: key)
     }
 
     func set(_ value: Bool, forKey key: String) {
@@ -139,7 +128,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
     }
 
     func set(_ value: String, forKey key: String) {
-        setIfChanged(value, forKey: key) { $0.string(forKey: key) }
+        setIfChanged(value, forKey: key) { $0.object(forKey: key) as? String }
     }
 
     func removeValue(forKey key: String) {

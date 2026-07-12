@@ -7,15 +7,10 @@ enum BatteryHistoryPowerRole: String, Codable, CaseIterable, Equatable, Hashable
     case inputPower
     case unknown
 
-    static let comparableCases: [BatteryHistoryPowerRole] = [
-        .batteryDrain,
-        .batteryCharge,
-        .inputPower
-    ]
+    static let comparableCases: [BatteryHistoryPowerRole] = [.batteryDrain, .batteryCharge, .inputPower]
 
     init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        self = Self(rawValue: try container.decode(String.self)) ?? .unknown
+        self = Self(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .unknown
     }
 
     func encode(to encoder: Encoder) throws {
@@ -36,42 +31,6 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     let powerRole: BatteryHistoryPowerRole?
     let temperatureCelsius: Double?
     let cycleCount: Int?
-
-    init(snapshot: BatterySnapshot) {
-        let powerState = snapshot.powerState
-        let activePowerWatts = Self.activePowerWatts(snapshot.activePowerWatts, powerState: powerState)
-        timestamp = snapshot.timestamp
-        self.powerState = powerState.rawValue
-        healthPercent = BatteryCalculations.presentationPercent(snapshot.healthPercent, maximumAllowed: 120)
-        stateOfChargePercent = BatteryCalculations.presentationPercent(snapshot.stateOfChargePercent, maximumAllowed: 105)
-        displayedTimeMinutes = Self.displayedTimeMinutes(snapshot.displayedTimeMinutes, powerState: powerState)
-        self.activePowerWatts = activePowerWatts
-        powerRole = Self.powerRole(for: snapshot, activePowerWatts: activePowerWatts)
-        temperatureCelsius = BatteryCalculations.plausibleTemperatureCelsius(snapshot.temperatureCelsius)
-        cycleCount = BatteryCalculations.plausibleCycleCount(snapshot.cycleCount)
-    }
-
-    private init(
-        timestamp: Date,
-        powerState: String,
-        healthPercent: Double?,
-        stateOfChargePercent: Double?,
-        displayedTimeMinutes: Int?,
-        activePowerWatts: Double?,
-        powerRole: BatteryHistoryPowerRole?,
-        temperatureCelsius: Double?,
-        cycleCount: Int?
-    ) {
-        self.timestamp = timestamp
-        self.powerState = powerState
-        self.healthPercent = healthPercent
-        self.stateOfChargePercent = stateOfChargePercent
-        self.displayedTimeMinutes = displayedTimeMinutes
-        self.activePowerWatts = activePowerWatts
-        self.powerRole = powerRole
-        self.temperatureCelsius = temperatureCelsius
-        self.cycleCount = cycleCount
-    }
 
     func normalized() -> BatteryHistoryEntry {
         let powerState = BatteryPowerState(rawValue: powerState) ?? .unknown
@@ -94,21 +53,19 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     }
 
     private static func displayedTimeMinutes(_ value: Int?, powerState: BatteryPowerState) -> Int? {
-        switch powerState {
-        case .onBattery, .connectedDischarging, .charging:
-            return BatteryCalculations.plausibleDurationMinutes(value)
-        case .connectedNotCharging, .fullOnAC, .unknown:
+        guard powerState == .charging || powerState.isBatteryDischarging else {
             return nil
         }
+
+        return BatteryCalculations.plausibleDurationMinutes(value)
     }
 
     private static func activePowerWatts(_ value: Double?, powerState: BatteryPowerState) -> Double? {
-        switch powerState {
-        case .onBattery, .connectedDischarging, .charging, .connectedNotCharging, .fullOnAC:
-            return BatteryCalculations.plausibleWatts(value)
-        case .unknown:
+        guard powerState != .unknown else {
             return nil
         }
+
+        return BatteryCalculations.plausibleWatts(value)
     }
 
     private static func powerRole(
@@ -161,6 +118,24 @@ struct BatteryHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+extension BatteryHistoryEntry {
+    init(snapshot: BatterySnapshot) {
+        let powerState = snapshot.powerState
+        let activePowerWatts = Self.activePowerWatts(snapshot.activePowerWatts, powerState: powerState)
+        self.init(
+            timestamp: snapshot.timestamp,
+            powerState: powerState.rawValue,
+            healthPercent: BatteryCalculations.presentationPercent(snapshot.healthPercent, maximumAllowed: 120),
+            stateOfChargePercent: BatteryCalculations.presentationPercent(snapshot.stateOfChargePercent, maximumAllowed: 105),
+            displayedTimeMinutes: Self.displayedTimeMinutes(snapshot.displayedTimeMinutes, powerState: powerState),
+            activePowerWatts: activePowerWatts,
+            powerRole: Self.powerRole(for: snapshot, activePowerWatts: activePowerWatts),
+            temperatureCelsius: BatteryCalculations.plausibleTemperatureCelsius(snapshot.temperatureCelsius),
+            cycleCount: BatteryCalculations.plausibleCycleCount(snapshot.cycleCount)
+        )
+    }
+}
+
 struct BatteryHistoryPowerStats: Equatable, Sendable {
     let role: BatteryHistoryPowerRole
     let sampleCount: Int
@@ -191,17 +166,29 @@ struct BatteryHistoryStats: Equatable, Sendable {
             .sorted { $0.timestamp < $1.timestamp }
 
         self.sampleCount = normalizedEntries.count
-        var firstTimestamp = Date.distantFuture
-        var latestTimestamp = Date.distantPast
+        self.firstTimestamp = normalizedEntries[0].timestamp
+        self.latestTimestamp = normalizedEntries[normalizedEntries.count - 1].timestamp
         var powerAccumulators: [BatteryHistoryPowerRole: BatteryHistoryPowerAccumulator] = [:]
         var minimumChargePercent: Double?
         var maximumChargePercent: Double?
         var minimumTemperatureCelsius: Double?
         var maximumTemperatureCelsius: Double?
+        var previousEntry: BatteryHistoryEntry?
 
+        // Each value describes the state until the next observation. The final
+        // point therefore affects the peak but not the weighted mean.
         for entry in normalizedEntries {
-            firstTimestamp = min(firstTimestamp, entry.timestamp)
-            latestTimestamp = max(latestTimestamp, entry.timestamp)
+            if let previousEntry {
+                let duration = entry.timestamp.timeIntervalSince(previousEntry.timestamp)
+                if let measurement = previousEntry.powerMeasurement,
+                   duration > 0,
+                   duration.isFinite,
+                   duration <= Self.maximumContinuousPowerObservationInterval {
+                    var accumulator = powerAccumulators[measurement.role] ?? BatteryHistoryPowerAccumulator()
+                    accumulator.record(watts: measurement.watts, duration: duration)
+                    powerAccumulators[measurement.role] = accumulator
+                }
+            }
 
             if let measurement = entry.powerMeasurement {
                 var accumulator = powerAccumulators[measurement.role] ?? BatteryHistoryPowerAccumulator()
@@ -218,29 +205,10 @@ struct BatteryHistoryStats: Equatable, Sendable {
                 minimumTemperatureCelsius = min(minimumTemperatureCelsius ?? temperatureCelsius, temperatureCelsius)
                 maximumTemperatureCelsius = max(maximumTemperatureCelsius ?? temperatureCelsius, temperatureCelsius)
             }
+
+            previousEntry = entry
         }
 
-        // Each captured value describes the state until the next observation.
-        // The final point has no known duration, so it contributes to the peak
-        // but not to a time-weighted average.
-        for index in normalizedEntries.indices.dropLast() {
-            let entry = normalizedEntries[index]
-            let nextEntry = normalizedEntries[normalizedEntries.index(after: index)]
-            let duration = nextEntry.timestamp.timeIntervalSince(entry.timestamp)
-            guard let measurement = entry.powerMeasurement,
-                  duration > 0,
-                  duration.isFinite,
-                  duration <= Self.maximumContinuousPowerObservationInterval else {
-                continue
-            }
-
-            var accumulator = powerAccumulators[measurement.role] ?? BatteryHistoryPowerAccumulator()
-            accumulator.record(watts: measurement.watts, duration: duration)
-            powerAccumulators[measurement.role] = accumulator
-        }
-
-        self.firstTimestamp = firstTimestamp
-        self.latestTimestamp = latestTimestamp
         self.powerStats = BatteryHistoryPowerRole.comparableCases.compactMap { role in
             powerAccumulators[role]?.stats(for: role)
         }

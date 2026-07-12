@@ -74,8 +74,9 @@ enum BooleanFlagNormalizer {
                 return number.boolValue
             }
 
-            if number.doubleValue == 0 || number.doubleValue == 1 {
-                return number.doubleValue == 1
+            let numericValue = number.doubleValue
+            if numericValue == 0 || numericValue == 1 {
+                return numericValue == 1
             }
 
             return nil
