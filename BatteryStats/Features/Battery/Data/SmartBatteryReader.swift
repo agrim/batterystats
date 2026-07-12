@@ -43,10 +43,7 @@ final class SmartBatteryReader: @unchecked Sendable {
             IOObjectRelease(service)
         }
 
-        var propertiesReference: Unmanaged<CFMutableDictionary>?
-        let result = IORegistryEntryCreateCFProperties(service, &propertiesReference, kCFAllocatorDefault, 0)
-        guard result == KERN_SUCCESS,
-              let rawProperties = propertiesReference?.takeRetainedValue() as? [String: Any] else {
+        guard let rawProperties = properties(for: service) else {
             return nil
         }
 
@@ -183,11 +180,22 @@ final class SmartBatteryReader: @unchecked Sendable {
             ],
             in: rawProperties
         )
-        let rawTemperature = rawTemperatureValue(for: [.root("Temperature"), .nested("BatteryData", "Temperature")], in: rawProperties)
-        let decodedManufactureDate = manufactureDate(
+        let rawTemperature = plausibleInteger(
+            for: [.root("Temperature"), .nested("BatteryData", "Temperature")],
+            in: rawProperties
+        ) {
+            BatteryCalculations.temperatureCelsius(fromRaw: $0) == nil ? nil : $0
+        }
+        let decodedManufactureDate: Date? = firstValue(
             for: [.root("ManufactureDate"), .nestedRootOnly("BatteryData", "ManufactureDate")],
             in: rawProperties
-        )
+        ) { rawValue in
+            guard let parsed = SignedIntegerNormalizer.normalize(rawValue) else {
+                return nil
+            }
+
+            return ManufactureDateDecoder.decode(rawValue: parsed)
+        }
         let adapterDetailsWatts = Self.stringDictionary(from: rawProperties["AdapterDetails"])
             .flatMap { adapterWatts(from: $0) }
         let negotiatedWatts = negotiatedAdapterContractWatts(in: rawProperties)
@@ -235,25 +243,6 @@ final class SmartBatteryReader: @unchecked Sendable {
             }
 
             return transform(parsed)
-        }
-    }
-
-    private func rawTemperatureValue(for candidates: [PropertyCandidate], in properties: [String: Any]) -> Int? {
-        plausibleInteger(for: candidates, in: properties) {
-            BatteryCalculations.temperatureCelsius(fromRaw: $0) == nil ? nil : $0
-        }
-    }
-
-    private func manufactureDate(
-        for candidates: [PropertyCandidate],
-        in properties: [String: Any]
-    ) -> Date? {
-        firstValue(for: candidates, in: properties) { rawValue in
-            guard let parsed = SignedIntegerNormalizer.normalize(rawValue) else {
-                return nil
-            }
-
-            return ManufactureDateDecoder.decode(rawValue: parsed)
         }
     }
 

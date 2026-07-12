@@ -977,13 +977,13 @@ private final class FakePreferencesSync: PreferencesSyncing {
     private(set) var flushCallCount = 0
 
     private var values: [String: Any] = [:]
-    private var changeHandler: (@Sendable ([String]) -> Void)?
+    private var changeHandler: (@MainActor @Sendable ([String]) -> Void)?
 
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled && isAvailable
     }
 
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
+    func observeChanges(_ handler: @escaping @MainActor @Sendable ([String]) -> Void) -> NSObjectProtocol {
         changeHandler = handler
         return NSObject()
     }

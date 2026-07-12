@@ -227,10 +227,9 @@ struct BatteryWidgetSnapshotStore {
             isCharging: flags.isCharging,
             isExternalPowerConnected: flags.isExternalPowerConnected,
             currentChargeMilliampHours: currentChargeMilliampHours,
-            currentChargeWattHours: derivedWattHours(
+            currentChargeWattHours: BatteryCalculations.wattHours(
                 milliampHours: currentChargeMilliampHours,
-                voltageMillivolts: voltageMillivolts,
-                allowsZero: true
+                voltageMillivolts: voltageMillivolts
             ),
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
             fullChargeCapacityWattHours: nil,
@@ -324,25 +323,9 @@ struct BatteryWidgetSnapshotStore {
         }
 
         return (
-            chargeRateWatts: dictionary.keys.contains("chargeRateWatts"),
-            dischargeRateWatts: dictionary.keys.contains("dischargeRateWatts")
+            chargeRateWatts: dictionary["chargeRateWatts"] != nil,
+            dischargeRateWatts: dictionary["dischargeRateWatts"] != nil
         )
-    }
-
-    private static func derivedWattHours(
-        milliampHours: Int?,
-        voltageMillivolts: Int?,
-        allowsZero: Bool
-    ) -> Double? {
-        guard let value = BatteryCalculations.wattHours(
-            milliampHours: milliampHours,
-            voltageMillivolts: voltageMillivolts
-        ),
-              allowsZero || value > 0 else {
-            return nil
-        }
-
-        return value
     }
 
     private static func rateBasedTimeRemainingMinutes(
@@ -519,7 +502,6 @@ struct BatteryWidgetCountdown: Equatable, Sendable {
 struct BatteryWidgetTimelinePlan: Equatable, Sendable {
     struct Entry: Equatable, Sendable {
         let date: Date
-        let evaluationDate: Date
         let snapshotIsDisplayable: Bool
         let displayedTimeMinutes: Int?
     }
@@ -552,7 +534,6 @@ struct BatteryWidgetTimelinePlan: Equatable, Sendable {
 
             return Entry(
                 date: date,
-                evaluationDate: evaluationDate,
                 snapshotIsDisplayable: snapshotIsDisplayable,
                 displayedTimeMinutes: snapshotIsDisplayable ? countdown?.remainingMinutes(at: evaluationDate) : nil
             )
@@ -566,11 +547,10 @@ struct BatteryWidgetTimelinePlan: Equatable, Sendable {
     }
 
     private static func singleEntryPlan(now: Date) -> BatteryWidgetTimelinePlan {
-        return BatteryWidgetTimelinePlan(
+        BatteryWidgetTimelinePlan(
             entries: [
                 Entry(
                     date: now,
-                    evaluationDate: now,
                     snapshotIsDisplayable: false,
                     displayedTimeMinutes: nil
                 )
@@ -609,7 +589,7 @@ enum BatteryWidgetSnapshotDisplayPolicy {
     }
 }
 
-enum BatteryWidgetMetricFormatting {
+enum BatteryMetricFormatting {
     static func percentText(_ value: Double?) -> String {
         guard let percent = BatteryCalculations.presentationPercent(value, maximumAllowed: 105) else {
             return "—"

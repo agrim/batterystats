@@ -14,7 +14,7 @@ actor BatteryReadingWorker {
 
 struct BatteryReadingClient: Sendable {
     let read: @Sendable (_ date: Date, _ options: BatteryReadOptions) async -> BatteryReadResult
-    let makeNotificationToken: @MainActor @Sendable (_ handler: @escaping @Sendable () -> Void) -> PowerSourceReader.NotificationToken?
+    let makeNotificationToken: @MainActor @Sendable (_ handler: @escaping @MainActor @Sendable () -> Void) -> PowerSourceReader.NotificationToken?
 
     static func live(service: BatteryReadingService = BatteryReadingService()) -> BatteryReadingClient {
         let worker = BatteryReadingWorker(service: service)

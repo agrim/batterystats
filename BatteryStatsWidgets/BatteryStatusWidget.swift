@@ -4,7 +4,6 @@ import WidgetKit
 struct BatteryStatusEntry: TimelineEntry {
     let date: Date
     let snapshot: BatterySnapshot?
-    let snapshotIsDisplayable: Bool
     let displayedTimeMinutes: Int?
 
     static var placeholder: BatteryStatusEntry {
@@ -13,7 +12,6 @@ struct BatteryStatusEntry: TimelineEntry {
         return BatteryStatusEntry(
             date: date,
             snapshot: snapshot,
-            snapshotIsDisplayable: true,
             displayedTimeMinutes: snapshot.displayedTimeMinutes
         )
     }
@@ -23,8 +21,7 @@ private extension BatteryStatusEntry {
     init(snapshot: BatterySnapshot?, projection: BatteryWidgetTimelinePlan.Entry, date: Date? = nil) {
         self.init(
             date: date ?? projection.date,
-            snapshot: snapshot,
-            snapshotIsDisplayable: projection.snapshotIsDisplayable,
+            snapshot: projection.snapshotIsDisplayable ? snapshot : nil,
             displayedTimeMinutes: projection.displayedTimeMinutes
         )
     }

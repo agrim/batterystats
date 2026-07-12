@@ -22,15 +22,9 @@ struct MenuBarDisplayPreferences: Equatable, Sendable {
             UserInfoKey.temperatureUnitPreference: temperatureUnitPreference.rawValue
         ]
     }
+}
 
-    init(
-        displayMode: MenuBarDisplayMode,
-        temperatureUnitPreference: TemperatureUnitPreference
-    ) {
-        self.displayMode = displayMode
-        self.temperatureUnitPreference = temperatureUnitPreference
-    }
-
+extension MenuBarDisplayPreferences {
     init?(notification: Notification) {
         guard let userInfo = notification.userInfo,
               let displayModeRawValue = userInfo[UserInfoKey.displayMode] as? String,
@@ -248,9 +242,7 @@ final class PreferencesStore {
         resolveHistoryICloudSyncState()
 
         observerToken = sync.observeChanges { [weak self] changedKeys in
-            Task { @MainActor in
-                self?.applyRemoteChanges(for: changedKeys)
-            }
+            self?.applyRemoteChanges(for: changedKeys)
         }
 
         defaultsObserverToken = NotificationCenter.default.addObserver(
@@ -557,29 +549,6 @@ final class PreferencesStore {
         }
     }
 
-    private func remoteEnumPreference<Value>(
-        forKey key: String,
-        defaultValue: Value,
-        defaultMissing: Bool
-    ) -> Value? where Value: RawRepresentable, Value.RawValue == String {
-        let rawValue = sync.object(forKey: key)
-        guard let rawValue = rawValue as? String else {
-            if rawValue != nil {
-                sync.set(defaultValue.rawValue, forKey: key)
-                return defaultValue
-            }
-
-            return defaultMissing ? defaultValue : nil
-        }
-
-        guard let value = Value(rawValue: rawValue) else {
-            sync.set(defaultValue.rawValue, forKey: key)
-            return defaultValue
-        }
-
-        return value
-    }
-
     private func remoteBoolPreference(
         forKey key: String,
         defaultValue: Bool,
@@ -604,11 +573,18 @@ final class PreferencesStore {
         defaultValue: Value,
         defaultMissing: Bool
     ) where Value: RawRepresentable, Value.RawValue == String {
-        guard let value = remoteEnumPreference(
-            forKey: key,
-            defaultValue: defaultValue,
-            defaultMissing: defaultMissing
-        ) else {
+        let storedValue = sync.object(forKey: key)
+        let value: Value
+
+        if let rawValue = storedValue as? String,
+           let storedValue = Value(rawValue: rawValue) {
+            value = storedValue
+        } else if storedValue != nil {
+            sync.set(defaultValue.rawValue, forKey: key)
+            value = defaultValue
+        } else if defaultMissing {
+            value = defaultValue
+        } else {
             return
         }
 

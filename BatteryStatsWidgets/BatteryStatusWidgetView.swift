@@ -5,7 +5,7 @@ struct BatteryStatusWidgetView: View {
     let entry: BatteryStatusEntry
 
     var body: some View {
-        let snapshot = entry.snapshotIsDisplayable ? entry.snapshot : nil
+        let snapshot = entry.snapshot
         let displayedTimeMinutes = snapshot == nil ? nil : entry.displayedTimeMinutes
 
         GeometryReader { geometry in
@@ -13,29 +13,30 @@ struct BatteryStatusWidgetView: View {
             let circleDiameter = floor(shortestSide * BatterySmallWidgetLayout.ringDiameterRatio)
             let spacing = round(shortestSide * BatterySmallWidgetLayout.interRingSpacingRatio)
             let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
-            let healthText = BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent)
+            let healthText = BatteryMetricFormatting.percentText(snapshot?.presentationHealthPercent)
             let healthMetric = BatteryWidgetMetric(
                 content: snapshot?.presentationHealthPercent == nil ? .empty : .text(healthText),
-                progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationHealthPercent),
+                progress: BatteryMetricFormatting.clampedProgress(snapshot?.presentationHealthPercent),
                 ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color,
                 accessibilityLabel: "Battery Health",
                 accessibilityValue: snapshot?.presentationHealthPercent == nil ? "Unavailable" : healthText
             )
-            let chargeText = BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)
+            let chargeText = BatteryMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent)
             let chargeMetric = BatteryWidgetMetric(
                 content: snapshot?.presentationStateOfChargePercent == nil ? .empty : .text(chargeText),
-                progress: BatteryWidgetMetricFormatting.clampedProgress(snapshot?.presentationStateOfChargePercent),
+                progress: BatteryMetricFormatting.clampedProgress(snapshot?.presentationStateOfChargePercent),
                 ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color,
                 accessibilityLabel: "Charge",
                 accessibilityValue: snapshot?.presentationStateOfChargePercent == nil ? "Unavailable" : chargeText
             )
-            let timeText = BatteryWidgetMetricFormatting.timeText(minutes: displayedTimeMinutes)
-            let timeRingTint: Color = displayedTimeMinutes == nil
-                ? .secondary
-                : (snapshot?.isLowCharge == true ? .red : .green)
+            let timeText = BatteryMetricFormatting.timeText(minutes: displayedTimeMinutes)
+            let timeRingTint = BatteryPresentationStyle.timeTintStyle(
+                for: snapshot,
+                displayedTimeMinutes: displayedTimeMinutes
+            ).color
             let timeMetric = BatteryWidgetMetric(
                 content: displayedTimeMinutes == nil ? .empty : .text(timeText),
-                progress: BatteryWidgetMetricFormatting.timeProgress(minutes: displayedTimeMinutes),
+                progress: BatteryMetricFormatting.timeProgress(minutes: displayedTimeMinutes),
                 ringTint: timeRingTint,
                 accessibilityLabel: snapshot?.powerState.timeTitle(
                     charging: "Time to Full",

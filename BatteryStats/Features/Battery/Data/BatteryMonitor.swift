@@ -81,7 +81,7 @@ final class BatteryMonitor {
         widgetTimelineReloader: @escaping @MainActor () -> Void = {
             WidgetCenter.shared.reloadTimelines(ofKind: BatteryWidgetSnapshotStore.timelineKind)
         },
-        widgetTimelineReloadMinimumInterval: TimeInterval = 5 * 60,
+        widgetTimelineReloadMinimumInterval: TimeInterval = BatteryWidgetTimelinePlan.minimumEntryInterval,
         transientReadFailureThreshold: Int = 3,
         transientReadRetryDelay: Duration = .milliseconds(250),
         now: @escaping @MainActor () -> Date = { Date() }
@@ -169,9 +169,7 @@ final class BatteryMonitor {
 
         if powerSourceNotificationToken == nil {
             powerSourceNotificationToken = reader.makeNotificationToken { [weak self] in
-                Task { @MainActor in
-                    self?.requestRefreshIfStarted()
-                }
+                self?.requestRefreshIfStarted()
             }
         }
 
@@ -348,7 +346,7 @@ final class BatteryMonitor {
 
         var options = initialOptions
 
-        refreshLoop: while true {
+        while true {
             let readSequence = nextReadSequence()
             let readDate = now()
             let result = await reader.read(readDate, options)
@@ -370,7 +368,7 @@ final class BatteryMonitor {
                 pendingRefreshOptions = nil
                 continue
             } else if application == .unsupported {
-                break refreshLoop
+                break
             }
 
             if let pendingOptions = pendingRefreshOptions {
@@ -456,12 +454,14 @@ final class BatteryMonitor {
 
     private func requestWidgetTimelineReload(for snapshot: BatterySnapshot?, at date: Date) {
         let signature = WidgetTimelineReloadSignature(snapshot: snapshot)
+        guard signature != lastWidgetTimelineReloadSignature else {
+            return
+        }
+
         let criticalSignature = WidgetCriticalReloadSignature(snapshot: snapshot)
         let elapsed = lastWidgetTimelineReloadDate.map { date.timeIntervalSince($0) } ?? .infinity
-        let hasPresentationChange = signature != lastWidgetTimelineReloadSignature
         let hasCriticalChange = criticalSignature != lastWidgetCriticalReloadSignature
-        guard hasPresentationChange,
-              lastWidgetTimelineReloadDate == nil
+        guard lastWidgetTimelineReloadDate == nil
                 || hasCriticalChange
                 || elapsed >= widgetTimelineReloadMinimumInterval else {
             return
@@ -482,8 +482,7 @@ final class BatteryMonitor {
         guard snapshot.powerState.isBatteryDischarging,
               let dischargeRate = BatteryCalculations.plausibleDischargeRateMilliamps(
                 snapshot.dischargeRateMilliamps
-              ),
-              dischargeRate > 0 else {
+              ) else {
             resetDischargeSampling()
             return nil
         }
@@ -746,16 +745,16 @@ private struct WidgetTimelineReloadSignature: Equatable {
     let batterySymbolName: String
     let updatedMinute: Int?
     let chargePercent: Int?
-    let chargeTint: String
+    let chargeTint: BatteryPresentationTint
     let healthPercent: Int?
-    let healthTint: String
+    let healthTint: BatteryPresentationTint
     let displayedTimeMinutes: Int?
-    let timeTint: String
+    let timeTint: BatteryPresentationTint
     let activePowerDeciwatts: Int?
     let usesInputPowerWatts: Bool
     let statusSymbolName: String
-    let statusRingTint: String
-    let statusContentTint: String
+    let statusRingTint: BatteryPresentationTint
+    let statusContentTint: BatteryPresentationTint
 
     init(snapshot: BatterySnapshot?, updatedAt: Date? = nil) {
         let statusDescriptor = BatteryPresentationStyle.statusDescriptor(for: snapshot)
@@ -764,16 +763,19 @@ private struct WidgetTimelineReloadSignature: Equatable {
         batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
         updatedMinute = Self.minuteIdentifier(updatedAt ?? snapshot?.timestamp)
         chargePercent = Self.roundedInt(snapshot?.presentationStateOfChargePercent)
-        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).rawValue
+        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot)
         healthPercent = Self.roundedInt(snapshot?.presentationHealthPercent)
-        healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot).rawValue
+        healthTint = BatteryPresentationStyle.healthTintStyle(for: snapshot)
         displayedTimeMinutes = snapshot?.displayedTimeMinutes
-        timeTint = BatteryPresentationStyle.timeTintStyle(for: snapshot).rawValue
+        timeTint = BatteryPresentationStyle.timeTintStyle(
+            for: snapshot,
+            displayedTimeMinutes: snapshot?.displayedTimeMinutes
+        )
         activePowerDeciwatts = Self.roundedInt(snapshot?.activePowerWatts, multiplier: 10)
         usesInputPowerWatts = snapshot?.visibleInputPowerWatts != nil
         statusSymbolName = statusDescriptor.symbolName
-        statusRingTint = statusDescriptor.ringTintStyle.rawValue
-        statusContentTint = statusDescriptor.contentTintStyle.rawValue
+        statusRingTint = statusDescriptor.ringTintStyle
+        statusContentTint = statusDescriptor.contentTintStyle
     }
 
     private static func minuteIdentifier(_ date: Date?) -> Int? {
@@ -809,14 +811,14 @@ private struct WidgetCriticalReloadSignature: Equatable {
     let powerState: BatteryPowerState?
     let isLowCharge: Bool
     let batterySymbolName: String
-    let chargeTint: String
+    let chargeTint: BatteryPresentationTint
 
     init(snapshot: BatterySnapshot?) {
         isAvailable = snapshot != nil
         powerState = snapshot?.powerState
         isLowCharge = snapshot?.isLowCharge ?? false
         batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
-        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot).rawValue
+        chargeTint = BatteryPresentationStyle.chargeTintStyle(for: snapshot)
     }
 }
 

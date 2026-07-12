@@ -306,7 +306,7 @@ protocol BatteryHistoryCloudStoring: AnyObject {
     func synchronize() -> Bool
     func string(forKey key: String) -> String?
     func setString(_ value: String, forKey key: String)
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol
+    func observeChanges(_ handler: @escaping @MainActor @Sendable ([String]) -> Void) -> NSObjectProtocol
     func removeObserver(_ token: NSObjectProtocol)
 }
 
@@ -315,14 +315,16 @@ extension NSUbiquitousKeyValueStore: BatteryHistoryCloudStoring {
         set(value, forKey: key)
     }
 
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
+    func observeChanges(_ handler: @escaping @MainActor @Sendable ([String]) -> Void) -> NSObjectProtocol {
         NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: self,
             queue: .main
         ) { notification in
             let keys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
-            handler(keys)
+            MainActor.assumeIsolated {
+                handler(keys)
+            }
         }
     }
 
@@ -680,9 +682,7 @@ final class BatteryHistoryStore {
         }
 
         cloudObserverToken = resolvedCloudStore.observeChanges { [weak self] changedKeys in
-            Task { @MainActor in
-                self?.handleCloudEntriesChanged(keys: changedKeys)
-            }
+            self?.handleCloudEntriesChanged(keys: changedKeys)
         }
     }
 

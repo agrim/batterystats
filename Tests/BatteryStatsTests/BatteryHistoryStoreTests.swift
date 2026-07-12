@@ -1230,7 +1230,7 @@ private final class FakeBatteryHistoryCloudStore: BatteryHistoryCloudStoring {
     private(set) var setStringCallCount = 0
     private(set) var removeObserverCallCount = 0
     var onSynchronize: (() -> Void)?
-    private var changeHandler: (@Sendable ([String]) -> Void)?
+    private var changeHandler: (@MainActor @Sendable ([String]) -> Void)?
 
     func synchronize() -> Bool {
         synchronizeCallCount += 1
@@ -1247,7 +1247,7 @@ private final class FakeBatteryHistoryCloudStore: BatteryHistoryCloudStoring {
         values[key] = value
     }
 
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
+    func observeChanges(_ handler: @escaping @MainActor @Sendable ([String]) -> Void) -> NSObjectProtocol {
         changeHandler = handler
         return NSObject()
     }

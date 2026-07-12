@@ -5,25 +5,25 @@ final class BatteryFreshnessFormattingTests: XCTestCase {
     func testFreshnessViewDefersPulseUntilRefreshCompletes() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
 
-        XCTAssertTrue(source.contains(".task(id: pulseTrigger)"))
-        XCTAssertTrue(source.contains("await runPulse()"))
-        XCTAssertTrue(source.contains("@MainActor\n    private func runPulse() async"))
-        XCTAssertFalse(source.contains("private func schedulePulse()"))
-        XCTAssertFalse(source.contains("private func schedulePulseCancellation()"))
-        XCTAssertFalse(source.contains("pulseUpdateTask"))
-        XCTAssertFalse(source.contains("pulseTask"))
-        XCTAssertTrue(source.contains("await Task.yield()"))
-        XCTAssertTrue(source.contains("guard isRefreshing == false,\n              BatteryFreshnessFormatting.hasUsableUpdate"))
-        XCTAssertTrue(source.contains("BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date())"))
+        XCTAssertSource(
+            source,
+            contains: [
+                ".task(id: pulseTrigger)", "await runPulse()", "@MainActor\n    private func runPulse() async",
+                "await Task.yield()", "guard isRefreshing == false,\n              BatteryFreshnessFormatting.hasUsableUpdate",
+                "BatteryFreshnessFormatting.hasUsableUpdate(lastUpdated: lastUpdated, now: Date())"
+            ],
+            excludes: ["private func schedulePulse()", "private func schedulePulseCancellation()", "pulseUpdateTask", "pulseTask"]
+        )
     }
 
     func testFreshnessViewRearmsPulseWhenReduceMotionTurnsOff() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryFreshnessView.swift")
 
-        XCTAssertTrue(source.contains("private struct BatteryFreshnessPulseTrigger: Equatable"))
-        XCTAssertTrue(source.contains("reduceMotion: reduceMotion"))
-        XCTAssertTrue(source.contains("let reduceMotion: Bool"))
-        XCTAssertFalse(source.contains(".onChange(of: reduceMotion)"))
+        XCTAssertSource(
+            source,
+            contains: ["private struct BatteryFreshnessPulseTrigger: Equatable", "reduceMotion: reduceMotion", "let reduceMotion: Bool"],
+            excludes: [".onChange(of: reduceMotion)"]
+        )
     }
 
     func testRefreshingTextTakesPriority() {

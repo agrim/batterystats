@@ -39,7 +39,7 @@ enum BatteryInputPowerEvidence: String, Codable, Equatable, Sendable {
 }
 
 struct BatterySnapshot: Codable, Equatable, Sendable {
-    let timestamp: Date
+    private(set) var timestamp: Date
     let powerState: BatteryPowerState
     let isCharging: Bool
     let isExternalPowerConnected: Bool
@@ -60,12 +60,12 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     private(set) var inputPowerEvidence: BatteryInputPowerEvidence? = nil
     let dischargeRateWatts: Double?
 
-    let rateBasedTimeRemainingMinutes: Int?
+    private(set) var rateBasedTimeRemainingMinutes: Int?
     let systemTimeRemainingMinutes: Int?
     let timeToFullMinutes: Int?
 
     let cycleCount: Int?
-    let manufactureDate: Date?
+    private(set) var manufactureDate: Date?
     let temperatureCelsius: Double?
 
     let adapterMaxWatts: Int?
@@ -268,36 +268,13 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     }
 
     func updating(rateBasedTimeRemainingMinutes: Int?, timestamp: Date? = nil) -> BatterySnapshot {
-        let nextTimestamp = timestamp ?? self.timestamp
-        let nextManufactureDate = BatteryCalculations.plausibleManufactureDate(manufactureDate, now: nextTimestamp)
-
-        return BatterySnapshot(
-            timestamp: nextTimestamp,
-            powerState: powerState,
-            isCharging: isCharging,
-            isExternalPowerConnected: isExternalPowerConnected,
-            currentChargeMilliampHours: currentChargeMilliampHours,
-            currentChargeWattHours: currentChargeWattHours,
-            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-            fullChargeCapacityWattHours: fullChargeCapacityWattHours,
-            designCapacityMilliampHours: designCapacityMilliampHours,
-            healthPercent: healthPercent,
-            stateOfChargePercent: stateOfChargePercent,
-            voltageMillivolts: voltageMillivolts,
-            currentMilliampsSigned: currentMilliampsSigned,
-            dischargeRateMilliamps: dischargeRateMilliamps,
-            chargeRateWatts: chargeRateWatts,
-            inputPowerWatts: inputPowerWatts,
-            inputPowerEvidence: inputPowerEvidence,
-            dischargeRateWatts: dischargeRateWatts,
-            rateBasedTimeRemainingMinutes: rateBasedTimeRemainingMinutes,
-            systemTimeRemainingMinutes: systemTimeRemainingMinutes,
-            timeToFullMinutes: timeToFullMinutes,
-            cycleCount: cycleCount,
-            manufactureDate: nextManufactureDate,
-            temperatureCelsius: temperatureCelsius,
-            adapterMaxWatts: adapterMaxWatts,
-            notes: notes
+        var updatedSnapshot = self
+        updatedSnapshot.timestamp = timestamp ?? self.timestamp
+        updatedSnapshot.rateBasedTimeRemainingMinutes = rateBasedTimeRemainingMinutes
+        updatedSnapshot.manufactureDate = BatteryCalculations.plausibleManufactureDate(
+            manufactureDate,
+            now: updatedSnapshot.timestamp
         )
+        return updatedSnapshot
     }
 }

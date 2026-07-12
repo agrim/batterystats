@@ -10,7 +10,7 @@ enum ICloudKeyValueStoreAvailability {
         FileManager.default.ubiquityIdentityToken != nil
     }
 
-    static var hasEntitlement: Bool {
+    static let hasEntitlement: Bool = {
         guard let task = SecTaskCreateFromSelf(nil),
               let value = SecTaskCopyValueForEntitlement(
                 task,
@@ -21,5 +21,5 @@ enum ICloudKeyValueStoreAvailability {
         }
 
         return CFGetTypeID(value) == CFStringGetTypeID()
-    }
+    }()
 }

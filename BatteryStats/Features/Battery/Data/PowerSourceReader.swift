@@ -6,9 +6,9 @@ final class PowerSourceReader: @unchecked Sendable {
         static let runLoopMode: CFRunLoopMode = .commonModes
 
         private final class CallbackBox {
-            let handler: @Sendable () -> Void
+            let handler: @MainActor @Sendable () -> Void
 
-            init(handler: @escaping @Sendable () -> Void) {
+            init(handler: @escaping @MainActor @Sendable () -> Void) {
                 self.handler = handler
             }
         }
@@ -16,7 +16,7 @@ final class PowerSourceReader: @unchecked Sendable {
         private let callbackBox: Unmanaged<CallbackBox>
         private let runLoopSource: CFRunLoopSource
 
-        init?(handler: @escaping @Sendable () -> Void) {
+        init?(handler: @escaping @MainActor @Sendable () -> Void) {
             let callbackBox = Unmanaged.passRetained(CallbackBox(handler: handler))
             self.callbackBox = callbackBox
 
@@ -26,7 +26,10 @@ final class PowerSourceReader: @unchecked Sendable {
                 }
 
                 let box = Unmanaged<CallbackBox>.fromOpaque(context).takeUnretainedValue()
-                box.handler()
+                let handler = box.handler
+                MainActor.assumeIsolated {
+                    handler()
+                }
             }, callbackBox.toOpaque()) else {
                 callbackBox.release()
                 return nil
@@ -43,7 +46,8 @@ final class PowerSourceReader: @unchecked Sendable {
         }
     }
 
-    func makeNotificationToken(handler: @escaping @Sendable () -> Void) -> NotificationToken? {
+    @MainActor
+    func makeNotificationToken(handler: @escaping @MainActor @Sendable () -> Void) -> NotificationToken? {
         NotificationToken(handler: handler)
     }
 
@@ -80,25 +84,11 @@ final class PowerSourceReader: @unchecked Sendable {
 
         let isInternalBattery = isInternalBatteryDescription(powerSource)
 
-        let currentCapacity = BatteryCalculations.plausibleCapacityMilliampHours(
-            SignedIntegerNormalizer.normalize(powerSource[string(for: kIOPSCurrentCapacityKey)])
+        let stateOfChargePercent = BatteryCalculations.stateOfChargePercent(
+            currentChargeMilliampHours: SignedIntegerNormalizer.normalize(powerSource[string(for: kIOPSCurrentCapacityKey)]),
+            fullChargeCapacityMilliampHours: SignedIntegerNormalizer.normalize(powerSource[string(for: kIOPSMaxCapacityKey)]),
+            publicPercentage: nil
         )
-        let maxCapacity = BatteryCalculations.plausibleCapacityMilliampHours(
-            SignedIntegerNormalizer.normalize(powerSource[string(for: kIOPSMaxCapacityKey)]),
-            allowsZero: false
-        )
-        let stateOfChargePercent: Double? = {
-            guard let currentCapacity, let maxCapacity else {
-                return nil
-            }
-
-            let percent = (Double(currentCapacity) / Double(maxCapacity)) * 100
-            guard percent.isFinite, percent >= 0, percent <= 105 else {
-                return nil
-            }
-
-            return min(100, percent)
-        }()
 
         let isCharging = BooleanFlagNormalizer.normalize(powerSource[string(for: kIOPSIsChargingKey)]) ?? false
         let isCharged = BooleanFlagNormalizer.normalize(powerSource[string(for: kIOPSIsChargedKey)]) ?? false

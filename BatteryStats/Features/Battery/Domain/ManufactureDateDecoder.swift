@@ -2,11 +2,6 @@ import Foundation
 
 enum ManufactureDateDecoder {
     private static let minimumSupportedYear = 2006
-    private static let gregorianUTCCalendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        return calendar
-    }()
 
     static func decode(
         rawValue: Int?,
@@ -28,7 +23,7 @@ enum ManufactureDateDecoder {
             return nil
         }
 
-        let calendar = providedCalendar ?? gregorianUTCCalendar
+        let calendar = providedCalendar ?? BatteryCalendar.gregorianUTC
         guard let date = calendar.date(from: DateComponents(year: year, month: month, day: day)) else {
             return nil
         }

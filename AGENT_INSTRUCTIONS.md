@@ -27,7 +27,7 @@ BatteryStats is a compact, Apple-framework-only macOS battery utility. Preserve 
 - `BatteryStats/Shared/` — cross-surface utilities and the app/widget snapshot store.
 - `BatteryStatsWidgets/` — WidgetKit provider and four-ring presentation.
 - `Tests/BatteryStatsTests/` — behavior, persistence, project, entitlement, source-contract, and release regressions.
-- `script/` — build, install, signed-product verification, widget verification, cleanup, and release packaging.
+- `script/` — build, install, signed-product verification, widget verification, and release packaging.
 
 ## Runtime Data Flow
 

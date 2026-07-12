@@ -64,8 +64,6 @@ extension BatterySnapshot {
     }
 
     private static var previewManufactureDate: Date? {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        return calendar.date(from: DateComponents(year: 2023, month: 9, day: 12))
+        BatteryCalendar.gregorianUTC.date(from: DateComponents(year: 2023, month: 9, day: 12))
     }
 }

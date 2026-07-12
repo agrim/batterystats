@@ -1,13 +1,6 @@
 name: BatteryStats
 options:
   minimumXcodeGenVersion: 2.39.0
-  deploymentTarget:
-    macOS: "26.0"
-  defaultConfig: Debug
-
-configs:
-  Debug: debug
-  Release: release
 
 settings:
   base:

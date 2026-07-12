@@ -61,23 +61,14 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     }
 
     func testDisplayValueUsesSelectedTemperatureUnit() {
-        XCTAssertEqual(
-            menuBarPresentationValue(
+        for (unit, expected) in [(TemperatureUnitPreference.celsius, "34°"), (.fahrenheit, "94°")] {
+            let presentation = MenuBarBatteryLabelFormatting.presentation(
                 snapshot: .previewDischarging,
                 displayMode: .iconAndTemperature,
-                temperatureUnitPreference: .celsius
-            ),
-            "34°"
-        )
-
-        XCTAssertEqual(
-            menuBarPresentationValue(
-                snapshot: .previewDischarging,
-                displayMode: .iconAndTemperature,
-                temperatureUnitPreference: .fahrenheit
-            ),
-            "94°"
-        )
+                temperatureUnitPreference: unit
+            )
+            XCTAssertEqual(presentation.value, expected)
+        }
     }
 
     func testMenuPanelPresentationDoesNotScheduleDuplicateVisibleSurfaceRefresh() throws {
@@ -355,8 +346,9 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let dashboardSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Presentation/BatteryDashboardView.swift")
         let monitorSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryMonitor.swift")
 
-        XCTAssertTrue(dashboardSource.contains("showsLightningRefreshButton: true"))
-        XCTAssertTrue(dashboardSource.contains("LightningRefreshButton"))
+        XCTAssertTrue(dashboardSource.contains("lightningRefreshBinding: $isLightningRefreshEnabled"))
+        XCTAssertFalse(dashboardSource.contains("showsLightningRefreshButton"))
+        XCTAssertTrue(dashboardSource.contains("LightningRefreshButton(isEnabled: lightningRefreshBinding)"))
         XCTAssertTrue(dashboardSource.contains("Image(systemName: isEnabled ? \"bolt.fill\" : \"bolt\")"))
         XCTAssertTrue(dashboardSource.contains("BatteryDashboardWindowObserver"))
         XCTAssertTrue(dashboardSource.contains("NSWindow.didResignKeyNotification"))
@@ -407,7 +399,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             controller.closePanelForTesting()
         }
 
-        let panel = try XCTUnwrap(controller.currentPanelSnapshotForTesting())
+        let panel = try XCTUnwrap(controller.panelForTesting)
         XCTAssertTrue(panel.isVisible)
         XCTAssertEqual(panel.level, .popUpMenu)
         XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
@@ -417,9 +409,9 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(panel.isFloatingPanel)
         XCTAssertFalse(panel.hidesOnDeactivate)
         XCTAssertFalse(panel.isOpaque)
-        XCTAssertEqual(panel.backgroundAlpha, 0)
-        XCTAssertEqual(panel.contentViewClassName, "NSVisualEffectView")
-        XCTAssertEqual(panel.contentViewCornerRadius, BatterySurfaceLayout.menuBarPanelCornerRadius)
+        XCTAssertEqual(panel.backgroundColor?.alphaComponent, 0)
+        XCTAssertTrue(panel.contentView is NSVisualEffectView)
+        XCTAssertEqual(panel.contentView?.layer?.cornerRadius, BatterySurfaceLayout.menuBarPanelCornerRadius)
         XCTAssertFalse(panel.collectionBehavior.contains(.canJoinAllSpaces))
         XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllApplications))
         XCTAssertTrue(panel.collectionBehavior.contains(.fullScreenAuxiliary))
@@ -440,12 +432,12 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         controller.overwriteLastPanelShowDateForTesting(shownAt)
         controller.closePanelFromGlobalEventForTesting(now: shownAt.addingTimeInterval(1.20))
 
-        XCTAssertTrue(try XCTUnwrap(controller.currentPanelSnapshotForTesting()).isVisible)
+        XCTAssertTrue(try XCTUnwrap(controller.panelForTesting).isVisible)
 
         try? await Task.sleep(nanoseconds: 180_000_000)
         await Self.drainObservationUpdates()
 
-        XCTAssertNil(controller.currentPanelSnapshotForTesting())
+        XCTAssertNil(controller.panelForTesting)
     }
 
     @MainActor
@@ -464,7 +456,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 180_000_000)
         await Self.drainObservationUpdates()
 
-        XCTAssertTrue(try XCTUnwrap(controller.currentPanelSnapshotForTesting()).isVisible)
+        XCTAssertTrue(try XCTUnwrap(controller.panelForTesting).isVisible)
     }
 
     @MainActor
@@ -579,20 +571,20 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = fixture.preferences
         let controller = fixture.controller
 
-        let initialStatusItem = controller.currentStatusItemIdentityForTesting()
+        let initialStatusItem = ObjectIdentifier(controller.statusItemForTesting)
         assertButtonSnapshot(controller, title: "92%")
 
         preferences.menuBarDisplayMode = .iconOnly
         await Self.drainObservationUpdates()
 
-        let iconOnlyStatusItem = controller.currentStatusItemIdentityForTesting()
+        let iconOnlyStatusItem = ObjectIdentifier(controller.statusItemForTesting)
         XCTAssertNotEqual(initialStatusItem, iconOnlyStatusItem)
         assertButtonSnapshot(controller, title: "", imagePosition: .imageOnly)
 
         preferences.menuBarDisplayMode = .iconAndPower
         await Self.drainObservationUpdates()
 
-        XCTAssertNotEqual(iconOnlyStatusItem, controller.currentStatusItemIdentityForTesting())
+        XCTAssertNotEqual(iconOnlyStatusItem, ObjectIdentifier(controller.statusItemForTesting))
         assertButtonSnapshot(controller, title: "13.9W", imagePosition: .imageLeft)
     }
 
@@ -678,7 +670,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
         assertButtonSnapshot(controller, title: "92%")
 
-        controller.overwriteButtonTitleForTesting("stale")
+        controller.statusItemForTesting.button?.title = "stale"
         preferences.invalidateMenuBarDisplayPreferences()
         await Self.drainObservationUpdates()
 
@@ -694,7 +686,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertEqual(preferences.menuBarDisplayMode, .iconAndPercentage)
         assertButtonSnapshot(controller, title: "92%")
 
-        controller.overwriteButtonTitleForTesting("stale")
+        controller.statusItemForTesting.button?.title = "stale"
         preferences.reset()
         await Self.drainObservationUpdates()
 
@@ -711,15 +703,15 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             controller.closePanelForTesting()
         }
 
-        let initialStatusItem = controller.currentStatusItemIdentityForTesting()
-        XCTAssertTrue(try XCTUnwrap(controller.currentPanelSnapshotForTesting()).isVisible)
+        let initialStatusItem = ObjectIdentifier(controller.statusItemForTesting)
+        XCTAssertTrue(try XCTUnwrap(controller.panelForTesting).isVisible)
 
-        controller.overwriteButtonTitleForTesting("stale")
+        controller.statusItemForTesting.button?.title = "stale"
         preferences.invalidateMenuBarDisplayPreferences()
         await Self.drainObservationUpdates()
 
-        XCTAssertEqual(controller.currentStatusItemIdentityForTesting(), initialStatusItem)
-        XCTAssertTrue(try XCTUnwrap(controller.currentPanelSnapshotForTesting()).isVisible)
+        XCTAssertEqual(ObjectIdentifier(controller.statusItemForTesting), initialStatusItem)
+        XCTAssertTrue(try XCTUnwrap(controller.panelForTesting).isVisible)
         assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
     }
 
@@ -731,7 +723,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
         assertButtonSnapshot(controller, title: "92%")
 
-        controller.overwriteButtonTitleForTesting("stale")
+        controller.statusItemForTesting.button?.title = "stale"
         settingsPreferences.invalidateMenuBarDisplayPreferences()
         await Self.drainObservationUpdates()
 
@@ -780,7 +772,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         assertButtonSnapshot(controller, title: "92%")
 
         preferences.invalidateMenuBarDisplayPreferences()
-        controller.overwriteButtonTitleForTesting("stale during picker commit")
+        controller.statusItemForTesting.button?.title = "stale during picker commit"
         await Self.drainDeferredStatusItemRepaint()
 
         assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
@@ -796,7 +788,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
 
         preferences.invalidateMenuBarDisplayPreferences()
         try? await Task.sleep(nanoseconds: 60_000_000)
-        controller.overwriteButtonTitleForTesting("stale after picker commit")
+        controller.statusItemForTesting.button?.title = "stale after picker commit"
         await Self.drainDelayedStatusItemRepaint()
 
         assertButtonSnapshot(controller, title: "92%", imagePosition: .imageLeft, toolTip: "Battery 92%")
@@ -820,24 +812,24 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     }
 
     func testAccessibilityLabelUsesSelectedTemperatureUnit() {
+        let presentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: .previewDischarging,
+            displayMode: .iconAndTemperature,
+            temperatureUnitPreference: .fahrenheit
+        )
         XCTAssertEqual(
-            menuBarPresentationAccessibilityLabel(
-                snapshot: .previewDischarging,
-                displayMode: .iconAndTemperature,
-                temperatureUnitPreference: .fahrenheit
-            ),
+            presentation.accessibilityLabel,
             "Battery temperature 93.6 °F"
         )
     }
 
     func testIconOnlyHasNoDisplayValue() {
-        XCTAssertNil(
-            menuBarPresentationValue(
-                snapshot: .previewDischarging,
-                displayMode: .iconOnly,
-                temperatureUnitPreference: .celsius
-            )
+        let presentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: .previewDischarging,
+            displayMode: .iconOnly,
+            temperatureUnitPreference: .celsius
         )
+        XCTAssertNil(presentation.value)
     }
 
     func testDisplayValueHidesImpossibleCapacityPowerAndTemperatureValues() {
@@ -859,36 +851,21 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             temperatureCelsius: 180,
         )
 
-        XCTAssertEqual(
-            menuBarPresentationValue(
+        for mode in [MenuBarDisplayMode.iconAndFullCharge, .iconAndPower, .iconAndTemperature] {
+            let presentation = MenuBarBatteryLabelFormatting.presentation(
                 snapshot: snapshot,
-                displayMode: .iconAndFullCharge,
+                displayMode: mode,
                 temperatureUnitPreference: .celsius
-            ),
-            "—"
+            )
+            XCTAssertEqual(presentation.value, "—")
+        }
+        let temperaturePresentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: snapshot,
+            displayMode: .iconAndTemperature,
+            temperatureUnitPreference: .celsius
         )
         XCTAssertEqual(
-            menuBarPresentationValue(
-                snapshot: snapshot,
-                displayMode: .iconAndPower,
-                temperatureUnitPreference: .celsius
-            ),
-            "—"
-        )
-        XCTAssertEqual(
-            menuBarPresentationValue(
-                snapshot: snapshot,
-                displayMode: .iconAndTemperature,
-                temperatureUnitPreference: .celsius
-            ),
-            "—"
-        )
-        XCTAssertEqual(
-            menuBarPresentationAccessibilityLabel(
-                snapshot: snapshot,
-                displayMode: .iconAndTemperature,
-                temperatureUnitPreference: .celsius
-            ),
+            temperaturePresentation.accessibilityLabel,
             "Battery temperature Unavailable"
         )
     }
@@ -900,25 +877,16 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             fullChargeCapacityMilliampHours: 0
         )
 
-        XCTAssertEqual(
-            menuBarPresentationValue(
-                snapshot: snapshot,
-                displayMode: .iconAndFullCharge,
-                temperatureUnitPreference: .celsius
-            ),
-            "—"
+        let presentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: snapshot,
+            displayMode: .iconAndFullCharge,
+            temperatureUnitPreference: .celsius
         )
-        XCTAssertEqual(
-            menuBarPresentationAccessibilityLabel(
-                snapshot: snapshot,
-                displayMode: .iconAndFullCharge,
-                temperatureUnitPreference: .celsius
-            ),
-            "Battery full charge capacity Unavailable"
-        )
+        XCTAssertEqual(presentation.value, "—")
+        XCTAssertEqual(presentation.accessibilityLabel, "Battery full charge capacity Unavailable")
     }
 
-    func testLabelStateIdentityChangesWithDisplayMode() {
+    func testLabelStateRenderStateChangesWithDisplayMode() {
         let iconOnly = MenuBarBatteryLabelState(
             snapshot: .previewDischarging,
             displayMode: .iconOnly,
@@ -935,29 +903,25 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertNotEqual(iconOnly, percentage)
     }
 
-    func testStatusItemTitleUsesSelectedDisplayValue() {
-        let iconOnly = MenuBarBatteryLabelState(
-            snapshot: .previewDischarging,
-            displayMode: .iconOnly,
-            temperatureUnitPreference: .celsius
+    func testTimeTintMatchesRenderedAvailabilityAndLowChargeState() {
+        XCTAssertEqual(
+            BatteryPresentationStyle.timeTintStyle(for: .previewDischarging, displayedTimeMinutes: nil),
+            .secondary
         )
-        let percentage = MenuBarBatteryLabelState(
-            snapshot: .previewDischarging,
-            displayMode: .iconAndPercentage,
-            temperatureUnitPreference: .celsius
+        XCTAssertEqual(
+            BatteryPresentationStyle.timeTintStyle(for: .previewDischarging, displayedTimeMinutes: 120),
+            .green
         )
-        let power = MenuBarBatteryLabelState(
-            snapshot: .previewDischarging,
-            displayMode: .iconAndPower,
-            temperatureUnitPreference: .celsius
+        XCTAssertEqual(
+            BatteryPresentationStyle.timeTintStyle(
+                for: makeSnapshot(powerState: .onBattery, stateOfChargePercent: 10),
+                displayedTimeMinutes: 20
+            ),
+            .red
         )
-
-        XCTAssertEqual(iconOnly.statusItemTitle, "")
-        XCTAssertEqual(percentage.statusItemTitle, "92%")
-        XCTAssertEqual(power.statusItemTitle, "13.9W")
     }
 
-    func testLabelStateIdentityChangesWithPowerStateEvenWhenTextMatches() {
+    func testLabelStateRenderStateChangesWithPowerStateEvenWhenTextMatches() {
         let connectedNotCharging = makeSnapshot(
             powerState: .connectedNotCharging,
             stateOfChargePercent: 100
@@ -1008,7 +972,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertEqual(greenState, yellowState)
     }
 
-    func testIconOnlyIdentityChangesWhenLowPowerStatusChangesInsideSameSymbolBucket() {
+    func testIconOnlyRenderStateChangesWhenLowPowerStatusChangesInsideSameSymbolBucket() {
         let normalState = MenuBarBatteryLabelState(
             snapshot: makeSnapshot(powerState: .onBattery, stateOfChargePercent: 21),
             displayMode: .iconOnly,
@@ -1089,20 +1053,17 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         )
 
         XCTAssertNil(snapshot.activePowerWatts)
+        let presentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: snapshot,
+            displayMode: .iconAndPower,
+            temperatureUnitPreference: .celsius
+        )
         XCTAssertEqual(
-            menuBarPresentationValue(
-                snapshot: snapshot,
-                displayMode: .iconAndPower,
-                temperatureUnitPreference: .celsius
-            ),
+            presentation.value,
             "—"
         )
         XCTAssertEqual(
-            menuBarPresentationAccessibilityLabel(
-                snapshot: snapshot,
-                displayMode: .iconAndPower,
-                temperatureUnitPreference: .celsius
-            ),
+            presentation.accessibilityLabel,
             "Battery charge rate Unavailable"
         )
     }
@@ -1121,30 +1082,19 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             inputPowerEvidence: .counterBacked
         )
 
-        XCTAssertEqual(
-            menuBarPresentationValue(
-                snapshot: charging,
-                displayMode: .iconAndPower,
-                temperatureUnitPreference: .celsius
-            ),
-            "In 39.8W"
+        let chargingPresentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: charging,
+            displayMode: .iconAndPower,
+            temperatureUnitPreference: .celsius
         )
-        XCTAssertEqual(
-            menuBarPresentationAccessibilityLabel(
-                snapshot: charging,
-                displayMode: .iconAndPower,
-                temperatureUnitPreference: .celsius
-            ),
-            "Battery input power 39.8 W"
+        let connectedPresentation = MenuBarBatteryLabelFormatting.presentation(
+            snapshot: connectedNotCharging,
+            displayMode: .iconAndPower,
+            temperatureUnitPreference: .celsius
         )
-        XCTAssertEqual(
-            menuBarPresentationValue(
-                snapshot: connectedNotCharging,
-                displayMode: .iconAndPower,
-                temperatureUnitPreference: .celsius
-            ),
-            "In 27.4W"
-        )
+        XCTAssertEqual(chargingPresentation.value, "In 39.8W")
+        XCTAssertEqual(chargingPresentation.accessibilityLabel, "Battery input power 39.8 W")
+        XCTAssertEqual(connectedPresentation.value, "In 27.4W")
     }
 
     @MainActor
@@ -1178,19 +1128,20 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let snapshot = controller.currentButtonSnapshot()
-        XCTAssertEqual(snapshot.title, title, file: file, line: line)
+        let statusItem = controller.statusItemForTesting
+        let button = statusItem.button
+        XCTAssertEqual(button?.title ?? "", title, file: file, line: line)
         if let attributedTitle {
-            XCTAssertEqual(snapshot.attributedTitle, attributedTitle, file: file, line: line)
+            XCTAssertEqual(button?.attributedTitle.string ?? "", attributedTitle, file: file, line: line)
         }
         if let imagePosition {
-            XCTAssertEqual(snapshot.imagePosition, imagePosition, file: file, line: line)
+            XCTAssertEqual(button?.imagePosition, imagePosition, file: file, line: line)
         }
         if let length {
-            XCTAssertEqual(snapshot.length, length, file: file, line: line)
+            XCTAssertEqual(statusItem.length, length, file: file, line: line)
         }
         if let toolTip {
-            XCTAssertEqual(snapshot.toolTip, toolTip, file: file, line: line)
+            XCTAssertEqual(button?.toolTip, toolTip, file: file, line: line)
         }
     }
 

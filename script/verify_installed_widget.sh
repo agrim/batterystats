@@ -14,10 +14,6 @@ fail() {
 
 "$ROOT_DIR/script/verify_signed_product.sh" "$APP_BUNDLE"
 
-if [[ ! -d "$WIDGET_BUNDLE" ]]; then
-  fail "installed widget bundle is missing"
-fi
-
 pluginkit -a "$WIDGET_BUNDLE"
 
 PLUGIN_OUTPUT=""

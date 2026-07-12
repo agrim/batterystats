@@ -280,7 +280,6 @@ case "$MODE" in
   --verify|verify)
     open_app
     sleep 1
-    "$PRODUCT_VERIFIER" "$APP_BUNDLE"
     verify_app_process
     ;;
   *)

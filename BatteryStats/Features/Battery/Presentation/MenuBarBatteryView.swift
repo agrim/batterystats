@@ -3,8 +3,8 @@ import Observation
 import SwiftUI
 
 struct MenuBarBatteryView: View {
-    @Bindable var monitor: BatteryMonitor
-    @Bindable var preferences: PreferencesStore
+    let monitor: BatteryMonitor
+    let preferences: PreferencesStore
     let historyStore: BatteryHistoryStore
     private let prepareForSettingsAction: @MainActor () -> Void
     private let openSettingsAction: @MainActor () -> Void
@@ -30,8 +30,7 @@ struct MenuBarBatteryView: View {
         VStack(spacing: 0) {
             BatterySurfaceView(
                 monitor: monitor,
-                preferences: preferences,
-                isLightningRefreshEnabled: .constant(false)
+                preferences: preferences
             )
                 .frame(minWidth: BatterySurfaceLayout.minimumWidth, alignment: .topLeading)
 
@@ -161,17 +160,8 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     #if DEBUG
-    func currentButtonSnapshot() -> MenuBarStatusItemButtonSnapshot {
-        MenuBarStatusItemButtonSnapshot(statusItem: statusItem)
-    }
-
-    func overwriteButtonTitleForTesting(_ title: String) {
-        statusItem.button?.title = title
-    }
-
-    func currentStatusItemIdentityForTesting() -> ObjectIdentifier {
-        ObjectIdentifier(statusItem)
-    }
+    var statusItemForTesting: NSStatusItem { statusItem }
+    var panelForTesting: NSPanel? { panel }
 
     func showPanelForTesting() {
         guard let button = statusItem.button else {
@@ -197,9 +187,6 @@ final class MenuBarStatusItemController: NSObject {
         cancelDeferredPanelDismissal()
     }
 
-    func currentPanelSnapshotForTesting() -> MenuBarPanelPresentationSnapshot? {
-        panel.map(MenuBarPanelPresentationSnapshot.init(panel:))
-    }
     #endif
 
     private func configureButton() {
@@ -627,41 +614,6 @@ private final class MenuBarStatusPanel: NSPanel {
     }
 }
 
-#if DEBUG
-struct MenuBarPanelPresentationSnapshot {
-    let isVisible: Bool
-    let level: NSWindow.Level
-    let collectionBehavior: NSWindow.CollectionBehavior
-    let styleMask: NSWindow.StyleMask
-    let canBecomeKey: Bool
-    let canBecomeMain: Bool
-    let becomesKeyOnlyIfNeeded: Bool
-    let isFloatingPanel: Bool
-    let hidesOnDeactivate: Bool
-    let isOpaque: Bool
-    let backgroundAlpha: CGFloat
-    let contentViewClassName: String
-    let contentViewCornerRadius: CGFloat?
-
-    @MainActor
-    init(panel: NSPanel) {
-        isVisible = panel.isVisible
-        level = panel.level
-        collectionBehavior = panel.collectionBehavior
-        styleMask = panel.styleMask
-        canBecomeKey = panel.canBecomeKey
-        canBecomeMain = panel.canBecomeMain
-        becomesKeyOnlyIfNeeded = panel.becomesKeyOnlyIfNeeded
-        isFloatingPanel = panel.isFloatingPanel
-        hidesOnDeactivate = panel.hidesOnDeactivate
-        isOpaque = panel.isOpaque
-        backgroundAlpha = panel.backgroundColor?.alphaComponent ?? 1
-        contentViewClassName = panel.contentView.map { String(describing: type(of: $0)) } ?? ""
-        contentViewCornerRadius = panel.contentView?.layer?.cornerRadius
-    }
-}
-#endif
-
 enum MenuBarPanelLayout {
     static let margin: CGFloat = 6
 
@@ -742,7 +694,7 @@ enum MenuBarPanelLayout {
 enum MenuBarStatusItemRenderer {
     @discardableResult
     static func apply(_ state: MenuBarBatteryLabelState, to statusItem: NSStatusItem) -> Bool {
-        let title = state.statusItemTitle
+        let title = state.value ?? ""
         let length = title.isEmpty ? NSStatusItem.squareLength : NSStatusItem.variableLength
         let imagePosition: NSControl.ImagePosition = title.isEmpty ? .imageOnly : .imageLeft
         statusItem.length = length
@@ -797,33 +749,10 @@ enum MenuBarStatusItemRenderer {
     }
 }
 
-#if DEBUG
-struct MenuBarStatusItemButtonSnapshot: Equatable {
-    let title: String
-    let attributedTitle: String
-    let imagePosition: NSControl.ImagePosition
-    let length: CGFloat
-    let toolTip: String?
-
-    @MainActor
-    init(statusItem: NSStatusItem) {
-        title = statusItem.button?.title ?? ""
-        attributedTitle = statusItem.button?.attributedTitle.string ?? ""
-        imagePosition = statusItem.button?.imagePosition ?? .noImage
-        length = statusItem.length
-        toolTip = statusItem.button?.toolTip
-    }
-}
-#endif
-
 struct MenuBarBatteryLabelState: Equatable {
     let symbolName: String
     let value: String?
     let accessibilityLabel: String
-
-    var statusItemTitle: String {
-        value ?? ""
-    }
 
     @MainActor
     init(snapshot: BatterySnapshot?, preferences: PreferencesStore) {
@@ -861,7 +790,7 @@ enum MenuBarBatteryLabelFormatting {
             return (nil, snapshot?.statusDisplayTitle ?? "Battery status unavailable")
         case .iconAndPercentage:
             return (
-                BatteryWidgetMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent),
+                BatteryMetricFormatting.percentText(snapshot?.presentationStateOfChargePercent),
                 "Battery \(BatteryFormatting.percent(snapshot?.presentationStateOfChargePercent))"
             )
         case .iconAndTimeRemaining:
@@ -871,7 +800,7 @@ enum MenuBarBatteryLabelFormatting {
             )
         case .iconAndHealth:
             return (
-                BatteryWidgetMetricFormatting.percentText(snapshot?.presentationHealthPercent),
+                BatteryMetricFormatting.percentText(snapshot?.presentationHealthPercent),
                 "Battery health \(BatteryFormatting.percent(snapshot?.presentationHealthPercent, decimals: 0))"
             )
         case .iconAndFullCharge:

@@ -24,7 +24,8 @@ struct BatteryReadingService: Sendable {
         self.smartBatteryReader = smartBatteryReader
     }
 
-    func makeNotificationToken(handler: @escaping @Sendable () -> Void) -> PowerSourceReader.NotificationToken? {
+    @MainActor
+    func makeNotificationToken(handler: @escaping @MainActor @Sendable () -> Void) -> PowerSourceReader.NotificationToken? {
         powerSourceReader.makeNotificationToken(handler: handler)
     }
 
@@ -506,15 +507,13 @@ struct BatteryReadingService: Sendable {
     }
 
     private func prettyRawSnapshot(publicSnapshot: PublicPowerSourceSnapshot?, smartBattery: SmartBatteryDetails?) -> String {
-        var sections: [String] = []
-
-        sections.append("Public power source")
-        sections.append(Self.renderDiagnosticValue(publicSnapshot?.rawDescription ?? [:]))
-        sections.append("")
-        sections.append("AppleSmartBattery")
-        sections.append(Self.renderDiagnosticValue(smartBattery?.rawProperties ?? [:]))
-
-        return sections.joined(separator: "\n")
+        [
+            "Public power source",
+            Self.renderDiagnosticValue(publicSnapshot?.rawDescription ?? [:]),
+            "",
+            "AppleSmartBattery",
+            Self.renderDiagnosticValue(smartBattery?.rawProperties ?? [:])
+        ].joined(separator: "\n")
     }
 
     static func renderDiagnosticValue(_ value: Any, indentLevel: Int = 0) -> String {

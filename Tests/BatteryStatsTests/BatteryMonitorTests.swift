@@ -139,7 +139,7 @@ final class BatteryMonitorTests: XCTestCase {
     func testPowerSourceNotificationsPreserveConfidenceAtFiveMinuteCadence() async {
         let snapshots = Array(repeating: makeWidgetReloadSnapshot(stateOfChargePercent: 60), count: 3)
         let reader = StubBatteryReader(snapshots: snapshots)
-        var notificationHandler: (@Sendable () -> Void)?
+        var notificationHandler: (@MainActor @Sendable () -> Void)?
         var publicationDates = [
             Date(timeIntervalSince1970: 1_000),
             Date(timeIntervalSince1970: 1_300),
@@ -306,7 +306,7 @@ final class BatteryMonitorTests: XCTestCase {
         let reader = StubBatteryReader(
             snapshots: [.previewDischarging, .previewCharging]
         )
-        var notificationHandler: (@Sendable () -> Void)?
+        var notificationHandler: (@MainActor @Sendable () -> Void)?
         let monitor = BatteryMonitor(
             reader: BatteryReadingClient(
                 read: { date, options in
@@ -1301,11 +1301,11 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(reader.requests, [.standard, .standard])
         XCTAssertEqual(monitor.snapshot?.displayedTimeMinutes, 125)
         XCTAssertEqual(
-            menuBarPresentationValue(
+            MenuBarBatteryLabelFormatting.presentation(
                 snapshot: monitor.snapshot,
                 displayMode: .iconAndTimeRemaining,
                 temperatureUnitPreference: .celsius
-            ),
+            ).value,
             "2h5m"
         )
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)

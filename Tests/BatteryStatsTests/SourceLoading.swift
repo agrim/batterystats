@@ -311,7 +311,7 @@ final class NoopPreferencesSync: PreferencesSyncing {
         isEnabled = enabled
     }
 
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
+    func observeChanges(_ handler: @escaping @MainActor @Sendable ([String]) -> Void) -> NSObjectProtocol {
         NSObject()
     }
 
@@ -340,28 +340,4 @@ func XCTAssertSource(
 
 func formattedActivePower(for snapshot: BatterySnapshot?) -> String {
     snapshot?.activePowerWatts.map(BatteryFormatting.watts) ?? "—"
-}
-
-func menuBarPresentationValue(
-    snapshot: BatterySnapshot?,
-    displayMode: MenuBarDisplayMode,
-    temperatureUnitPreference: TemperatureUnitPreference
-) -> String? {
-    MenuBarBatteryLabelFormatting.presentation(
-        snapshot: snapshot,
-        displayMode: displayMode,
-        temperatureUnitPreference: temperatureUnitPreference
-    ).value
-}
-
-func menuBarPresentationAccessibilityLabel(
-    snapshot: BatterySnapshot?,
-    displayMode: MenuBarDisplayMode,
-    temperatureUnitPreference: TemperatureUnitPreference
-) -> String {
-    MenuBarBatteryLabelFormatting.presentation(
-        snapshot: snapshot,
-        displayMode: displayMode,
-        temperatureUnitPreference: temperatureUnitPreference
-    ).accessibilityLabel
 }

@@ -7,7 +7,7 @@ protocol PreferencesSyncing: AnyObject {
     var availabilityDescription: String { get }
 
     func setEnabled(_ enabled: Bool)
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol
+    func observeChanges(_ handler: @escaping @MainActor @Sendable ([String]) -> Void) -> NSObjectProtocol
     func removeObserver(_ token: NSObjectProtocol)
     func object(forKey key: String) -> Any?
     func set(_ value: Bool, forKey key: String)
@@ -94,7 +94,7 @@ final class ICloudPreferencesSync: PreferencesSyncing {
         _ = resolveStore()?.synchronize()
     }
 
-    func observeChanges(_ handler: @escaping @Sendable ([String]) -> Void) -> NSObjectProtocol {
+    func observeChanges(_ handler: @escaping @MainActor @Sendable ([String]) -> Void) -> NSObjectProtocol {
         notificationCenter.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: nil,

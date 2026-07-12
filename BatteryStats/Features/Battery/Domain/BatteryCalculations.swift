@@ -5,6 +5,14 @@ struct BatteryDischargeRateSample: Equatable, Sendable {
     let milliamps: Int
 }
 
+enum BatteryCalendar {
+    static let gregorianUTC: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        return calendar
+    }()
+}
+
 enum BatteryCalculations {
     private static let maximumPlausibleBatteryCapacityMilliampHours = 1_000_000
     private static let maximumPlausibleBatteryCurrentMilliamps = 1_000_000
@@ -19,11 +27,6 @@ enum BatteryCalculations {
     private static let maximumPlausibleAdapterWatts = 1_000
     private static let maximumPlausibleCycleCount = 100_000
     private static let maximumPlausibleDurationMinutes = 24 * 60
-    private static let gregorianUTCCalendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        return calendar
-    }()
     private static let minimumPlausibleManufactureDateComponents = DateComponents(year: 2006, month: 1, day: 1)
 
     static func stateOfChargePercent(
@@ -456,8 +459,7 @@ enum BatteryCalculations {
         var previousTimestamp: Date?
 
         for sample in samples.suffix(8) {
-            guard let rate = plausibleDischargeRateMilliamps(sample.milliamps),
-                  rate > 0 else {
+            guard let rate = plausibleDischargeRateMilliamps(sample.milliamps) else {
                 return nil
             }
 
@@ -511,7 +513,7 @@ enum BatteryCalculations {
             return nil
         }
 
-        let calendar = providedCalendar ?? gregorianUTCCalendar
+        let calendar = providedCalendar ?? BatteryCalendar.gregorianUTC
         let manufactureDay = calendar.startOfDay(for: manufactureDate)
         let nowDay = calendar.startOfDay(for: now)
         guard manufactureDay <= nowDay else {
@@ -560,13 +562,13 @@ enum BatteryCalculations {
     }
 
     private static func isOnOrAfterMinimumPlausibleManufactureDay(_ date: Date) -> Bool {
-        isDate(date, onOrAfter: minimumPlausibleManufactureDateComponents, calendar: gregorianUTCCalendar)
+        isDate(date, onOrAfter: minimumPlausibleManufactureDateComponents, calendar: BatteryCalendar.gregorianUTC)
             || isDate(date, onOrAfter: minimumPlausibleManufactureDateComponents, calendar: Calendar(identifier: .gregorian))
     }
 
     private static func isManufactureDay(_ manufactureDate: Date, onOrBefore now: Date) -> Bool {
-        let manufactureDay = gregorianUTCCalendar.startOfDay(for: manufactureDate)
-        let nowDay = gregorianUTCCalendar.startOfDay(for: now)
+        let manufactureDay = BatteryCalendar.gregorianUTC.startOfDay(for: manufactureDate)
+        let nowDay = BatteryCalendar.gregorianUTC.startOfDay(for: now)
         return manufactureDay <= nowDay
     }
 

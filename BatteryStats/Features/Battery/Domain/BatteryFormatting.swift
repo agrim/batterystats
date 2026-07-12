@@ -21,11 +21,6 @@ enum BatteryFormatting {
             .map { "\($0.formatted(.number.grouping(.automatic))) mV" } ?? "Unavailable"
     }
 
-    static func wattHours(_ value: Double?) -> String {
-        BatteryCalculations.plausibleWattHours(value)
-            .map { "\($0.formatted(.number.precision(.fractionLength(1)))) Wh" } ?? "Unavailable"
-    }
-
     static func watts(_ value: Double?) -> String {
         BatteryCalculations.plausibleWatts(value)
             .map { "\($0.formatted(.number.precision(.fractionLength(1)))) W" } ?? "Unavailable"
@@ -122,12 +117,6 @@ enum BatteryFormatting {
         return DateComponentsFormatter.batteryStatsAge.string(from: completedComponents) ?? "Unavailable"
     }
 
-    static func summaryText(for snapshot: BatterySnapshot) -> String {
-        let capacity = milliampHours(snapshot.fullChargeCapacityMilliampHours, allowsZero: false)
-        let health = percent(snapshot.presentationHealthPercent, decimals: 1)
-        return "\(capacity) • \(health) health"
-    }
-
     static func compactCapacityPair(current: Int?, maximum: Int?, currentAllowsZero: Bool = true) -> String {
         let current = BatteryCalculations.plausibleCapacityMilliampHours(current, allowsZero: currentAllowsZero)
         let maximum = BatteryCalculations.plausibleCapacityMilliampHours(maximum, allowsZero: false)
@@ -143,15 +132,13 @@ enum BatteryFormatting {
         let maximum = BatteryCalculations.positiveWattHours(maximum)
         let displayCurrent = displayablePairCurrent(current: current, maximum: maximum) { $0 }
 
-        return compactPair(displayCurrent, maximum: maximum, unit: "Wh", numberText: wattHourNumber)
+        return compactPair(displayCurrent, maximum: maximum, unit: "Wh") {
+            $0.formatted(.number.precision(.fractionLength(1)))
+        }
     }
 
     private static func formattedMilliamps(_ value: Int) -> String {
         "\(value.formatted(.number.grouping(.automatic))) mA"
-    }
-
-    private static func wattHourNumber(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(1)))
     }
 
     private static func compactPair<Value>(

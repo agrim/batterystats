@@ -199,7 +199,7 @@ private struct BatteryCapacityBarSectionView: View {
     let tint: Color
 
     var body: some View {
-        let progressPresentation = BatteryCapacityProgressPresentation(progress: progress)
+        let fillFraction = BatteryMetricFormatting.clampedProgress(progress)
         let valueAnimation: Animation? = reduceMotion ? nil : .smooth(duration: 0.35)
 
         VStack(alignment: .leading, spacing: 6) {
@@ -216,9 +216,9 @@ private struct BatteryCapacityBarSectionView: View {
             .font(.subheadline)
 
             HStack(alignment: .center, spacing: Self.barSpacing) {
-                BatteryCapacityProgressBar(presentation: progressPresentation, tint: tint)
+                BatteryCapacityProgressBar(fillFraction: fillFraction, tint: tint)
                     .frame(minWidth: Self.barMinimumWidth, maxWidth: .infinity)
-                    .animation(valueAnimation, value: progressPresentation)
+                    .animation(valueAnimation, value: fillFraction)
 
                 Text(percentValue)
                     .font(.callout)
@@ -233,16 +233,8 @@ private struct BatteryCapacityBarSectionView: View {
     }
 }
 
-struct BatteryCapacityProgressPresentation: Equatable {
-    let fillFraction: Double?
-
-    init(progress: Double?) {
-        fillFraction = BatteryCalculations.presentationPercent(progress, maximumAllowed: 105).map { $0 / 100 }
-    }
-}
-
 private struct BatteryCapacityProgressBar: View {
-    let presentation: BatteryCapacityProgressPresentation
+    let fillFraction: Double?
     let tint: Color
 
     var body: some View {
@@ -251,9 +243,9 @@ private struct BatteryCapacityProgressBar: View {
 
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(tint.opacity(presentation.fillFraction == nil ? 0.12 : 0.18))
+                    .fill(tint.opacity(fillFraction == nil ? 0.12 : 0.18))
 
-                if let fillFraction = presentation.fillFraction {
+                if let fillFraction {
                     let fillWidth = width * fillFraction
                     if fillWidth > 0 {
                         Capsule()

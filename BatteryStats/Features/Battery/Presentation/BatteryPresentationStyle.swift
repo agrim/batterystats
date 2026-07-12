@@ -42,27 +42,16 @@ enum BatteryPresentationStyle {
         return snapshot.powerState.isExternallyPowered ? snapshot.powerState.symbolName : "questionmark"
     }
 
-    static func timeTintStyle(for snapshot: BatterySnapshot?) -> BatteryPresentationTint {
-        guard let snapshot else {
+    static func timeTintStyle(
+        for snapshot: BatterySnapshot?,
+        displayedTimeMinutes: Int?
+    ) -> BatteryPresentationTint {
+        guard let snapshot,
+              displayedTimeMinutes != nil else {
             return .secondary
         }
 
-        switch snapshot.powerState {
-        case .charging, .connectedNotCharging, .fullOnAC:
-            if snapshot.isLowCharge {
-                return .yellow
-            }
-
-            return .green
-        case .onBattery, .connectedDischarging:
-            guard snapshot.displayedTimeMinutes != nil || snapshot.hasUsableCharge else {
-                return .secondary
-            }
-
-            return snapshot.isLowCharge ? .red : .yellow
-        case .unknown:
-            return .secondary
-        }
+        return snapshot.isLowCharge ? .red : .green
     }
 
     static func statusDescriptor(for snapshot: BatterySnapshot?) -> BatteryStatusDescriptor {
@@ -114,7 +103,7 @@ struct BatteryStatusDescriptor {
     }
 }
 
-enum BatteryPresentationTint: String, Equatable {
+enum BatteryPresentationTint: Equatable {
     case primary
     case secondary
     case green
