@@ -19,13 +19,13 @@ struct BatteryWidgetMetricTile: View {
             if let progress, progress > 0 {
                 if progress >= 1 {
                     Circle()
-                        .stroke(metric.ringTint, lineWidth: lineWidth)
+                        .stroke(metric.ringTint.color, lineWidth: lineWidth)
                         .padding(lineWidth / 2)
                 } else {
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(
-                            metric.ringTint,
+                            metric.ringTint.color,
                             style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
                         )
                         .padding(lineWidth / 2)
@@ -51,10 +51,10 @@ struct BatteryWidgetMetric {
 
     let content: Content
     let progress: Double?
-    let ringTint: Color
+    let ringTint: BatteryPresentationTint
     let accessibilityLabel: String
     let accessibilityValue: String
-    var contentTint: Color = .primary
+    var contentTint: BatteryPresentationTint = .primary
 }
 
 private struct BatteryWidgetMetricContent: View {
@@ -69,7 +69,7 @@ private struct BatteryWidgetMetricContent: View {
             Text(value)
                 .font(.system(size: max(14, size * 0.225), weight: .medium, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(metric.contentTint)
+                .foregroundStyle(metric.contentTint.color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
                 .allowsTightening(true)
@@ -78,7 +78,7 @@ private struct BatteryWidgetMetricContent: View {
             Image(systemName: name)
                 .font(.system(size: max(17, size * 0.27), weight: .medium, design: .rounded))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(metric.contentTint)
+                .foregroundStyle(metric.contentTint.color)
         }
     }
 }

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-enum BatteryHistoryPowerRole: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
+enum BatteryHistoryPowerRole: String, Codable, Hashable, Sendable {
     case batteryDrain
     case batteryCharge
     case inputPower
@@ -136,7 +136,7 @@ extension BatteryHistoryEntry {
     }
 }
 
-struct BatteryHistoryPowerStats: Equatable, Sendable {
+struct BatteryHistoryPowerStats: Sendable {
     let role: BatteryHistoryPowerRole
     let sampleCount: Int
     let observedDuration: TimeInterval
@@ -144,7 +144,7 @@ struct BatteryHistoryPowerStats: Equatable, Sendable {
     let peakWatts: Double
 }
 
-struct BatteryHistoryStats: Equatable, Sendable {
+struct BatteryHistoryStats: Sendable {
     private static let maximumContinuousPowerObservationInterval: TimeInterval = 10 * 60
 
     let sampleCount: Int

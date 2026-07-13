@@ -1,6 +1,6 @@
 import Foundation
 
-enum BatteryLevelTone: String, Equatable, Sendable {
+enum BatteryLevelTone: Equatable, Sendable {
     case red
     case yellow
     case greenYellow
@@ -45,9 +45,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
     let isExternalPowerConnected: Bool
 
     let currentChargeMilliampHours: Int?
-    let currentChargeWattHours: Double?
     let fullChargeCapacityMilliampHours: Int?
-    let fullChargeCapacityWattHours: Double?
     let designCapacityMilliampHours: Int?
     let healthPercent: Double?
     let stateOfChargePercent: Double?
@@ -70,6 +68,13 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
 
     let adapterMaxWatts: Int?
     let notes: [String]
+
+    var currentChargeWattHours: Double? {
+        BatteryCalculations.wattHours(
+            milliampHours: currentChargeMilliampHours,
+            voltageMillivolts: voltageMillivolts
+        )
+    }
 
     var presentationHealthPercent: Double? {
         BatteryCalculations.presentationPercent(healthPercent, maximumAllowed: 120)
@@ -171,27 +176,6 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         }
     }
 
-    var statusSecondaryText: String? {
-        switch powerState {
-        case .onBattery:
-            return "Using internal battery"
-        case .connectedDischarging:
-            if let inputPowerSecondaryText {
-                return "\(inputPowerSecondaryText), battery discharging"
-            }
-            return activePowerWatts.map { "Discharging at \(BatteryFormatting.watts($0))" } ?? "External power connected"
-        case .charging:
-            return inputPowerSecondaryText
-                ?? BatteryCalculations.plausibleWatts(chargeRateWatts)
-                .map { "Charging at \(BatteryFormatting.watts($0))" }
-                ?? "External power connected"
-        case .connectedNotCharging, .fullOnAC:
-            return inputPowerSecondaryText ?? "External power connected"
-        case .unknown:
-            return nil
-        }
-    }
-
     var healthTone: BatteryLevelTone {
         BatteryLevelTone.forPercent(
             presentationHealthPercent,
@@ -241,8 +225,7 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         lines.append("Full charge capacity: \(BatteryFormatting.milliampHours(fullChargeCapacityMilliampHours, allowsZero: false))")
         lines.append("Design capacity: \(BatteryFormatting.milliampHours(designCapacityMilliampHours, allowsZero: false))")
         lines.append("Current charge: \(BatteryFormatting.milliampHours(currentChargeMilliampHours))")
-        let energyLabel = fullChargeCapacityWattHours == nil ? "Estimated Energy" : "Energy"
-        lines.append("\(energyLabel): \(BatteryFormatting.compactWattHourPair(current: currentChargeWattHours, maximum: fullChargeCapacityWattHours))")
+        lines.append("Estimated Energy: \(BatteryFormatting.compactWattHours(currentChargeWattHours))")
         lines.append("Voltage: \(BatteryFormatting.millivolts(voltageMillivolts))")
         lines.append("Signed current: \(BatteryFormatting.signedMilliamps(currentMilliampsSigned))")
         lines.append("\(timeTitle): \(BatteryFormatting.duration(minutes: displayedTimeMinutes))")
@@ -263,13 +246,9 @@ struct BatterySnapshot: Codable, Equatable, Sendable {
         return lines.joined(separator: "\n")
     }
 
-    private var inputPowerSecondaryText: String? {
-        visibleInputPowerWatts.map { "Input power \(BatteryFormatting.watts($0))" }
-    }
-
-    func updating(rateBasedTimeRemainingMinutes: Int?, timestamp: Date? = nil) -> BatterySnapshot {
+    func updating(rateBasedTimeRemainingMinutes: Int?, timestamp: Date) -> BatterySnapshot {
         var updatedSnapshot = self
-        updatedSnapshot.timestamp = timestamp ?? self.timestamp
+        updatedSnapshot.timestamp = timestamp
         updatedSnapshot.rateBasedTimeRemainingMinutes = rateBasedTimeRemainingMinutes
         updatedSnapshot.manufactureDate = BatteryCalculations.plausibleManufactureDate(
             manufactureDate,

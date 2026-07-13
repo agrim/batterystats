@@ -185,19 +185,16 @@ extension XCTestCase {
         try String(contentsOf: sourceURL(relativePath: relativePath), encoding: .utf8)
     }
 
-    func makeIsolatedUserDefaults(
-        prefix: String? = nil
-    ) -> IsolatedUserDefaultsFixture<InMemoryUserDefaults> {
+    func makeIsolatedUserDefaults(prefix: String) -> IsolatedUserDefaultsFixture<InMemoryUserDefaults> {
         makeIsolatedUserDefaults(prefix: prefix) { suiteName, backing in
             InMemoryUserDefaults(suiteName: suiteName, backing: backing)
         }
     }
 
     func makeIsolatedUserDefaults<Defaults: UserDefaults>(
-        prefix: String? = nil,
+        prefix: String,
         factory: (String, InMemoryUserDefaultsBacking) -> Defaults?
     ) -> IsolatedUserDefaultsFixture<Defaults> {
-        let prefix = prefix ?? String(describing: type(of: self))
         let suiteName = "io.github.agrim.batterystats.tests.\(prefix).\(UUID().uuidString)"
         let backing = InMemoryUserDefaultsBacking()
         guard let defaults = factory(suiteName, backing) else {
@@ -223,9 +220,7 @@ func makeBatterySnapshot(
     isCharging: Bool,
     isExternalPowerConnected: Bool,
     currentChargeMilliampHours: Int? = 3_000,
-    currentChargeWattHours: Double? = 36,
     fullChargeCapacityMilliampHours: Int? = 5_000,
-    fullChargeCapacityWattHours: Double? = 60,
     designCapacityMilliampHours: Int? = 6_000,
     healthPercent: Double? = 83,
     stateOfChargePercent: Double? = 60,
@@ -251,9 +246,7 @@ func makeBatterySnapshot(
         isCharging: isCharging,
         isExternalPowerConnected: isExternalPowerConnected,
         currentChargeMilliampHours: currentChargeMilliampHours,
-        currentChargeWattHours: currentChargeWattHours,
         fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-        fullChargeCapacityWattHours: fullChargeCapacityWattHours,
         designCapacityMilliampHours: designCapacityMilliampHours,
         healthPercent: healthPercent,
         stateOfChargePercent: stateOfChargePercent,

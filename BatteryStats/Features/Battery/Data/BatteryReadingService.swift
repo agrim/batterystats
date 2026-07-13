@@ -29,7 +29,7 @@ struct BatteryReadingService: Sendable {
         powerSourceReader.makeNotificationToken(handler: handler)
     }
 
-    func read(at now: Date = .now, options: BatteryReadOptions = .standard) -> BatteryReadResult {
+    func read(at now: Date, options: BatteryReadOptions) -> BatteryReadResult {
         let publicSnapshot = powerSourceReader.read()
         let smartBattery = smartBatteryReader.read()
         let resolvedPublicSnapshot = Self.resolvedPublicSnapshot(
@@ -144,12 +144,7 @@ struct BatteryReadingService: Sendable {
             isCharging: powerFlags.isCharging,
             isExternalPowerConnected: powerFlags.isExternalPowerConnected,
             currentChargeMilliampHours: currentChargeMilliampHours,
-            currentChargeWattHours: BatteryCalculations.wattHours(
-                milliampHours: currentChargeMilliampHours,
-                voltageMillivolts: voltageMillivolts
-            ),
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-            fullChargeCapacityWattHours: nil,
             designCapacityMilliampHours: designCapacityMilliampHours,
             healthPercent: BatteryCalculations.healthPercent(
                 fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
@@ -367,29 +362,6 @@ struct BatteryReadingService: Sendable {
         }
 
         return nil
-    }
-
-    static func reconciledPowerState(
-        publicSnapshot: PublicPowerSourceSnapshot,
-        smartBattery: SmartBatteryDetails?,
-        signedCurrentMilliamps: Int?,
-        currentChargeMilliampHours: Int?,
-        fullChargeCapacityMilliampHours: Int?
-    ) -> BatteryPowerState {
-        reconciledPowerState(
-            publicSnapshot: publicSnapshot,
-            smartBattery: smartBattery,
-            isCharged: reconciledChargedState(
-                publicSnapshot: publicSnapshot,
-                smartBattery: smartBattery,
-                signedCurrentMilliamps: signedCurrentMilliamps,
-                currentChargeMilliampHours: currentChargeMilliampHours,
-                fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
-            ),
-            signedCurrentMilliamps: signedCurrentMilliamps,
-            currentChargeMilliampHours: currentChargeMilliampHours,
-            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
-        )
     }
 
     private static func reconciledExternalPowerConnected(

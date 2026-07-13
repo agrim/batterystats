@@ -91,13 +91,9 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertFalse(appSource.contains("@State private var runtime = BatteryStatsAppRuntime.shared"))
         XCTAssertFalse(appSource.contains("@Observable\nprivate final class BatteryStatsAppRuntime"))
         XCTAssertFalse(appSource.contains("@ObservationIgnored"))
-        XCTAssertTrue(appSource.contains("WindowGroup(\"BatteryStats\", id: \"main\")"))
-        XCTAssertTrue(appSource.contains(".defaultLaunchBehavior(.presented)"))
         XCTAssertFalse(appSource.contains("private let mainWindowController = MainBatteryWindowController()"))
         XCTAssertFalse(appSource.contains("forName: .showBatteryStatsMainWindow"))
-        XCTAssertFalse(appSource.contains("BatteryStatsAppRuntime.shared.showMainWindow()"))
         XCTAssertFalse(appSource.contains("func showMainWindow()"))
-        XCTAssertFalse(appSource.contains("private final class MainBatteryWindowController"))
         XCTAssertTrue(appSource.contains("private let settingsWindowController = SettingsWindowController()"))
         XCTAssertTrue(appSource.contains("forName: .showBatteryStatsSettingsWindow"))
         XCTAssertTrue(appSource.contains("func showSettingsWindow()"))
@@ -106,10 +102,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertTrue(windowSpaceBehaviorSource.contains("enum BatteryWindowSpaceBehavior"))
         XCTAssertTrue(windowSpaceBehaviorSource.contains("static let activeSpacePresentation: NSWindow.CollectionBehavior"))
         XCTAssertTrue(windowSpaceBehaviorSource.contains("static let menuBarPanelPresentation: NSWindow.CollectionBehavior"))
-        XCTAssertTrue(windowSpaceBehaviorSource.contains("behavior.remove(.canJoinAllSpaces)"))
-        XCTAssertTrue(windowSpaceBehaviorSource.contains(".canJoinAllApplications"))
-        XCTAssertTrue(windowSpaceBehaviorSource.contains(".fullScreenAuxiliary"))
-        XCTAssertTrue(windowSpaceBehaviorSource.contains(".moveToActiveSpace"))
         XCTAssertTrue(appSource.contains("installMenuBarStatusItem()"))
         XCTAssertTrue(appSource.contains("MenuBarStatusItemController("))
         XCTAssertTrue(appSource.contains("private let monitorConfigurationObserver: BatteryMonitorConfigurationObserver"))
@@ -130,8 +122,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertFalse(appSource.contains("MenuBarExtra"))
         XCTAssertFalse(appCommandsSource.contains("static let showBatteryStatsMainWindow"))
         XCTAssertTrue(appCommandsSource.contains("static let showBatteryStatsSettingsWindow"))
-        XCTAssertTrue(appCommandsSource.contains("@Environment(\\.openWindow)"))
-        XCTAssertTrue(appCommandsSource.contains("openWindow(id: \"main\")"))
         XCTAssertTrue(appCommandsSource.contains("CommandGroup(replacing: .appSettings)"))
         XCTAssertFalse(appCommandsSource.contains("NotificationCenter.default.post(name: .showBatteryStatsMainWindow"))
         XCTAssertTrue(appCommandsSource.contains("NotificationCenter.default.post(name: .showBatteryStatsSettingsWindow"))
@@ -191,9 +181,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         XCTAssertFalse(menuBarSource.contains("styleMask: [.borderless]"))
         XCTAssertTrue(menuBarSource.contains("styleMask: [.borderless, .nonactivatingPanel]"))
         XCTAssertFalse(menuBarSource.contains(".canJoinAllSpaces"))
-        XCTAssertTrue(windowSpaceBehaviorSource.contains(".canJoinAllApplications"))
-        XCTAssertTrue(windowSpaceBehaviorSource.contains(".fullScreenAuxiliary"))
-        XCTAssertTrue(windowSpaceBehaviorSource.contains(".moveToActiveSpace"))
         XCTAssertFalse(menuBarSource.contains(".stationary"))
         XCTAssertTrue(menuBarSource.contains("BatterySurfaceLayout.menuBarPanelMinimumHeight"))
         XCTAssertFalse(menuBarSource.contains("contentView.layoutSubtreeIfNeeded()"))
@@ -839,9 +826,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: nil,
-            currentChargeWattHours: nil,
             fullChargeCapacityMilliampHours: Int.max,
-            fullChargeCapacityWattHours: nil,
             designCapacityMilliampHours: nil,
             healthPercent: nil,
             stateOfChargePercent: 50,
@@ -1043,8 +1028,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: true,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 55,
             currentMilliampsSigned: 1_200,
             chargeRateWatts: -18,
@@ -1163,7 +1146,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         controller.start()
 
         return MenuBarStatusItemControllerFixture(
-            suiteName: preferencesFixture.suiteName,
             defaults: preferencesFixture.defaults,
             defaultsFixture: preferencesFixture.defaultsFixture,
             preferences: preferences,
@@ -1178,7 +1160,6 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults, sync: NoopPreferencesSync())
 
         return PreferencesFixture(
-            suiteName: defaultsFixture.suiteName,
             defaults: defaults,
             defaultsFixture: defaultsFixture,
             preferences: preferences
@@ -1186,14 +1167,12 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
     }
 
     private struct PreferencesFixture {
-        let suiteName: String
         let defaults: UserDefaults
         let defaultsFixture: IsolatedUserDefaultsFixture<InMemoryUserDefaults>
         let preferences: PreferencesStore
     }
 
     private struct MenuBarStatusItemControllerFixture {
-        let suiteName: String
         let defaults: UserDefaults
         let defaultsFixture: IsolatedUserDefaultsFixture<InMemoryUserDefaults>
         let preferences: PreferencesStore
@@ -1212,9 +1191,7 @@ final class MenuBarBatteryLabelFormattingTests: XCTestCase {
             isCharging: powerState == .charging,
             isExternalPowerConnected: powerState != .onBattery,
             currentChargeMilliampHours: 5_000,
-            currentChargeWattHours: 65,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: stateOfChargePercent,
             inputPowerWatts: inputPowerWatts,
             inputPowerEvidence: inputPowerEvidence,

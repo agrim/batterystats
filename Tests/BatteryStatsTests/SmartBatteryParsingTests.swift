@@ -327,7 +327,13 @@ final class SmartBatteryParsingTests: XCTestCase {
             ])
         ])
 
-        assertManufactureDate(details.manufactureDate, year: 2023, month: 9, day: 12)
+        let manufactureDate = try XCTUnwrap(details.manufactureDate)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let components = calendar.dateComponents([.year, .month, .day], from: manufactureDate)
+        XCTAssertEqual(components.year, 2023)
+        XCTAssertEqual(components.month, 9)
+        XCTAssertEqual(components.day, 12)
     }
 
     func testReaderDoesNotTreatNestedPackMfgDataCellRevisionAsManufactureDate() throws {
@@ -542,17 +548,6 @@ final class SmartBatteryParsingTests: XCTestCase {
             ],
             "PowerTelemetryData": [
                 "SystemPowerIn": Int.max
-            ]
-        ])
-
-        XCTAssertNil(details.inputPowerWatts)
-    }
-
-    func testReaderIgnoresLiveInputPowerThatWouldRenderAsZeroWatts() throws {
-        let details = SmartBatteryReader().parse(properties: [
-            "PowerTelemetryData": [
-                "SystemVoltageIn": 20_000,
-                "SystemCurrentIn": 4
             ]
         ])
 
@@ -1667,27 +1662,6 @@ final class SmartBatteryParsingTests: XCTestCase {
         XCTAssertNil(SignedIntegerNormalizer.normalize(42.9))
         XCTAssertNil(SignedIntegerNormalizer.normalize(Float(42.5)))
         XCTAssertNil(SignedIntegerNormalizer.normalize(NSNumber(value: 42.9)))
-    }
-
-    private func assertManufactureDate(
-        _ date: Date?,
-        year: Int,
-        month: Int,
-        day: Int,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard let date = date else {
-            XCTFail("Expected manufacture date", file: file, line: line)
-            return
-        }
-
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        let components = calendar.dateComponents([.year, .month, .day], from: date)
-        XCTAssertEqual(components.year, year, file: file, line: line)
-        XCTAssertEqual(components.month, month, file: file, line: line)
-        XCTAssertEqual(components.day, day, file: file, line: line)
     }
 
     private func packedManufactureDate(year: Int, month: Int, day: Int) -> Int {

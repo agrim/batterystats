@@ -807,14 +807,12 @@ private struct WidgetTimelineReloadSignature: Equatable {
 }
 
 private struct WidgetCriticalReloadSignature: Equatable {
-    let isAvailable: Bool
     let powerState: BatteryPowerState?
     let isLowCharge: Bool
     let batterySymbolName: String
     let chargeTint: BatteryPresentationTint
 
     init(snapshot: BatterySnapshot?) {
-        isAvailable = snapshot != nil
         powerState = snapshot?.powerState
         isLowCharge = snapshot?.isLowCharge ?? false
         batterySymbolName = BatteryPresentationStyle.batterySymbolName(for: snapshot)
@@ -829,8 +827,6 @@ private struct EnergyProbePresentationSignature: Equatable {
     let designCapacityMilliampHours: Int?
     let visibleCurrentMilliamps: Int?
     let voltageMillivolts: Int?
-    let currentChargeDeciwattHours: Int?
-    let fullChargeCapacityDeciwattHours: Int?
     let temperatureTenthsCelsius: Int?
     let cycleCount: Int?
     let manufactureDateDay: Int?
@@ -849,14 +845,6 @@ private struct EnergyProbePresentationSignature: Equatable {
         )
         visibleCurrentMilliamps = Self.visibleCurrentMilliamps(snapshot)
         voltageMillivolts = BatteryCalculations.plausibleVoltageMillivolts(snapshot.voltageMillivolts)
-        currentChargeDeciwattHours = WidgetTimelineReloadSignature.roundedInt(
-            BatteryCalculations.plausibleWattHours(snapshot.currentChargeWattHours),
-            multiplier: 10
-        )
-        fullChargeCapacityDeciwattHours = WidgetTimelineReloadSignature.roundedInt(
-            BatteryCalculations.plausibleWattHours(snapshot.fullChargeCapacityWattHours),
-            multiplier: 10
-        )
         temperatureTenthsCelsius = WidgetTimelineReloadSignature.roundedInt(
             snapshot.presentationTemperatureCelsius,
             multiplier: 10

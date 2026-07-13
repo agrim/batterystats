@@ -90,14 +90,6 @@ struct BatteryStatusDescriptor {
     let ringTintStyle: BatteryPresentationTint
     let contentTintStyle: BatteryPresentationTint
 
-    var ringTint: Color {
-        ringTintStyle.color
-    }
-
-    var contentTint: Color {
-        contentTintStyle.color
-    }
-
     var progress: Double? {
         ringTintStyle == .secondary ? nil : 1
     }

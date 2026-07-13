@@ -31,214 +31,72 @@ final class BatteryCalculationsTests: XCTestCase {
         ))
     }
 
-    func testStateOfChargeUsesSmartCapacityWhenConsistentWithPublicPercent() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 4_912,
-            fullChargeCapacityMilliampHours: 5_338,
-            publicPercentage: 92
-        ))
+    func testStateOfChargeReconciliationPolicy() {
+        let cases: [(
+            label: String,
+            current: Int,
+            full: Int,
+            publicPercentage: Double,
+            expected: Double,
+            accuracy: Double
+        )] = [
+            ("consistent smart capacity", 4_912, 5_338, 92, 92, 0.1),
+            ("transiently empty smart capacity", 0, 5_338, 92, 92, 0.001),
+            ("raw capacity drift", 4_220, 4_575, 97, 97, 0.001),
+            ("transiently empty public percentage", 4_000, 5_000, 0, 80, 0.001),
+            ("transiently low public percentage", 4_000, 5_000, 6, 80, 0.001),
+            ("smart full capacity with empty public percentage", 5_000, 5_000, 0, 100, 0.001),
+            ("transiently full public percentage", 3_000, 5_000, 100, 60, 0.001),
+            ("full public percentage with empty smart capacity", 0, 5_000, 100, 100, 0.001),
+            ("impossible calculated percentage", 6_500, 5_338, 99, 99, 0.001)
+        ]
 
-        XCTAssertEqual(percent, 92, accuracy: 0.1)
+        for testCase in cases {
+            let percent = BatteryCalculations.stateOfChargePercent(
+                currentChargeMilliampHours: testCase.current,
+                fullChargeCapacityMilliampHours: testCase.full,
+                publicPercentage: testCase.publicPercentage
+            )
+            guard let percent else {
+                XCTFail("\(testCase.label): expected \(testCase.expected), got nil")
+                continue
+            }
+
+            XCTAssertEqual(percent, testCase.expected, accuracy: testCase.accuracy, testCase.label)
+        }
     }
 
-    func testStateOfChargeFallsBackToPublicPercentWhenSmartCapacityIsTransientlyWrong() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 0,
-            fullChargeCapacityMilliampHours: 5_338,
-            publicPercentage: 92
-        ))
+    func testReconciledCurrentChargePolicy() {
+        let cases: [(
+            label: String,
+            smartCurrent: Int?,
+            full: Int,
+            publicPercentage: Double?,
+            expected: Int?
+        )] = [
+            ("transiently wrong smart current", 0, 5_000, 92, 4_600),
+            ("raw capacity drift", 4_220, 4_575, 97, 4_438),
+            ("transiently empty public percentage", 4_000, 5_000, 0, 4_000),
+            ("transiently low public percentage", 4_000, 5_000, 6, 4_000),
+            ("smart full current with empty public percentage", 5_000, 5_000, 0, 5_000),
+            ("transiently full public percentage", 3_000, 5_000, 100, 3_000),
+            ("full public percentage with empty smart current", 0, 5_000, 100, 5_000),
+            ("smart current matches public percentage", 4_550, 5_000, 92, 4_550),
+            ("missing smart current", nil, 5_000, 92, 4_600),
+            ("missing public percentage", 4_000, 5_000, nil, 4_000),
+            ("impossible smart current without public percentage", 6_000, 5_000, nil, nil),
+            ("small smart overfull value", 5_050, 5_000, nil, 5_000)
+        ]
 
-        XCTAssertEqual(percent, 92, accuracy: 0.001)
-    }
+        for testCase in cases {
+            let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
+                smartCurrentChargeMilliampHours: testCase.smartCurrent,
+                fullChargeCapacityMilliampHours: testCase.full,
+                publicPercentage: testCase.publicPercentage
+            )
 
-    func testStateOfChargeUsesStablePublicPercentWhenRawCapacityDriftsFromSystemPercent() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 4_220,
-            fullChargeCapacityMilliampHours: 4_575,
-            publicPercentage: 97
-        ))
-
-        XCTAssertEqual(percent, 97, accuracy: 0.001)
-    }
-
-    func testStateOfChargePrefersSmartCapacityWhenPublicPercentIsTransientlyEmpty() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 4_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 0
-        ))
-
-        XCTAssertEqual(percent, 80, accuracy: 0.001)
-    }
-
-    func testStateOfChargePrefersSmartCapacityWhenPublicPercentIsTransientlyLow() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 4_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 6
-        ))
-
-        XCTAssertEqual(percent, 80, accuracy: 0.001)
-    }
-
-    func testStateOfChargePrefersSmartFullCapacityWhenPublicPercentIsTransientlyEmpty() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 5_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 0
-        ))
-
-        XCTAssertEqual(percent, 100, accuracy: 0.001)
-    }
-
-    func testStateOfChargePrefersSmartCapacityWhenPublicPercentIsTransientlyFull() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 3_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 100
-        ))
-
-        XCTAssertEqual(percent, 60, accuracy: 0.001)
-    }
-
-    func testStateOfChargeUsesFullPublicPercentWhenSmartCapacityIsTransientlyEmpty() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 0,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 100
-        ))
-
-        XCTAssertEqual(percent, 100, accuracy: 0.001)
-    }
-
-    func testStateOfChargeRejectsImpossibleCalculatedPercent() throws {
-        let percent = try XCTUnwrap(BatteryCalculations.stateOfChargePercent(
-            currentChargeMilliampHours: 6_500,
-            fullChargeCapacityMilliampHours: 5_338,
-            publicPercentage: 99
-        ))
-
-        XCTAssertEqual(percent, 99, accuracy: 0.001)
-    }
-
-    func testReconciledCurrentChargeUsesPublicPercentWhenSmartCurrentIsTransientlyWrong() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 0,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 92
-        )
-
-        XCTAssertEqual(currentCharge, 4_600)
-    }
-
-    func testReconciledCurrentChargeUsesStablePublicPercentWhenRawCapacityDriftsFromSystemPercent() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 4_220,
-            fullChargeCapacityMilliampHours: 4_575,
-            publicPercentage: 97
-        )
-
-        XCTAssertEqual(currentCharge, 4_438)
-    }
-
-    func testReconciledCurrentChargeKeepsSmartCurrentWhenPublicPercentIsTransientlyEmpty() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 4_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 0
-        )
-
-        XCTAssertEqual(currentCharge, 4_000)
-    }
-
-    func testReconciledCurrentChargeKeepsSmartCurrentWhenPublicPercentIsTransientlyLow() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 4_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 6
-        )
-
-        XCTAssertEqual(currentCharge, 4_000)
-    }
-
-    func testReconciledCurrentChargeKeepsSmartFullCurrentWhenPublicPercentIsTransientlyEmpty() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 5_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 0
-        )
-
-        XCTAssertEqual(currentCharge, 5_000)
-    }
-
-    func testReconciledCurrentChargeKeepsSmartCurrentWhenPublicPercentIsTransientlyFull() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 3_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 100
-        )
-
-        XCTAssertEqual(currentCharge, 3_000)
-    }
-
-    func testReconciledCurrentChargeUsesFullPublicPercentWhenSmartCurrentIsTransientlyEmpty() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 0,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 100
-        )
-
-        XCTAssertEqual(currentCharge, 5_000)
-    }
-
-    func testReconciledCurrentChargeKeepsSmartCurrentWhenItMatchesPublicPercent() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 4_550,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 92
-        )
-
-        XCTAssertEqual(currentCharge, 4_550)
-    }
-
-    func testReconciledCurrentChargeDerivesCurrentWhenSmartCurrentIsMissing() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: nil,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: 92
-        )
-
-        XCTAssertEqual(currentCharge, 4_600)
-    }
-
-    func testReconciledCurrentChargeKeepsPlausibleSmartCurrentWhenPublicPercentIsMissing() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 4_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: nil
-        )
-
-        XCTAssertEqual(currentCharge, 4_000)
-    }
-
-    func testReconciledCurrentChargeRejectsImpossibleSmartCurrentWhenPublicPercentIsMissing() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 6_000,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: nil
-        )
-
-        XCTAssertNil(currentCharge)
-    }
-
-    func testReconciledCurrentChargeClampsSmallSmartOverfullValue() {
-        let currentCharge = BatteryCalculations.reconciledCurrentChargeMilliampHours(
-            smartCurrentChargeMilliampHours: 5_050,
-            fullChargeCapacityMilliampHours: 5_000,
-            publicPercentage: nil
-        )
-
-        XCTAssertEqual(currentCharge, 5_000)
+            XCTAssertEqual(currentCharge, testCase.expected, testCase.label)
+        }
     }
 
     func testTimeRemainingCalculation() {

@@ -1407,119 +1407,44 @@ final class BatteryReadingServiceTests: XCTestCase {
         )
     }
 
-    func testChargingRateStaysBatteryCurrentWhenVerifiedLiveInputPowerExists() throws {
-        XCTAssertEqual(
-            try XCTUnwrap(chargeRateWatts(
-                voltageMillivolts: 12_044,
-                signedCurrentMilliamps: 2_111,
-                adapterMaxWatts: 100
-            )),
-            25.424884,
-            accuracy: 0.001
-        )
+    func testChargingRateUsesPlausibleBatteryCurrentWithinAdapterContract() throws {
+        let cases: [(
+            name: String,
+            voltageMillivolts: Int?,
+            signedCurrentMilliamps: Int?,
+            adapterMaxWatts: Int?,
+            expectedWatts: Double?
+        )] = [
+            ("below 100 W contract", 12_044, 2_111, 100, 25.424884),
+            ("below 70 W contract", 12_044, 2_111, 70, 25.424884),
+            ("near 70 W capability", 12_000, 5_785, 70, 69.42),
+            ("above 70 W contract", 12_000, 8_333, 70, nil),
+            ("near 100 W capability echo", 12_000, 8_333, 100, nil),
+            ("near 100 W without contract", 12_000, 8_333, nil, nil),
+            ("missing current with contract", 12_044, nil, 70, nil),
+            ("missing current without contract", 12_044, nil, nil, nil)
+        ]
+
+        for testCase in cases {
+            let actualWatts = BatteryTelemetrySanitization.chargeRateWattsWithinAdapterContract(
+                voltageMillivolts: testCase.voltageMillivolts,
+                signedCurrentMilliamps: testCase.signedCurrentMilliamps,
+                adapterMaxWatts: testCase.adapterMaxWatts
+            )
+            if let expectedWatts = testCase.expectedWatts {
+                XCTAssertEqual(
+                    try XCTUnwrap(actualWatts, testCase.name),
+                    expectedWatts,
+                    accuracy: 0.001,
+                    testCase.name
+                )
+            } else {
+                XCTAssertNil(actualWatts, testCase.name)
+            }
+        }
     }
 
-    func testChargingPowerUsesBatteryCurrentWhenInputPowerIsUnavailable() throws {
-        XCTAssertEqual(
-            try XCTUnwrap(chargeRateWatts(
-                voltageMillivolts: 12_044,
-                signedCurrentMilliamps: 2_111,
-                adapterMaxWatts: 100
-            )),
-            25.424884,
-            accuracy: 0.001
-        )
-    }
-
-    func testChargingPowerFallsBackToBatteryCurrentWhenInputPowerMirrorsAdapterCapability() throws {
-        XCTAssertEqual(
-            try XCTUnwrap(chargeRateWatts(
-                voltageMillivolts: 12_044,
-                signedCurrentMilliamps: 2_111,
-                adapterMaxWatts: 100
-            )),
-            25.424884,
-            accuracy: 0.001
-        )
-    }
-
-    func testChargingPowerDoesNotUseBatteryCurrentWattsAboveAdapterContract() {
-        XCTAssertNil(chargeRateWatts(
-            voltageMillivolts: 12_000,
-            signedCurrentMilliamps: 8_333,
-            adapterMaxWatts: 70
-        ))
-    }
-
-    func testChargingPowerUsesCurrentDerivedRateNearAdapterCapability() throws {
-        XCTAssertEqual(
-            try XCTUnwrap(chargeRateWatts(
-                voltageMillivolts: 12_000,
-                signedCurrentMilliamps: 5_785,
-                adapterMaxWatts: 70
-            )),
-            69.42,
-            accuracy: 0.001
-        )
-    }
-
-    func testChargingPowerDoesNotUseBatteryCurrentThatMirrorsStaleAdapterCapability() {
-        XCTAssertNil(chargeRateWatts(
-            voltageMillivolts: 12_000,
-            signedCurrentMilliamps: 8_333,
-            adapterMaxWatts: 100
-        ))
-    }
-
-    func testChargingPowerDoesNotUseUnverifiedHundredWattBatteryCurrentWithoutAdapterContract() {
-        XCTAssertNil(chargeRateWatts(
-            voltageMillivolts: 12_000,
-            signedCurrentMilliamps: 8_333,
-            adapterMaxWatts: nil
-        ))
-    }
-
-    func testChargingRateStaysBatteryCurrentWhenCounterBackedInputPowerIsNearAdapterCapability() throws {
-        XCTAssertEqual(
-            try XCTUnwrap(chargeRateWatts(
-                voltageMillivolts: 12_044,
-                signedCurrentMilliamps: 2_111,
-                adapterMaxWatts: 70
-            )),
-            25.424884,
-            accuracy: 0.001
-        )
-    }
-
-    func testChargingRateDoesNotUseLiveInputPowerWhenBatteryCurrentIsUnavailable() {
-        XCTAssertNil(chargeRateWatts(
-            voltageMillivolts: 12_044,
-            signedCurrentMilliamps: nil,
-            adapterMaxWatts: 70
-        ))
-    }
-
-    func testChargingPowerDoesNotFallBackToUnverifiedHundredWattInputPower() {
-        XCTAssertNil(chargeRateWatts(
-            voltageMillivolts: 12_044,
-            signedCurrentMilliamps: nil,
-            adapterMaxWatts: nil
-        ))
-    }
-
-    func testChargingPowerFallsBackToBatteryCurrentWhenInputPowerIsInvalid() throws {
-        XCTAssertEqual(
-            try XCTUnwrap(chargeRateWatts(
-                voltageMillivolts: 12_044,
-                signedCurrentMilliamps: 2_111,
-                adapterMaxWatts: 70
-            )),
-            25.424884,
-            accuracy: 0.001
-        )
-    }
-
-    func testReadPathUsesDynamicChargingPowerForSnapshotChargeRate() throws {
+    func testReadPathUsesContractCheckedBatteryCurrentForSnapshotChargeRate() throws {
         let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryReadingService.swift")
 
         XCTAssertSource(
@@ -1617,18 +1542,26 @@ final class BatteryReadingServiceTests: XCTestCase {
         )
     }
 
-    func testDisplayableEnergyEstimatesDoNotDeriveCapacityEnergyFromLiveVoltage() throws {
-        let source = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryReadingService.swift")
+    func testCurrentChargeEnergyIsComputedFromCapacityAndVoltageWithoutEagerWriters() throws {
+        let snapshotSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Domain/BatterySnapshot.swift")
+        let readingSource = try Self.loadSource(relativePath: "BatteryStats/Features/Battery/Data/BatteryReadingService.swift")
+        let widgetStoreSource = try Self.loadSource(relativePath: "BatteryStats/Shared/Widget/BatteryWidgetSnapshotStore.swift")
 
         XCTAssertEqual(BatteryCalculations.wattHours(
             milliampHours: 3_000,
             voltageMillivolts: 12_000
         ), 36)
         XCTAssertSource(
-            source,
-            contains: ["currentChargeWattHours: BatteryCalculations.wattHours(", "fullChargeCapacityWattHours: nil"],
-            excludes: ["designCapacityWattHours:"]
+            snapshotSource,
+            contains: [
+                "var currentChargeWattHours: Double? {",
+                "milliampHours: currentChargeMilliampHours",
+                "voltageMillivolts: voltageMillivolts"
+            ],
+            excludes: ["fullChargeCapacityWattHours:", "designCapacityWattHours:"]
         )
+        XCTAssertSource(readingSource, excludes: ["currentChargeWattHours:"])
+        XCTAssertSource(widgetStoreSource, excludes: ["currentChargeWattHours:"])
     }
 
     func testDiagnosticRendererPrintsBooleansAsBooleansAndNumbersAsNumbers() {
@@ -1666,9 +1599,15 @@ final class BatteryReadingServiceTests: XCTestCase {
         publicSnapshot: PublicPowerSourceSnapshot,
         smartBattery: SmartBatteryDetails
     ) -> BatteryPowerState {
-        BatteryReadingService.reconciledPowerState(
+        let isCharged = reconciledChargedState(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery
+        )
+
+        return BatteryReadingService.reconciledPowerState(
             publicSnapshot: publicSnapshot,
             smartBattery: smartBattery,
+            isCharged: isCharged,
             signedCurrentMilliamps: smartBattery.signedCurrentMilliamps,
             currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours
@@ -1680,7 +1619,7 @@ final class BatteryReadingServiceTests: XCTestCase {
         smartBattery: SmartBatteryDetails,
         isCharged: Bool
     ) -> BatteryPowerState {
-        BatteryReadingService.reconciledPowerState(
+        return BatteryReadingService.reconciledPowerState(
             publicSnapshot: publicSnapshot,
             smartBattery: smartBattery,
             isCharged: isCharged,
@@ -1695,24 +1634,21 @@ final class BatteryReadingServiceTests: XCTestCase {
         smartBattery: SmartBatteryDetails,
         signedCurrentMilliamps: Int?
     ) -> BatteryPowerState {
-        BatteryReadingService.reconciledPowerState(
+        let isCharged = BatteryReadingService.reconciledChargedState(
             publicSnapshot: publicSnapshot,
             smartBattery: smartBattery,
             signedCurrentMilliamps: signedCurrentMilliamps,
             currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
             fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours
         )
-    }
 
-    private func chargeRateWatts(
-        voltageMillivolts: Int?,
-        signedCurrentMilliamps: Int?,
-        adapterMaxWatts: Int?
-    ) -> Double? {
-        BatteryTelemetrySanitization.chargeRateWattsWithinAdapterContract(
-            voltageMillivolts: voltageMillivolts,
+        return BatteryReadingService.reconciledPowerState(
+            publicSnapshot: publicSnapshot,
+            smartBattery: smartBattery,
+            isCharged: isCharged,
             signedCurrentMilliamps: signedCurrentMilliamps,
-            adapterMaxWatts: adapterMaxWatts
+            currentChargeMilliampHours: smartBattery.currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: smartBattery.fullChargeCapacityMilliampHours
         )
     }
 

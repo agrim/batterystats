@@ -44,7 +44,7 @@ enum BatteryAlertEvaluator {
     }
 }
 
-struct BatteryAlertNotification: Equatable, Sendable {
+struct BatteryAlertNotification: Sendable {
     let identifier: String
     let title: String
     let body: String

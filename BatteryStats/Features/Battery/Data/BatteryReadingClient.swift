@@ -3,11 +3,11 @@ import Foundation
 actor BatteryReadingWorker {
     private let service: BatteryReadingService
 
-    init(service: BatteryReadingService = BatteryReadingService()) {
+    init(service: BatteryReadingService) {
         self.service = service
     }
 
-    func read(at date: Date = .now, options: BatteryReadOptions = .standard) -> BatteryReadResult {
+    func read(at date: Date, options: BatteryReadOptions) -> BatteryReadResult {
         service.read(at: date, options: options)
     }
 }

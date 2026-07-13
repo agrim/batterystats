@@ -319,8 +319,6 @@ final class BatteryAlertEvaluatorTests: XCTestCase {
             isCharging: isCharging,
             isExternalPowerConnected: isExternalPowerConnected,
             currentChargeMilliampHours: 4_950,
-            currentChargeWattHours: 63.0,
-            fullChargeCapacityWattHours: 65.0,
             healthPercent: 83.3,
             stateOfChargePercent: stateOfChargePercent,
             voltageMillivolts: 12_800,

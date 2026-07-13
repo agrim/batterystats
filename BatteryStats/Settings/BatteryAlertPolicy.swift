@@ -1,6 +1,4 @@
-import Foundation
-
-struct BatteryAlertPolicy: Equatable {
+struct BatteryAlertPolicy {
     var isLowBatteryAlertEnabled = false
     var isChargeCompleteAlertEnabled = false
     var isHighTemperatureAlertEnabled = false

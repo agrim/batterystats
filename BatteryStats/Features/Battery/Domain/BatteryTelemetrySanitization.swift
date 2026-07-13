@@ -68,9 +68,8 @@ enum BatteryTelemetrySanitization {
         computedTimeToFullMinutes: Int?,
         reportedTimeToFullMinutes: Int?
     ) -> Int? {
-        let computed = BatteryCalculations.plausibleDurationMinutes(computedTimeToFullMinutes)
-        let reported = BatteryCalculations.plausibleDurationMinutes(reportedTimeToFullMinutes)
-        return reported ?? computed
+        BatteryCalculations.plausibleDurationMinutes(reportedTimeToFullMinutes)
+            ?? BatteryCalculations.plausibleDurationMinutes(computedTimeToFullMinutes)
     }
 
     static func chargeRateWattsWithinAdapterContract(

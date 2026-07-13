@@ -13,8 +13,8 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(BatteryFormatting.milliampHours(Int.max), "Unavailable")
         XCTAssertEqual(BatteryFormatting.millivolts(-12_000), "Unavailable")
         XCTAssertEqual(BatteryFormatting.millivolts(Int.max), "Unavailable")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: -4.2, maximum: nil), "Unavailable")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: .greatestFiniteMagnitude, maximum: nil), "Unavailable")
+        XCTAssertEqual(BatteryFormatting.compactWattHours(-4.2), "Unavailable")
+        XCTAssertEqual(BatteryFormatting.compactWattHours(.greatestFiniteMagnitude), "Unavailable")
         XCTAssertEqual(BatteryFormatting.watts(-4.2), "Unavailable")
         XCTAssertEqual(BatteryFormatting.watts(0), "Unavailable")
         XCTAssertEqual(BatteryFormatting.watts(0.09), "Unavailable")
@@ -175,16 +175,18 @@ final class FormatterTests: XCTestCase {
 
         let stored = try XCTUnwrap(store.snapshot(now: now))
         XCTAssertEqual(try XCTUnwrap(stored.currentChargeWattHours), 36, accuracy: 0.001)
-        XCTAssertNil(stored.fullChargeCapacityWattHours)
         XCTAssertEqual(stored.designCapacityMilliampHours, 6_000)
-        let expectedAge = BatteryCalculations.batteryAgeComponents(
+        let expectedAge = try XCTUnwrap(BatteryCalculations.batteryAgeComponents(
             from: Date(timeIntervalSinceReferenceDate: 700_000_000),
             now: now
-        )
-        XCTAssertEqual(stored.validatedBatteryAgeComponents?.year, expectedAge?.year)
-        XCTAssertEqual(stored.validatedBatteryAgeComponents?.month, expectedAge?.month)
+        ))
+        let storedAge = try XCTUnwrap(stored.validatedBatteryAgeComponents)
+        XCTAssertEqual(storedAge.year, expectedAge.year)
+        XCTAssertEqual(storedAge.month, expectedAge.month)
         let normalizedSnapshot = try XCTUnwrap(defaults.data(forKey: "latestBatteryWidgetSnapshot"))
         let normalizedJSON = try XCTUnwrap(String(data: normalizedSnapshot, encoding: .utf8))
+        XCTAssertFalse(normalizedJSON.contains("currentChargeWattHours"))
+        XCTAssertFalse(normalizedJSON.contains("fullChargeCapacityWattHours"))
         XCTAssertFalse(normalizedJSON.contains("designCapacityWattHours"))
         XCTAssertFalse(normalizedJSON.contains("batteryAgeComponents"))
     }
@@ -504,23 +506,11 @@ final class FormatterTests: XCTestCase {
         XCTAssertFalse(try XCTUnwrap(plan.entries.last).snapshotIsDisplayable)
     }
 
-    func testFormatsCompactWattHourPair() {
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: 40.2, maximum: 65.4), "40.2 / 65.4 Wh")
-    }
-
-    func testFormatsCompactWattHourPairWithPartialValues() {
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: 40.2, maximum: nil), "40.2 Wh")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: nil, maximum: 65.4), "65.4 Wh max")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: .nan, maximum: 65.4), "65.4 Wh max")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: .greatestFiniteMagnitude, maximum: 65.4), "65.4 Wh max")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: 40.2, maximum: 0), "40.2 Wh")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: nil, maximum: 0), "Unavailable")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: nil, maximum: nil), "Unavailable")
-    }
-
-    func testCompactWattHourPairKeepsSmallMeasuredOverMaximumValues() {
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: 60.6, maximum: 60), "60.6 / 60.0 Wh")
-        XCTAssertEqual(BatteryFormatting.compactWattHourPair(current: 80, maximum: 60), "60.0 Wh max")
+    func testFormatsCompactWattHours() {
+        XCTAssertEqual(BatteryFormatting.compactWattHours(40.2), "40.2 Wh")
+        XCTAssertEqual(BatteryFormatting.compactWattHours(0), "0.0 Wh")
+        XCTAssertEqual(BatteryFormatting.compactWattHours(nil), "Unavailable")
+        XCTAssertEqual(BatteryFormatting.compactWattHours(.nan), "Unavailable")
     }
 
     func testFormatsFahrenheitTemperature() {
@@ -876,33 +866,7 @@ final class FormatterTests: XCTestCase {
     }
 
     func testSnapshotUsesUnknownIconWhenChargePercentIsUnavailable() {
-        var snapshot = makeSnapshot(stateOfChargePercent: 55, powerState: .charging)
-        snapshot = makeBatterySnapshot(
-            timestamp: snapshot.timestamp,
-            powerState: snapshot.powerState,
-            isCharging: snapshot.isCharging,
-            isExternalPowerConnected: snapshot.isExternalPowerConnected,
-            currentChargeMilliampHours: snapshot.currentChargeMilliampHours,
-            currentChargeWattHours: snapshot.currentChargeWattHours,
-            fullChargeCapacityMilliampHours: snapshot.fullChargeCapacityMilliampHours,
-            fullChargeCapacityWattHours: snapshot.fullChargeCapacityWattHours,
-            designCapacityMilliampHours: snapshot.designCapacityMilliampHours,
-            healthPercent: snapshot.healthPercent,
-            stateOfChargePercent: nil,
-            voltageMillivolts: snapshot.voltageMillivolts,
-            currentMilliampsSigned: snapshot.currentMilliampsSigned,
-            dischargeRateMilliamps: snapshot.dischargeRateMilliamps,
-            chargeRateWatts: snapshot.chargeRateWatts,
-            dischargeRateWatts: snapshot.dischargeRateWatts,
-            rateBasedTimeRemainingMinutes: snapshot.rateBasedTimeRemainingMinutes,
-            systemTimeRemainingMinutes: snapshot.systemTimeRemainingMinutes,
-            timeToFullMinutes: snapshot.timeToFullMinutes,
-            cycleCount: snapshot.cycleCount,
-            manufactureDate: snapshot.manufactureDate,
-            temperatureCelsius: snapshot.temperatureCelsius,
-            adapterMaxWatts: snapshot.adapterMaxWatts,
-            notes: snapshot.notes
-        )
+        let snapshot = makeSnapshot(stateOfChargePercent: nil, powerState: .charging)
 
         XCTAssertEqual(snapshot.batterySymbolName, "questionmark")
     }
@@ -1046,7 +1010,7 @@ final class FormatterTests: XCTestCase {
 
         let summary = snapshot.debugSummary
         XCTAssertTrue(summary.contains("Health: 83.3%"))
-        XCTAssertTrue(summary.contains("Energy: 40.0 / 65.0 Wh"))
+        XCTAssertTrue(summary.contains("Estimated Energy: 36.0 Wh"))
         XCTAssertTrue(summary.contains("Time to full: \(BatteryFormatting.duration(minutes: 89))"))
         XCTAssertTrue(summary.contains("Active power: 69.4 W"))
         XCTAssertTrue(summary.contains("Input power: 69.4 W"))
@@ -1064,7 +1028,6 @@ final class FormatterTests: XCTestCase {
             chargeRateWatts: -18
         )
         XCTAssertNil(chargingSnapshot.activePowerWatts)
-        XCTAssertEqual(chargingSnapshot.statusSecondaryText, "External power connected")
 
         let dischargingSnapshot = makeSnapshot(
             stateOfChargePercent: 55,
@@ -1078,13 +1041,11 @@ final class FormatterTests: XCTestCase {
     func testSnapshotLabelsCurrentOnlyWattHoursAsEstimatedEnergy() {
         let snapshot = makeSnapshot(
             stateOfChargePercent: 55,
-            powerState: .onBattery,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: nil
+            powerState: .onBattery
         )
 
-        XCTAssertTrue(snapshot.debugSummary.contains("Estimated Energy: 40.0 Wh"))
-        XCTAssertFalse(snapshot.debugSummary.contains("\nEnergy: 40.0 Wh"))
+        XCTAssertTrue(snapshot.debugSummary.contains("Estimated Energy: 36.0 Wh"))
+        XCTAssertFalse(snapshot.debugSummary.contains("\nEnergy: 36.0 Wh"))
     }
 
     func testSnapshotTreatsRoundedZeroActivePowerAsUnavailable() {
@@ -1129,7 +1090,6 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(snapshot.chargeRateWatts), 25.4, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(snapshot.inputPowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 39.8, accuracy: 0.001)
-        XCTAssertEqual(snapshot.statusSecondaryText, "Input power 39.8 W")
         XCTAssertEqual(snapshot.energyUseComparisonValue ?? 0, 39.8, accuracy: 0.001)
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(formattedActivePower(for: snapshot), "39.8 W")
@@ -1153,7 +1113,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(try XCTUnwrap(snapshot.inputPowerWatts), 39.8, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 39.8, accuracy: 0.001)
-        XCTAssertEqual(snapshot.statusSecondaryText, "Input power 39.8 W")
         XCTAssertEqual(snapshot.energyUseComparisonValue ?? 0, 39.8, accuracy: 0.001)
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(formattedActivePower(for: snapshot), "39.8 W")
@@ -1176,7 +1135,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(chargingSnapshot.activePowerWatts, 25.4)
-        XCTAssertEqual(chargingSnapshot.statusSecondaryText, "Charging at 25.4 W")
         XCTAssertEqual(chargingSnapshot.energyUseComparisonValue ?? 0, 25.4, accuracy: 0.001)
         XCTAssertEqual(formattedActivePower(for: chargingSnapshot), "25.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: chargingSnapshot).title, "Charge Rate")
@@ -1206,7 +1164,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertNil(idleSnapshot.activePowerWatts)
-        XCTAssertEqual(idleSnapshot.statusSecondaryText, "External power connected")
         XCTAssertEqual(formattedActivePower(for: idleSnapshot), "—")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: idleSnapshot).title, "Power")
     }
@@ -1221,7 +1178,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertNil(chargingSnapshot.activePowerWatts)
-        XCTAssertEqual(chargingSnapshot.statusSecondaryText, "External power connected")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: chargingSnapshot).title, "Charge Rate")
         XCTAssertEqual(formattedActivePower(for: chargingSnapshot), "—")
         XCTAssertTrue(chargingSnapshot.debugSummary.contains("Input power: Unavailable"))
@@ -1238,7 +1194,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(chargingSnapshot.activePowerWatts, 25.4)
-        XCTAssertEqual(chargingSnapshot.statusSecondaryText, "Charging at 25.4 W")
         XCTAssertEqual(formattedActivePower(for: chargingSnapshot), "25.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: chargingSnapshot).title, "Charge Rate")
         XCTAssertTrue(chargingSnapshot.debugSummary.contains("Input power: Unavailable"))
@@ -1265,7 +1220,6 @@ final class FormatterTests: XCTestCase {
 
         XCTAssertEqual(try XCTUnwrap(snapshot.visibleInputPowerWatts), 69.42, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 69.42, accuracy: 0.001)
-        XCTAssertEqual(snapshot.statusSecondaryText, "Input power 69.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(formattedActivePower(for: snapshot), "69.4 W")
         XCTAssertTrue(snapshot.debugSummary.contains("Input power: 69.4 W"))
@@ -1280,7 +1234,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 39.8, accuracy: 0.001)
-        XCTAssertEqual(snapshot.statusSecondaryText, "Input power 39.8 W, battery discharging")
         XCTAssertEqual(formattedActivePower(for: snapshot), "39.8 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Input Power")
         XCTAssertEqual(
@@ -1309,7 +1262,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(try XCTUnwrap(snapshot.activePowerWatts), 14, accuracy: 0.001)
-        XCTAssertEqual(snapshot.statusSecondaryText, "Discharging at 14.0 W")
         XCTAssertEqual(formattedActivePower(for: snapshot), "14.0 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: snapshot).title, "Battery Drain")
         XCTAssertEqual(
@@ -1390,7 +1342,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(try XCTUnwrap(connectedNotCharging.activePowerWatts), 39.8, accuracy: 0.001)
-        XCTAssertEqual(connectedNotCharging.statusSecondaryText, "Input power 39.8 W")
         XCTAssertEqual(formattedActivePower(for: connectedNotCharging), "39.8 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: connectedNotCharging).title, "Input Power")
         XCTAssertEqual(
@@ -1403,7 +1354,6 @@ final class FormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(try XCTUnwrap(fullOnAC.activePowerWatts), 27.4, accuracy: 0.001)
-        XCTAssertEqual(fullOnAC.statusSecondaryText, "Input power 27.4 W")
         XCTAssertEqual(formattedActivePower(for: fullOnAC), "27.4 W")
         XCTAssertEqual(BatteryPowerDisplayRole.role(for: fullOnAC).title, "Input Power")
     }
@@ -1615,8 +1565,6 @@ final class FormatterTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40.0,
-            fullChargeCapacityWattHours: 65.0,
             healthPercent: 83.3,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -1664,8 +1612,6 @@ final class FormatterTests: XCTestCase {
         inputPowerWatts: Double? = nil,
         inputPowerEvidence: BatteryInputPowerEvidence? = nil,
         dischargeRateWatts: Double? = nil,
-        currentChargeWattHours: Double? = 40.0,
-        fullChargeCapacityWattHours: Double? = 65.0,
         cycleCount: Int? = 120,
         manufactureDate: Date? = nil,
         adapterMaxWatts: Int? = 70,
@@ -1676,8 +1622,6 @@ final class FormatterTests: XCTestCase {
             powerState: powerState,
             isCharging: powerState == .charging,
             isExternalPowerConnected: powerState != .onBattery && powerState != .unknown,
-            currentChargeWattHours: currentChargeWattHours,
-            fullChargeCapacityWattHours: fullChargeCapacityWattHours,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
             currentMilliampsSigned: currentMilliampsSigned ?? (powerState == .charging ? 1_200 : -1_200),

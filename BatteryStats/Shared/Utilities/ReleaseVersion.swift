@@ -1,6 +1,6 @@
 import Foundation
 
-struct ReleaseVersion: Equatable {
+struct ReleaseVersion {
     let marketingVersion: String
     let buildNumber: String
 

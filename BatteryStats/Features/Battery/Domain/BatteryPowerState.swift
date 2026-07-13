@@ -1,5 +1,3 @@
-import Foundation
-
 enum BatteryPowerState: String, Codable, Equatable, Sendable {
     case onBattery
     case charging
@@ -59,14 +57,14 @@ enum BatteryPowerState: String, Codable, Equatable, Sendable {
         self == .onBattery || self == .connectedDischarging
     }
 
-    func timeTitle(charging: String, discharging: String, idle: String = "Time") -> String {
+    func timeTitle(charging: String, discharging: String) -> String {
         switch self {
         case .charging:
             return charging
         case .onBattery, .connectedDischarging:
             return discharging
         case .connectedNotCharging, .fullOnAC, .unknown:
-            return idle
+            return "Time"
         }
     }
 }

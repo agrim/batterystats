@@ -120,66 +120,39 @@ enum BatteryFormatting {
     static func compactCapacityPair(current: Int?, maximum: Int?, currentAllowsZero: Bool = true) -> String {
         let current = BatteryCalculations.plausibleCapacityMilliampHours(current, allowsZero: currentAllowsZero)
         let maximum = BatteryCalculations.plausibleCapacityMilliampHours(maximum, allowsZero: false)
-        let displayCurrent = displayablePairCurrent(current: current, maximum: maximum, numericValue: Double.init)
+        let displayCurrent: Int?
+        if let current, let maximum, current > maximum {
+            let overagePercent = (Double(current) / Double(maximum)) * 100
+            displayCurrent = overagePercent.isFinite && overagePercent <= 105 ? current : nil
+        } else {
+            displayCurrent = current
+        }
 
-        return compactPair(displayCurrent, maximum: maximum, unit: "mAh") {
+        let numberText: (Int) -> String = {
             $0.formatted(.number.grouping(.automatic))
+        }
+        return switch (displayCurrent, maximum) {
+        case let (current?, maximum?):
+            "\(numberText(current)) / \(numberText(maximum)) mAh"
+        case let (current?, nil):
+            "\(numberText(current)) mAh"
+        case let (nil, maximum?):
+            "\(numberText(maximum)) mAh max"
+        case (nil, nil):
+            "Unavailable"
         }
     }
 
-    static func compactWattHourPair(current: Double?, maximum: Double?) -> String {
-        let current = BatteryCalculations.plausibleWattHours(current)
-        let maximum = BatteryCalculations.positiveWattHours(maximum)
-        let displayCurrent = displayablePairCurrent(current: current, maximum: maximum) { $0 }
-
-        return compactPair(displayCurrent, maximum: maximum, unit: "Wh") {
-            $0.formatted(.number.precision(.fractionLength(1)))
+    static func compactWattHours(_ value: Double?) -> String {
+        guard let value = BatteryCalculations.plausibleWattHours(value) else {
+            return "Unavailable"
         }
+
+        return "\(value.formatted(.number.precision(.fractionLength(1)))) Wh"
     }
 
     private static func formattedMilliamps(_ value: Int) -> String {
         "\(value.formatted(.number.grouping(.automatic))) mA"
     }
 
-    private static func compactPair<Value>(
-        _ current: Value?,
-        maximum: Value?,
-        unit: String,
-        numberText: (Value) -> String
-    ) -> String {
-        switch (current, maximum) {
-        case let (current?, maximum?):
-            return "\(numberText(current)) / \(numberText(maximum)) \(unit)"
-        case let (current?, nil):
-            return "\(numberText(current)) \(unit)"
-        case let (nil, maximum?):
-            return "\(numberText(maximum)) \(unit) max"
-        case (nil, nil):
-            return "Unavailable"
-        }
-    }
-
-    private static func displayablePairCurrent<Value>(
-        current: Value?,
-        maximum: Value?,
-        numericValue: (Value) -> Double
-    ) -> Value? {
-        guard let current, let maximum else {
-            return current
-        }
-
-        let currentValue = numericValue(current)
-        let maximumValue = numericValue(maximum)
-        guard currentValue > maximumValue else {
-            return current
-        }
-
-        let overagePercent = (currentValue / maximumValue) * 100
-        guard overagePercent.isFinite,
-              overagePercent <= 105 else {
-            return nil
-        }
-
-        return current
-    }
 }

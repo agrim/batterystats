@@ -56,8 +56,6 @@ final class RefreshPolicyTests: XCTestCase {
             powerState: powerState,
             isCharging: powerState == .charging,
             isExternalPowerConnected: powerState != .onBattery && powerState != .unknown,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: chargePercent,
             currentMilliampsSigned: powerState == .charging ? 1_200 : -1_200,
             dischargeRateMilliamps: (powerState == .onBattery || powerState == .connectedDischarging) ? 1_200 : nil,

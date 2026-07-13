@@ -57,8 +57,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeWattHours: 39,
-            fullChargeCapacityWattHours: 65,
             dischargeRateMilliamps: 1_200,
             adapterMaxWatts: 70,
         )
@@ -78,8 +76,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .connectedDischarging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeWattHours: 39,
-            fullChargeCapacityWattHours: 65,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
             dischargeRateWatts: 14.4,
@@ -1430,8 +1426,7 @@ final class BatteryMonitorTests: XCTestCase {
             voltageMillivolts: 12_000,
             temperatureCelsius: 32.0,
             cycleCount: 120,
-            currentChargeMilliampHours: 3_050,
-            currentChargeWattHours: 39.6
+            currentChargeMilliampHours: 3_050
         )
         let secondSnapshot = makeEnergyProbeSnapshot(
             powerState: .charging,
@@ -1440,8 +1435,7 @@ final class BatteryMonitorTests: XCTestCase {
             voltageMillivolts: 12_180,
             temperatureCelsius: 33.2,
             cycleCount: 121,
-            currentChargeMilliampHours: 3_075,
-            currentChargeWattHours: 39.9
+            currentChargeMilliampHours: 3_075
         )
 
         monitor.updateRefreshPolicy(BatteryRefreshPolicy(cadence: .dynamic, energyChangeSensitivity: .balanced))
@@ -1461,7 +1455,11 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.snapshot?.voltageMillivolts, 12_180)
         XCTAssertEqual(monitor.snapshot?.cycleCount, 121)
         XCTAssertEqual(monitor.snapshot?.currentChargeMilliampHours, 3_075)
-        XCTAssertEqual(monitor.snapshot?.currentChargeWattHours, 39.9)
+        XCTAssertEqual(
+            monitor.snapshot?.currentChargeWattHours ?? -1,
+            37.4535,
+            accuracy: 0.001
+        )
         XCTAssertEqual(monitor.snapshot?.timestamp, probeDate)
         XCTAssertEqual(reloadCount, 1)
     }
@@ -2138,8 +2136,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .charging,
             isCharging: true,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 39,
-            fullChargeCapacityWattHours: 65,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
             dischargeRateWatts: 14.4,
@@ -2165,8 +2161,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_000,
-            currentChargeWattHours: 65,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 100,
             adapterMaxWatts: 70,
         )
@@ -2186,8 +2180,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
-            currentChargeWattHours: 0,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: nil,
             adapterMaxWatts: 70,
         )
@@ -2208,8 +2200,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 1_000,
-            currentChargeWattHours: 12,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 20,
             adapterMaxWatts: 70,
         )
@@ -2230,8 +2220,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 4_000,
-            currentChargeWattHours: 52,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 80,
             adapterMaxWatts: 70,
         )
@@ -2280,8 +2268,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 4_000,
-            currentChargeWattHours: 52,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 80,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2314,8 +2300,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 4_000,
-            currentChargeWattHours: 52,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 80,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
@@ -2338,8 +2322,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 4_000,
-            currentChargeWattHours: 52,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 80,
             rateBasedTimeRemainingMinutes: 150,
             systemTimeRemainingMinutes: 145,
@@ -2365,8 +2347,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 4_000,
-            currentChargeWattHours: 52,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 80,
             adapterMaxWatts: 70,
         )
@@ -2397,8 +2377,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             healthPercent: nil,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2421,9 +2399,7 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40,
             fullChargeCapacityMilliampHours: 4_000,
-            fullChargeCapacityWattHours: 52,
             designCapacityMilliampHours: 5_000,
             healthPercent: 100,
             stateOfChargePercent: 75,
@@ -2448,8 +2424,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: nil,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2473,8 +2447,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: 92,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2499,8 +2471,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 6_000,
-            currentChargeWattHours: 72,
-            fullChargeCapacityWattHours: 65,
             stateOfChargePercent: nil,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2515,7 +2485,6 @@ final class BatteryMonitorTests: XCTestCase {
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: Date(timeIntervalSince1970: 1_030), maximumAge: 60))
         XCTAssertNil(loadedSnapshot.currentChargeMilliampHours)
         XCTAssertNil(loadedSnapshot.currentChargeWattHours)
-        XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
     }
 
     func testWidgetSnapshotStoreSanitizesOutOfRangeValues() throws {
@@ -2548,8 +2517,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 39.0,
-            fullChargeCapacityWattHours: 65.0,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
             dischargeRateWatts: 14.4,
@@ -2597,7 +2564,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
-            currentChargeWattHours: 0,
             stateOfChargePercent: 0,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2622,9 +2588,7 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: true,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 725,
-            currentChargeWattHours: 8.7,
             fullChargeCapacityMilliampHours: 4_525,
-            fullChargeCapacityWattHours: 54.3,
             designCapacityMilliampHours: 5_000,
             healthPercent: 90.5,
             stateOfChargePercent: 16,
@@ -2699,7 +2663,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: true,
             isExternalPowerConnected: true,
             currentChargeMilliampHours: 5_000,
-            currentChargeWattHours: 60,
             stateOfChargePercent: 100,
             timeToFullMinutes: 0,
             adapterMaxWatts: 70,
@@ -2720,9 +2683,7 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: Int.max,
-            currentChargeWattHours: .greatestFiniteMagnitude,
             fullChargeCapacityMilliampHours: Int.max,
-            fullChargeCapacityWattHours: .greatestFiniteMagnitude,
             designCapacityMilliampHours: Int.max,
             voltageMillivolts: Int.max,
             currentMilliampsSigned: Int.max,
@@ -2741,7 +2702,6 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.currentChargeMilliampHours)
         XCTAssertNil(loadedSnapshot.currentChargeWattHours)
         XCTAssertNil(loadedSnapshot.fullChargeCapacityMilliampHours)
-        XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
         XCTAssertNil(loadedSnapshot.designCapacityMilliampHours)
         XCTAssertNil(loadedSnapshot.voltageMillivolts)
         XCTAssertNil(loadedSnapshot.currentMilliampsSigned)
@@ -2752,15 +2712,13 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertNil(loadedSnapshot.adapterMaxWatts)
     }
 
-    func testWidgetSnapshotStoreDropsStaleZeroMaximumEnergyValues() throws {
+    func testWidgetSnapshotStorePreservesZeroCurrentEnergyForEmptyBattery() throws {
         let store = try makeWidgetSnapshotStore()
         let snapshot = makeBatterySnapshot(
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 0,
-            currentChargeWattHours: 0,
-            fullChargeCapacityWattHours: 0,
             stateOfChargePercent: 0,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2772,7 +2730,6 @@ final class BatteryMonitorTests: XCTestCase {
 
         let loadedSnapshot = try XCTUnwrap(store.snapshot(now: Date(timeIntervalSince1970: 1_030), maximumAge: 60))
         XCTAssertEqual(loadedSnapshot.currentChargeWattHours, 0)
-        XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
     }
 
     func testWidgetSnapshotStoreClampsSmallCurrentChargeOverage() throws {
@@ -2782,7 +2739,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_050,
-            currentChargeWattHours: 60.6,
             stateOfChargePercent: nil,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
@@ -2796,7 +2752,6 @@ final class BatteryMonitorTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot.currentChargeMilliampHours, 5_000)
         XCTAssertEqual(loadedSnapshot.fullChargeCapacityMilliampHours, 5_000)
         XCTAssertEqual(loadedSnapshot.currentChargeWattHours, 60)
-        XCTAssertNil(loadedSnapshot.fullChargeCapacityWattHours)
         XCTAssertEqual(loadedSnapshot.stateOfChargePercent, 100)
     }
 
@@ -2816,8 +2771,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeWattHours: 39.0,
-            fullChargeCapacityWattHours: 65.0,
             adapterMaxWatts: 70,
         )
 
@@ -3029,8 +2982,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .connectedNotCharging,
             isCharging: false,
             isExternalPowerConnected: true,
-            currentChargeWattHours: 39.0,
-            fullChargeCapacityWattHours: 65.0,
             chargeRateWatts: 18,
             dischargeRateWatts: 14,
             rateBasedTimeRemainingMinutes: 25,
@@ -3259,8 +3210,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_000,
-            currentChargeWattHours: 65.0,
-            fullChargeCapacityWattHours: 65.0,
             designCapacityMilliampHours: 4_900,
             healthPercent: 100.2,
             stateOfChargePercent: 105,
@@ -3286,8 +3235,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 5_000,
-            currentChargeWattHours: 65.0,
-            fullChargeCapacityWattHours: 65.0,
             designCapacityMilliampHours: 4_900,
             healthPercent: 119,
             stateOfChargePercent: 119,
@@ -3315,8 +3262,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
             dischargeRateWatts: 14.4,
@@ -3358,8 +3303,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
             dischargeRateWatts: 14.4,
@@ -3390,8 +3333,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
             dischargeRateWatts: 14.4,
@@ -3418,8 +3359,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40,
-            fullChargeCapacityWattHours: 65,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,
             dischargeRateWatts: 14.4,
@@ -3687,8 +3626,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 1_000,
-            currentChargeWattHours: 12.0,
-            fullChargeCapacityWattHours: 65.0,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
             currentMilliampsSigned: -1_200,
@@ -3711,9 +3648,7 @@ final class BatteryMonitorTests: XCTestCase {
         temperatureCelsius: Double = 32.0,
         cycleCount: Int = 120,
         currentChargeMilliampHours: Int = 3_050,
-        currentChargeWattHours: Double = 39.6,
         fullChargeCapacityMilliampHours: Int = 5_000,
-        fullChargeCapacityWattHours: Double = 65.0,
         designCapacityMilliampHours: Int = 6_000,
         inputPowerWatts: Double? = nil
     ) -> BatterySnapshot {
@@ -3724,9 +3659,7 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: powerState == .charging,
             isExternalPowerConnected: powerState != .onBattery,
             currentChargeMilliampHours: currentChargeMilliampHours,
-            currentChargeWattHours: currentChargeWattHours,
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-            fullChargeCapacityWattHours: fullChargeCapacityWattHours,
             designCapacityMilliampHours: designCapacityMilliampHours,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
@@ -3750,8 +3683,6 @@ final class BatteryMonitorTests: XCTestCase {
             powerState: .onBattery,
             isCharging: false,
             isExternalPowerConnected: false,
-            currentChargeWattHours: 40.0,
-            fullChargeCapacityWattHours: 65.0,
             healthPercent: .infinity,
             stateOfChargePercent: .nan,
             currentMilliampsSigned: -1_200,
@@ -3769,9 +3700,7 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: -1,
-            currentChargeWattHours: -1,
             fullChargeCapacityMilliampHours: 0,
-            fullChargeCapacityWattHours: -65.0,
             designCapacityMilliampHours: -6_000,
             healthPercent: 150,
             stateOfChargePercent: -4,
@@ -3796,8 +3725,6 @@ final class BatteryMonitorTests: XCTestCase {
             isCharging: false,
             isExternalPowerConnected: false,
             currentChargeMilliampHours: 500,
-            currentChargeWattHours: 6.0,
-            fullChargeCapacityWattHours: 65.0,
             stateOfChargePercent: 10,
             currentMilliampsSigned: -1_200,
             dischargeRateMilliamps: 1_200,

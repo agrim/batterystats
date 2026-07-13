@@ -17,7 +17,7 @@ struct BatteryStatusWidgetView: View {
             let healthMetric = BatteryWidgetMetric(
                 content: snapshot?.presentationHealthPercent == nil ? .empty : .text(healthText),
                 progress: BatteryMetricFormatting.clampedProgress(snapshot?.presentationHealthPercent),
-                ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color,
+                ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot),
                 accessibilityLabel: "Battery Health",
                 accessibilityValue: snapshot?.presentationHealthPercent == nil ? "Unavailable" : healthText
             )
@@ -25,19 +25,19 @@ struct BatteryStatusWidgetView: View {
             let chargeMetric = BatteryWidgetMetric(
                 content: snapshot?.presentationStateOfChargePercent == nil ? .empty : .text(chargeText),
                 progress: BatteryMetricFormatting.clampedProgress(snapshot?.presentationStateOfChargePercent),
-                ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color,
+                ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot),
                 accessibilityLabel: "Charge",
                 accessibilityValue: snapshot?.presentationStateOfChargePercent == nil ? "Unavailable" : chargeText
             )
             let timeText = BatteryMetricFormatting.timeText(minutes: displayedTimeMinutes)
-            let timeRingTint = BatteryPresentationStyle.timeTintStyle(
+            let timeRingTintStyle = BatteryPresentationStyle.timeTintStyle(
                 for: snapshot,
                 displayedTimeMinutes: displayedTimeMinutes
-            ).color
+            )
             let timeMetric = BatteryWidgetMetric(
                 content: displayedTimeMinutes == nil ? .empty : .text(timeText),
                 progress: BatteryMetricFormatting.timeProgress(minutes: displayedTimeMinutes),
-                ringTint: timeRingTint,
+                ringTint: timeRingTintStyle,
                 accessibilityLabel: snapshot?.powerState.timeTitle(
                     charging: "Time to Full",
                     discharging: "Time Remaining"
@@ -47,10 +47,10 @@ struct BatteryStatusWidgetView: View {
             let statusMetric = BatteryWidgetMetric(
                 content: snapshot == nil ? .empty : .symbol(statusDescriptor.symbolName),
                 progress: statusDescriptor.progress,
-                ringTint: statusDescriptor.ringTint,
+                ringTint: statusDescriptor.ringTintStyle,
                 accessibilityLabel: "Power State",
                 accessibilityValue: snapshot?.statusDisplayTitle ?? "Unavailable",
-                contentTint: statusDescriptor.contentTint
+                contentTint: statusDescriptor.contentTintStyle
             )
 
             VStack(spacing: spacing) {

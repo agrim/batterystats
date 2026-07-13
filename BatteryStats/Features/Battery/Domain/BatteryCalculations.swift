@@ -1,6 +1,6 @@
 import Foundation
 
-struct BatteryDischargeRateSample: Equatable, Sendable {
+struct BatteryDischargeRateSample: Sendable {
     let timestamp: Date
     let milliamps: Int
 }
@@ -49,12 +49,13 @@ enum BatteryCalculations {
             }
 
             if let publicPercentage,
-               shouldPreferFullPublicPercentWhenCapacityIsEmpty(calculated: normalizedCalculatedPercentage, publicPercentage: publicPercentage) {
-                return publicPercentage
-            }
-
-            if let publicPercentage,
-               shouldPreferPublicPercent(calculated: normalizedCalculatedPercentage, publicPercentage: publicPercentage) {
+               shouldPreferFullPublicPercentWhenCapacityIsEmpty(
+                   calculated: normalizedCalculatedPercentage,
+                   publicPercentage: publicPercentage
+               ) || shouldPreferPublicPercent(
+                   calculated: normalizedCalculatedPercentage,
+                   publicPercentage: publicPercentage
+               ) {
                 return publicPercentage
             }
 
@@ -97,11 +98,13 @@ enum BatteryCalculations {
             return boundedSmartCurrentChargeMilliampHours
         }
 
-        if shouldPreferFullPublicPercentWhenCapacityIsEmpty(calculated: normalizedSmartPercentage, publicPercentage: publicPercentage) {
-            return derivedCurrentChargeMilliampHours ?? boundedSmartCurrentChargeMilliampHours
-        }
-
-        if shouldPreferPublicPercent(calculated: normalizedSmartPercentage, publicPercentage: publicPercentage) {
+        if shouldPreferFullPublicPercentWhenCapacityIsEmpty(
+            calculated: normalizedSmartPercentage,
+            publicPercentage: publicPercentage
+        ) || shouldPreferPublicPercent(
+            calculated: normalizedSmartPercentage,
+            publicPercentage: publicPercentage
+        ) {
             return derivedCurrentChargeMilliampHours ?? boundedSmartCurrentChargeMilliampHours
         }
 
@@ -176,15 +179,6 @@ enum BatteryCalculations {
         }
 
         return min(100, value)
-    }
-
-    static func positiveWattHours(_ value: Double?) -> Double? {
-        guard let value = plausibleWattHours(value),
-              value > 0 else {
-            return nil
-        }
-
-        return value
     }
 
     static func plausibleWatts(_ value: Double?) -> Double? {
@@ -745,8 +739,7 @@ enum BatteryCalculations {
     }
 
     private static func isStablePublicPercent(_ value: Double) -> Bool {
-        !isEmptyPercent(value)
-            && !isTransientLowPercent(value)
+        !isTransientLowPercent(value)
             && !isFullPercent(value)
     }
 

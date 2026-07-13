@@ -1,5 +1,3 @@
-import Foundation
-
 struct PublicPowerSourceSnapshot {
     let isPresent: Bool
     let isCharging: Bool

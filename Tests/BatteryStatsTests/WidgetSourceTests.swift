@@ -9,21 +9,26 @@ final class WidgetSourceTests: XCTestCase {
         XCTAssertSource(source, contains: [
             "let snapshot = entry.snapshot",
             "let displayedTimeMinutes = snapshot == nil ? nil : entry.displayedTimeMinutes",
-            "BatteryPresentationStyle.healthTintStyle(for: snapshot).color",
-            "BatteryPresentationStyle.chargeTintStyle(for: snapshot).color",
+            "ringTint: BatteryPresentationStyle.healthTintStyle(for: snapshot)",
+            "ringTint: BatteryPresentationStyle.chargeTintStyle(for: snapshot)",
             "BatteryPresentationStyle.timeTintStyle(\n                for: snapshot,\n                displayedTimeMinutes: displayedTimeMinutes",
             "BatteryPresentationStyle.statusDescriptor(for: snapshot)",
             "BatteryMetricFormatting.timeText(minutes: displayedTimeMinutes)"
         ], excludes: [
             "entry.snapshotIsDisplayable",
             "BatterySnapshotFreshnessPolicy.isLive",
-            "BatteryMediumWidgetView"
+            "BatteryMediumWidgetView",
+            ").color", "statusDescriptor.ringTint,", "contentTint: statusDescriptor.contentTint\n"
         ])
         XCTAssertSource(componentSource, contains: [
             ".trim(from: 0, to: progress)",
             "case empty",
-            ".accessibilityLabel(Text(metric.accessibilityLabel))"
-        ], excludes: ["BatteryMediumWidgetView", "BatteryMediumMetricView", "mediumTimeText", ".accessoryCircularCapacity"])
+            ".accessibilityLabel(Text(metric.accessibilityLabel))",
+            "let ringTint: BatteryPresentationTint",
+            "var contentTint: BatteryPresentationTint = .primary",
+            ".stroke(metric.ringTint.color, lineWidth: lineWidth)",
+            ".foregroundStyle(metric.contentTint.color)"
+        ], excludes: ["BatteryMediumWidgetView", "BatteryMediumMetricView", "mediumTimeText", ".accessoryCircularCapacity", "let ringTint: Color", "var contentTint: Color"])
         XCTAssertSource(providerSource, contains: [
             "BatteryWidgetTimelinePlan.make(snapshot: snapshot, now: now)",
             "snapshot: projection.snapshotIsDisplayable ? snapshot : nil",
@@ -46,8 +51,12 @@ final class WidgetSourceTests: XCTestCase {
             "title: \"Adapter Rating\"",
             "value: adapter",
             "BatteryDetailRowView(title: \"Charging Speed\", value: chargingSpeed)",
-            "if chargingSpeed == nil,"
-        ], excludes: ["BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)"])
+            "if chargingSpeed == nil,",
+            "title: \"Estimated Energy\"",
+            "value: BatteryFormatting.compactWattHours(currentEnergy)",
+            "let tint: BatteryPresentationTint",
+            ".fill(tint.color)"
+        ], excludes: ["BatterySummaryDetailFormatting.chargingSpeed(for: snapshot)", "snapshot.fullChargeCapacityWattHours", "let tint: Color"])
     }
 
 }

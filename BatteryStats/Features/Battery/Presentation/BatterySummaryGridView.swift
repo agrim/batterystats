@@ -21,7 +21,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatterySummaryDetailFormatting.compactPercent(snapshot.presentationHealthPercent),
                 progress: snapshot.presentationHealthPercent,
-                tint: BatteryPresentationStyle.healthTintStyle(for: snapshot).color
+                tint: BatteryPresentationStyle.healthTintStyle(for: snapshot)
             )
 
             BatteryCapacityBarSectionView(
@@ -32,7 +32,7 @@ struct BatterySummaryGridView: View {
                 ),
                 percentValue: BatterySummaryDetailFormatting.compactPercent(snapshot.presentationStateOfChargePercent),
                 progress: snapshot.presentationStateOfChargePercent,
-                tint: BatteryPresentationStyle.chargeTintStyle(for: snapshot).color
+                tint: BatteryPresentationStyle.chargeTintStyle(for: snapshot)
             )
 
             GroupBox {
@@ -52,7 +52,7 @@ struct BatterySummaryGridView: View {
                         BatteryDetailRowView(title: "Charge Cycles", value: String(cycleCount))
                     }
 
-                    if let temperature = BatteryCalculations.plausibleTemperatureCelsius(snapshot.presentationTemperatureCelsius) {
+                    if let temperature = snapshot.presentationTemperatureCelsius {
                         rowDivider
 
                         BatteryDetailRowView(
@@ -107,14 +107,12 @@ struct BatterySummaryGridView: View {
             BatteryDetailRowView(title: "Voltage", value: BatteryFormatting.millivolts(voltage))
         }
 
-        let currentEnergy = BatteryCalculations.plausibleWattHours(snapshot.currentChargeWattHours)
-        let maximumEnergy = BatteryCalculations.positiveWattHours(snapshot.fullChargeCapacityWattHours)
-        if currentEnergy != nil || maximumEnergy != nil {
+        if let currentEnergy = BatteryCalculations.plausibleWattHours(snapshot.currentChargeWattHours) {
             rowDivider
 
             BatteryDetailRowView(
-                title: maximumEnergy == nil ? "Estimated Energy" : "Energy",
-                value: BatteryFormatting.compactWattHourPair(current: currentEnergy, maximum: maximumEnergy)
+                title: "Estimated Energy",
+                value: BatteryFormatting.compactWattHours(currentEnergy)
             )
         }
 
@@ -196,7 +194,7 @@ private struct BatteryCapacityBarSectionView: View {
     let capacityValue: String
     let percentValue: String
     let progress: Double?
-    let tint: Color
+    let tint: BatteryPresentationTint
 
     var body: some View {
         let fillFraction = BatteryMetricFormatting.clampedProgress(progress)
@@ -235,7 +233,7 @@ private struct BatteryCapacityBarSectionView: View {
 
 private struct BatteryCapacityProgressBar: View {
     let fillFraction: Double?
-    let tint: Color
+    let tint: BatteryPresentationTint
 
     var body: some View {
         GeometryReader { geometry in
@@ -243,18 +241,18 @@ private struct BatteryCapacityProgressBar: View {
 
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(tint.opacity(fillFraction == nil ? 0.12 : 0.18))
+                    .fill(tint.color.opacity(fillFraction == nil ? 0.12 : 0.18))
 
                 if let fillFraction {
                     let fillWidth = width * fillFraction
                     if fillWidth > 0 {
                         Capsule()
-                            .fill(tint)
+                            .fill(tint.color)
                             .frame(width: fillWidth)
                     }
                 } else if width > 0 {
                     Capsule()
-                        .fill(tint.opacity(0.46))
+                        .fill(tint.color.opacity(0.46))
                         .frame(width: min(width, max(36, width * 0.28)))
                         .frame(maxWidth: .infinity, alignment: .center)
                 }

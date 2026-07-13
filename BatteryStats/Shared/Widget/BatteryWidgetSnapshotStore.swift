@@ -49,7 +49,7 @@ struct BatteryWidgetSnapshotStore {
         defaults.synchronize()
     }
 
-    func snapshot(now: Date = .now, maximumAge: TimeInterval = defaultRetentionAge) -> BatterySnapshot? {
+    func snapshot(now: Date, maximumAge: TimeInterval = defaultRetentionAge) -> BatterySnapshot? {
         guard maximumAge > 0,
               let defaults,
               let data = defaults.data(forKey: Self.snapshotKey) else {
@@ -227,12 +227,7 @@ struct BatteryWidgetSnapshotStore {
             isCharging: flags.isCharging,
             isExternalPowerConnected: flags.isExternalPowerConnected,
             currentChargeMilliampHours: currentChargeMilliampHours,
-            currentChargeWattHours: BatteryCalculations.wattHours(
-                milliampHours: currentChargeMilliampHours,
-                voltageMillivolts: voltageMillivolts
-            ),
             fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
-            fullChargeCapacityWattHours: nil,
             designCapacityMilliampHours: designCapacityMilliampHours,
             healthPercent: healthPercent,
             stateOfChargePercent: stateOfChargePercent,
@@ -466,7 +461,7 @@ struct BatteryWidgetSnapshotStore {
 
 }
 
-struct BatteryWidgetCountdown: Equatable, Sendable {
+struct BatteryWidgetCountdown: Sendable {
     let deadline: Date
     private let initialMinutes: Int
 
@@ -499,8 +494,8 @@ struct BatteryWidgetCountdown: Equatable, Sendable {
     }
 }
 
-struct BatteryWidgetTimelinePlan: Equatable, Sendable {
-    struct Entry: Equatable, Sendable {
+struct BatteryWidgetTimelinePlan: Sendable {
+    struct Entry: Sendable {
         let date: Date
         let snapshotIsDisplayable: Bool
         let displayedTimeMinutes: Int?
