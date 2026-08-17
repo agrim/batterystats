@@ -103,8 +103,7 @@ Do not use unsigned output as proof of WidgetKit, App Groups, iCloud KVS, launch
 
 ## Release Contract
 
-- Current source version: `1.0.4 (5)`.
-- Public download remains `v1.0.3` until a new Developer ID artifact is verified, notarized, stapled, and published.
+- Read `RELEASE_STATUS.md` for dated version, artifact, and public-download state; verify every external fact live before use.
 - `BatteryStats/Resources/IconLayers/AppIcon.icon` is the complete editable Icon Composer source, including its layer assets.
 - `dist/BatteryStats-arm64.dmg` and its checksum are the tracked notarized reference artifact.
 - `script/package_release.sh` creates a versioned candidate; publishing or replacing the tracked artifact is separate.
