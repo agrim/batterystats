@@ -10,38 +10,29 @@ enum RefreshCadencePreference: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    private var metadata: (title: String, fixedInterval: TimeInterval?) {
         switch self {
         case .dynamic:
-            return "Dynamic"
+            return ("Dynamic", nil)
         case .fiveSeconds:
-            return "Every 5 Seconds"
+            return ("Every 5 Seconds", 5)
         case .fifteenSeconds:
-            return "Every 15 Seconds"
+            return ("Every 15 Seconds", 15)
         case .thirtySeconds:
-            return "Every 30 Seconds"
+            return ("Every 30 Seconds", 30)
         case .oneMinute:
-            return "Every 1 Minute"
+            return ("Every 1 Minute", 60)
         case .fiveMinutes:
-            return "Every 5 Minutes"
+            return ("Every 5 Minutes", 300)
         }
     }
 
+    var title: String {
+        metadata.title
+    }
+
     var fixedInterval: TimeInterval? {
-        switch self {
-        case .dynamic:
-            return nil
-        case .fiveSeconds:
-            return 5
-        case .fifteenSeconds:
-            return 15
-        case .thirtySeconds:
-            return 30
-        case .oneMinute:
-            return 60
-        case .fiveMinutes:
-            return 300
-        }
+        metadata.fixedInterval
     }
 }
 
@@ -52,27 +43,28 @@ enum EnergyChangeSensitivity: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    private var metadata: (title: String, thresholdPercent: Double) {
         switch self {
         case .subtle:
-            return "20%"
+            return ("20%", 20)
         case .balanced:
-            return "35%"
+            return ("35%", 35)
         case .large:
-            return "50%"
+            return ("50%", 50)
         }
     }
 
-    var thresholdPercent: Double {
-        switch self {
-        case .subtle:
-            return 20
-        case .balanced:
-            return 35
-        case .large:
-            return 50
-        }
+    var title: String {
+        metadata.title
     }
+
+    var thresholdPercent: Double {
+        metadata.thresholdPercent
+    }
+}
+
+struct BatteryMonitoringDemand: Equatable, Sendable {
+    var needsEnergyChangeAwareness = false
 }
 
 struct BatteryRefreshPolicy: Equatable {
@@ -87,12 +79,9 @@ struct BatteryRefreshPolicy: Equatable {
         15
     }
 
-    var usesEnergyChangeProbe: Bool {
-        guard let fixedInterval = cadence.fixedInterval else {
-            return true
-        }
-
-        return fixedInterval > energyProbeInterval
+    func usesEnergyChangeProbe(for demand: BatteryMonitoringDemand) -> Bool {
+        demand.needsEnergyChangeAwareness
+            && (cadence.fixedInterval.map { $0 > energyProbeInterval } ?? true)
     }
 
     func refreshInterval(for snapshot: BatterySnapshot?) -> TimeInterval {
@@ -104,14 +93,14 @@ struct BatteryRefreshPolicy: Equatable {
             return 60
         }
 
-        if let stateOfChargePercent = snapshot.stateOfChargePercent,
-           snapshot.powerState == .onBattery,
+        if let stateOfChargePercent = snapshot.presentationStateOfChargePercent,
+           snapshot.powerState.isBatteryDischarging,
            stateOfChargePercent <= 20 {
             return 30
         }
 
         switch snapshot.powerState {
-        case .onBattery, .charging:
+        case .onBattery, .connectedDischarging, .charging:
             return 60
         case .connectedNotCharging, .fullOnAC:
             return 300
@@ -121,14 +110,18 @@ struct BatteryRefreshPolicy: Equatable {
     }
 
     static func isSignificantEnergyChange(previous: Double?, current: Double?, thresholdPercent: Double) -> Bool {
-        guard let previous,
-              let current,
-              previous > 0,
-              current > 0 else {
-            return false
-        }
+        let previous = previous.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        let current = current.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
 
-        let percentChange = abs(current - previous) / previous * 100
-        return percentChange >= thresholdPercent
+        switch (previous, current) {
+        case (nil, nil):
+            return false
+        case (nil, .some), (.some, nil):
+            return true
+        case let (.some(previous), .some(current)):
+            let thresholdPercent = max(0, thresholdPercent)
+            let percentChange = abs(current - previous) / previous * 100
+            return percentChange >= thresholdPercent
+        }
     }
 }

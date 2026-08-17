@@ -1,58 +1,293 @@
 import Foundation
 
+struct BatteryDischargeRateSample: Sendable {
+    let timestamp: Date
+    let milliamps: Int
+}
+
+enum BatteryCalendar {
+    static let gregorianUTC: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        return calendar
+    }()
+}
+
 enum BatteryCalculations {
+    private static let maximumPlausibleBatteryCapacityMilliampHours = 1_000_000
+    private static let maximumPlausibleBatteryCurrentMilliamps = 1_000_000
+    private static let maximumPlausibleBatteryVoltageMillivolts = 100_000
+    private static let maximumPlausibleBatteryEnergyWattHours = 100_000.0
+    private static let minimumPlausibleBatteryPowerWatts = 0.1
+    private static let maximumPlausibleBatteryPowerWatts = 1_000.0
+    private static let maximumUnverifiedInputPowerWatts = 90.0
+    private static let adapterCapabilityEchoTolerance = 0.02
+    private static let counterBackedAdapterCapabilityEchoTolerance = 0.005
+    private static let highWattageCounterBackedAdapterCapabilityEchoTolerance = 0.05
+    private static let maximumPlausibleAdapterWatts = 1_000
+    private static let maximumPlausibleCycleCount = 100_000
+    private static let maximumPlausibleDurationMinutes = 24 * 60
+    private static let minimumPlausibleManufactureDateComponents = DateComponents(year: 2006, month: 1, day: 1)
+
     static func stateOfChargePercent(
         currentChargeMilliampHours: Int?,
         fullChargeCapacityMilliampHours: Int?,
         publicPercentage: Double?
     ) -> Double? {
-        if let currentChargeMilliampHours,
-           let fullChargeCapacityMilliampHours,
-           fullChargeCapacityMilliampHours > 0 {
-            return (Double(currentChargeMilliampHours) / Double(fullChargeCapacityMilliampHours)) * 100
+        let publicPercentage = publicPercentage.flatMap(normalizedPercent)
+
+        if let currentChargeMilliampHours = plausibleCapacityMilliampHours(currentChargeMilliampHours),
+           let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(fullChargeCapacityMilliampHours, allowsZero: false) {
+            let calculatedPercentage = (Double(currentChargeMilliampHours) / Double(fullChargeCapacityMilliampHours)) * 100
+            guard let normalizedCalculatedPercentage = normalizedPercent(calculatedPercentage) else {
+                return publicPercentage
+            }
+
+            if let publicPercentage,
+               shouldPreferCapacityPercent(calculated: normalizedCalculatedPercentage, publicPercentage: publicPercentage) {
+                return normalizedCalculatedPercentage
+            }
+
+            if let publicPercentage,
+               shouldPreferFullPublicPercentWhenCapacityIsEmpty(
+                   calculated: normalizedCalculatedPercentage,
+                   publicPercentage: publicPercentage
+               ) || shouldPreferPublicPercent(
+                   calculated: normalizedCalculatedPercentage,
+                   publicPercentage: publicPercentage
+               ) {
+                return publicPercentage
+            }
+
+            return normalizedCalculatedPercentage
         }
 
         return publicPercentage
     }
 
+    static func reconciledCurrentChargeMilliampHours(
+        smartCurrentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        publicPercentage: Double?
+    ) -> Int? {
+        let smartCurrentChargeMilliampHours = plausibleCapacityMilliampHours(smartCurrentChargeMilliampHours)
+        let derivedCurrentChargeMilliampHours = deriveCurrentChargeMilliampHours(
+            publicPercentage: publicPercentage,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        )
+
+        guard let smartCurrentChargeMilliampHours else {
+            return derivedCurrentChargeMilliampHours
+        }
+
+        guard let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(fullChargeCapacityMilliampHours, allowsZero: false) else {
+            return smartCurrentChargeMilliampHours
+        }
+
+        let smartPercentage = (Double(smartCurrentChargeMilliampHours) / Double(fullChargeCapacityMilliampHours)) * 100
+        guard let normalizedSmartPercentage = normalizedPercent(smartPercentage) else {
+            return derivedCurrentChargeMilliampHours
+        }
+        let boundedSmartCurrentChargeMilliampHours = min(smartCurrentChargeMilliampHours, fullChargeCapacityMilliampHours)
+
+        guard let publicPercentage = publicPercentage.flatMap(normalizedPercent) else {
+            return boundedSmartCurrentChargeMilliampHours
+        }
+
+        if shouldPreferCapacityPercent(calculated: normalizedSmartPercentage, publicPercentage: publicPercentage) {
+            return boundedSmartCurrentChargeMilliampHours
+        }
+
+        if shouldPreferFullPublicPercentWhenCapacityIsEmpty(
+            calculated: normalizedSmartPercentage,
+            publicPercentage: publicPercentage
+        ) || shouldPreferPublicPercent(
+            calculated: normalizedSmartPercentage,
+            publicPercentage: publicPercentage
+        ) {
+            return derivedCurrentChargeMilliampHours ?? boundedSmartCurrentChargeMilliampHours
+        }
+
+        return boundedSmartCurrentChargeMilliampHours
+    }
+
     static func healthPercent(fullChargeCapacityMilliampHours: Int?, designCapacityMilliampHours: Int?) -> Double? {
-        guard let fullChargeCapacityMilliampHours,
-              let designCapacityMilliampHours,
-              designCapacityMilliampHours > 0 else {
+        guard let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(fullChargeCapacityMilliampHours, allowsZero: false),
+              let designCapacityMilliampHours = plausibleCapacityMilliampHours(designCapacityMilliampHours, allowsZero: false) else {
             return nil
         }
 
-        return (Double(fullChargeCapacityMilliampHours) / Double(designCapacityMilliampHours)) * 100
+        let calculatedPercent = (Double(fullChargeCapacityMilliampHours) / Double(designCapacityMilliampHours)) * 100
+        guard let calculatedPercent = plausibleFiniteDouble(calculatedPercent, in: 0...120) else {
+            return nil
+        }
+
+        return min(100, calculatedPercent)
     }
 
     static func wattHours(milliampHours: Int?, voltageMillivolts: Int?) -> Double? {
-        guard let milliampHours, let voltageMillivolts else {
+        guard let milliampHours = plausibleCapacityMilliampHours(milliampHours),
+              let voltageMillivolts = plausibleVoltageMillivolts(voltageMillivolts) else {
             return nil
         }
 
-        return (Double(milliampHours) * Double(voltageMillivolts)) / 1_000_000
+        return plausibleWattHours((Double(milliampHours) * Double(voltageMillivolts)) / 1_000_000)
     }
 
     static func dischargeRateMilliamps(from signedCurrentMilliamps: Int?) -> Int? {
-        guard let signedCurrentMilliamps, signedCurrentMilliamps < 0 else {
+        negativeCurrentMagnitude(signedCurrentMilliamps)
+    }
+
+    static func plausibleCapacityMilliampHours(_ value: Int?, allowsZero: Bool = true) -> Int? {
+        plausibleInteger(value, in: (allowsZero ? 0 : 1)...maximumPlausibleBatteryCapacityMilliampHours)
+    }
+
+    static func plausibleVoltageMillivolts(_ value: Int?) -> Int? {
+        plausibleInteger(value, in: 1...maximumPlausibleBatteryVoltageMillivolts)
+    }
+
+    static func plausibleSignedCurrentMilliamps(_ value: Int?) -> Int? {
+        guard let value,
+              value != Int.min,
+              plausibleCurrentMagnitudeMilliamps(value < 0 ? -value : value) != nil else {
             return nil
         }
 
-        return abs(signedCurrentMilliamps)
+        return value
+    }
+
+    static func plausibleCurrentMagnitudeMilliamps(_ value: Int?) -> Int? {
+        plausibleInteger(value, in: 0...maximumPlausibleBatteryCurrentMilliamps)
+    }
+
+    static func plausibleDischargeRateMilliamps(_ value: Int?) -> Int? {
+        guard let value = plausibleCurrentMagnitudeMilliamps(value),
+              value > 40 else {
+            return nil
+        }
+
+        return value
+    }
+
+    static func plausibleWattHours(_ value: Double?) -> Double? {
+        plausibleFiniteDouble(value, in: 0...maximumPlausibleBatteryEnergyWattHours)
+    }
+
+    static func presentationPercent(_ value: Double?, maximumAllowed: Double) -> Double? {
+        guard let value = plausibleFiniteDouble(value, in: 0...maximumAllowed) else {
+            return nil
+        }
+
+        return min(100, value)
+    }
+
+    static func plausibleWatts(_ value: Double?) -> Double? {
+        plausibleFiniteDouble(value, in: minimumPlausibleBatteryPowerWatts...maximumPlausibleBatteryPowerWatts)
+    }
+
+    static func plausibleInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        guard let value = plausibleWatts(value) else {
+            return nil
+        }
+
+        guard let adapterMaxWatts = plausibleAdapterWatts(adapterMaxWatts) else {
+            return value
+        }
+
+        return value <= Double(adapterMaxWatts) * 1.15 ? value : nil
+    }
+
+    static func displayableInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        displayableInputPowerWatts(
+            value,
+            adapterMaxWatts: adapterMaxWatts,
+            relativeAdapterCapabilityTolerance: adapterCapabilityEchoTolerance,
+            minimumAdapterCapabilityToleranceWatts: 0.001
+        )
+    }
+
+    static func displayableCounterBackedInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        let tolerance = (plausibleAdapterWatts(adapterMaxWatts) ?? 0) >= 90
+            ? highWattageCounterBackedAdapterCapabilityEchoTolerance
+            : counterBackedAdapterCapabilityEchoTolerance
+        return displayableInputPowerWatts(
+            value,
+            adapterMaxWatts: adapterMaxWatts,
+            relativeAdapterCapabilityTolerance: tolerance,
+            minimumAdapterCapabilityToleranceWatts: 0.1
+        )
+    }
+
+    static func displayableLiveMeasuredInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        displayableInputPowerWatts(
+            value,
+            adapterMaxWatts: adapterMaxWatts,
+            relativeAdapterCapabilityTolerance: 0,
+            minimumAdapterCapabilityToleranceWatts: 0.1
+        )
+    }
+
+    private static func displayableInputPowerWatts(
+        _ value: Double?,
+        adapterMaxWatts: Int?,
+        relativeAdapterCapabilityTolerance: Double,
+        minimumAdapterCapabilityToleranceWatts: Double
+    ) -> Double? {
+        guard let value = baseDisplayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
+              isDistinctFromAdapterCapability(
+                  value,
+                  adapterMaxWatts: adapterMaxWatts,
+                  relativeTolerance: relativeAdapterCapabilityTolerance,
+                  minimumToleranceWatts: minimumAdapterCapabilityToleranceWatts
+              ) else {
+            return nil
+        }
+
+        return value
+    }
+
+    static func displayableInputPowerWatts(
+        _ value: Double?,
+        evidence: BatteryInputPowerEvidence?,
+        adapterMaxWatts: Int?
+    ) -> Double? {
+        switch evidence {
+        case .counterBacked:
+            return displayableCounterBackedInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts)
+        case nil:
+            return displayableInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts)
+        }
+    }
+
+    private static func baseDisplayableInputPowerWatts(_ value: Double?, adapterMaxWatts: Int?) -> Double? {
+        guard let value = plausibleInputPowerWatts(value, adapterMaxWatts: adapterMaxWatts),
+              plausibleAdapterWatts(adapterMaxWatts) != nil || value < maximumUnverifiedInputPowerWatts else {
+            return nil
+        }
+
+        return value
+    }
+
+    static func plausibleAdapterWatts(_ value: Int?) -> Int? {
+        plausibleInteger(value, in: 1...maximumPlausibleAdapterWatts)
+    }
+
+    static func plausibleCycleCount(_ value: Int?) -> Int? {
+        plausibleInteger(value, in: 0...maximumPlausibleCycleCount)
     }
 
     static func chargeRateWatts(voltageMillivolts: Int?, signedCurrentMilliamps: Int?) -> Double? {
-        guard let voltageMillivolts,
-              let signedCurrentMilliamps,
-              signedCurrentMilliamps > 0 else {
+        guard let voltageMillivolts = plausibleVoltageMillivolts(voltageMillivolts),
+              let chargeCurrentMilliamps = chargeRateMilliamps(from: signedCurrentMilliamps) else {
             return nil
         }
 
-        return (Double(voltageMillivolts) * Double(signedCurrentMilliamps)) / 1_000_000
+        return plausibleWatts((Double(voltageMillivolts) * Double(chargeCurrentMilliamps)) / 1_000_000)
     }
 
     static func chargeRateMilliamps(from signedCurrentMilliamps: Int?) -> Int? {
-        guard let signedCurrentMilliamps, signedCurrentMilliamps > 40 else {
+        guard let signedCurrentMilliamps = plausibleSignedCurrentMilliamps(signedCurrentMilliamps),
+              signedCurrentMilliamps > 40 else {
             return nil
         }
 
@@ -60,19 +295,17 @@ enum BatteryCalculations {
     }
 
     static func dischargeRateWatts(voltageMillivolts: Int?, signedCurrentMilliamps: Int?) -> Double? {
-        guard let voltageMillivolts,
-              let signedCurrentMilliamps,
-              signedCurrentMilliamps < 0 else {
+        guard let voltageMillivolts = plausibleVoltageMillivolts(voltageMillivolts),
+              let dischargeCurrentMilliamps = negativeCurrentMagnitude(signedCurrentMilliamps) else {
             return nil
         }
 
-        return (Double(voltageMillivolts) * Double(abs(signedCurrentMilliamps))) / 1_000_000
+        return plausibleWatts((Double(voltageMillivolts) * Double(dischargeCurrentMilliamps)) / 1_000_000)
     }
 
     static func timeRemainingMinutes(currentChargeMilliampHours: Int?, dischargeRateMilliamps: Int?) -> Int? {
-        guard let currentChargeMilliampHours,
-              let dischargeRateMilliamps,
-              dischargeRateMilliamps > 40 else {
+        guard let currentChargeMilliampHours = plausibleCapacityMilliampHours(currentChargeMilliampHours),
+              let dischargeRateMilliamps = plausibleDischargeRateMilliamps(dischargeRateMilliamps) else {
             return nil
         }
 
@@ -85,21 +318,86 @@ enum BatteryCalculations {
         return minutes
     }
 
+    static func chargedCapacityEvidence(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?
+    ) -> Bool? {
+        guard let currentChargeMilliampHours = plausibleCapacityMilliampHours(currentChargeMilliampHours) else {
+            return nil
+        }
+
+        if currentChargeMilliampHours == 0 {
+            return nil
+        }
+
+        guard let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(
+            fullChargeCapacityMilliampHours,
+            allowsZero: false
+        ) else {
+            return nil
+        }
+
+        let threshold = max(8, Int(Double(fullChargeCapacityMilliampHours) * 0.01))
+        return currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold
+    }
+
+    static func isEffectivelyEmpty(
+        currentChargeMilliampHours: Int?,
+        stateOfChargePercent: Double?
+    ) -> Bool {
+        if let stateOfChargePercent,
+           stateOfChargePercent.isFinite {
+            return stateOfChargePercent >= 0 && stateOfChargePercent <= 1
+        }
+
+        return plausibleCapacityMilliampHours(currentChargeMilliampHours) == 0
+    }
+
+    static func isEffectivelyFull(
+        currentChargeMilliampHours: Int?,
+        fullChargeCapacityMilliampHours: Int?,
+        stateOfChargePercent: Double?
+    ) -> Bool {
+        if let stateOfChargePercent,
+           stateOfChargePercent.isFinite {
+            return stateOfChargePercent >= 99 && stateOfChargePercent <= 105
+        }
+
+        return chargedCapacityEvidence(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours
+        ) == true
+    }
+
     static func estimatedTimeToFullMinutes(
         currentChargeMilliampHours: Int?,
         fullChargeCapacityMilliampHours: Int?,
         chargeCurrentMilliamps: Int?,
         reportedTimeToFullMinutes: Int?
     ) -> Int? {
-        guard let currentChargeMilliampHours,
-              let fullChargeCapacityMilliampHours,
-              let chargeCurrentMilliamps,
-              chargeCurrentMilliamps > 40 else {
+        let reportedTimeToFullMinutes = plausibleDurationMinutes(reportedTimeToFullMinutes)
+
+        guard let currentChargeMilliampHours = plausibleCapacityMilliampHours(currentChargeMilliampHours),
+              let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(fullChargeCapacityMilliampHours, allowsZero: false) else {
             return reportedTimeToFullMinutes
         }
 
         if currentChargeMilliampHours >= fullChargeCapacityMilliampHours {
+            if let reportedTimeToFullMinutes {
+                return reportedTimeToFullMinutes
+            }
+
+            if let chargeCurrentMilliamps = plausibleCurrentMagnitudeMilliamps(chargeCurrentMilliamps),
+               chargeCurrentMilliamps > 40 {
+                return nil
+            }
+
             return 0
+        }
+
+        guard let chargeCurrentMilliamps = plausibleCurrentMagnitudeMilliamps(chargeCurrentMilliamps),
+              chargeCurrentMilliamps > 40 else {
+            return reportedTimeToFullMinutes
         }
 
         let totalCapacity = Double(fullChargeCapacityMilliampHours)
@@ -128,22 +426,156 @@ enum BatteryCalculations {
         return estimatedMinutes
     }
 
-    static func smoothedDischargeRate(_ samples: [Int], fallback: Int?) -> Int? {
-        let recentSamples = Array(samples.suffix(8)).filter { $0 > 40 }
-        guard recentSamples.isEmpty == false else {
-            return fallback
-        }
-
-        let total = recentSamples.reduce(0, +)
-        return Int((Double(total) / Double(recentSamples.count)).rounded())
+    static func plausibleDurationMinutes(_ value: Int?) -> Int? {
+        plausibleInteger(value, in: 0...maximumPlausibleDurationMinutes)
     }
 
-    static func batteryAgeComponents(from manufactureDate: Date?, now: Date, calendar: Calendar = .current) -> DateComponents? {
-        guard let manufactureDate else {
+    static func confidentSmoothedDischargeRate(
+        _ samples: [BatteryDischargeRateSample],
+        now: Date,
+        minimumSampleCount: Int = 3,
+        minimumSampleDuration: TimeInterval = 30,
+        maximumSampleAge: TimeInterval = 180,
+        maximumRelativeSpread: Double = 0.25
+    ) -> Int? {
+        guard minimumSampleCount > 1,
+              minimumSampleDuration > 0,
+              maximumSampleAge >= minimumSampleDuration,
+              maximumRelativeSpread >= 0,
+              samples.count >= minimumSampleCount else {
             return nil
         }
 
-        return calendar.dateComponents([.year, .month, .day], from: manufactureDate, to: now)
+        var total = 0
+        var minimumRate = Int.max
+        var maximumRate = 0
+        var firstTimestamp: Date?
+        var previousTimestamp: Date?
+
+        for sample in samples.suffix(8) {
+            guard let rate = plausibleDischargeRateMilliamps(sample.milliamps) else {
+                return nil
+            }
+
+            let age = now.timeIntervalSince(sample.timestamp)
+            guard age >= 0,
+                  age <= maximumSampleAge,
+                  previousTimestamp.map({ sample.timestamp > $0 }) ?? true else {
+                return nil
+            }
+
+            firstTimestamp = firstTimestamp ?? sample.timestamp
+            previousTimestamp = sample.timestamp
+            total += rate
+            minimumRate = min(minimumRate, rate)
+            maximumRate = max(maximumRate, rate)
+        }
+
+        let consideredCount = min(samples.count, 8)
+        guard consideredCount >= minimumSampleCount,
+              let firstTimestamp,
+              let previousTimestamp,
+              previousTimestamp.timeIntervalSince(firstTimestamp) >= minimumSampleDuration else {
+            return nil
+        }
+
+        let average = Double(total) / Double(consideredCount)
+        guard average > 0,
+              Double(maximumRate - minimumRate) / average <= maximumRelativeSpread else {
+            return nil
+        }
+
+        return Int(average.rounded())
+    }
+
+    static func plausibleManufactureDate(_ manufactureDate: Date?, now: Date) -> Date? {
+        guard let manufactureDate,
+              isOnOrAfterMinimumPlausibleManufactureDay(manufactureDate),
+              isManufactureDay(manufactureDate, onOrBefore: now) else {
+            return nil
+        }
+
+        return manufactureDate
+    }
+
+    static func batteryAgeComponents(
+        from manufactureDate: Date?,
+        now: Date,
+        calendar providedCalendar: Calendar? = nil
+    ) -> DateComponents? {
+        guard let manufactureDate = plausibleManufactureDate(manufactureDate, now: now) else {
+            return nil
+        }
+
+        let calendar = providedCalendar ?? BatteryCalendar.gregorianUTC
+        let manufactureDay = calendar.startOfDay(for: manufactureDate)
+        let nowDay = calendar.startOfDay(for: now)
+        guard manufactureDay <= nowDay else {
+            return nil
+        }
+
+        return calendar.dateComponents([.year, .month, .day], from: manufactureDay, to: nowDay)
+    }
+
+    static func displayableBatteryAgeComponents(_ components: DateComponents?) -> DateComponents? {
+        guard let components else {
+            return nil
+        }
+
+        guard (components.year == nil) == (components.month == nil) else {
+            return nil
+        }
+
+        let years = components.year ?? 0
+        let months = components.month ?? 0
+        guard years >= 0,
+              months >= 0,
+              months <= 11,
+              (components.day ?? 0) >= 0 else {
+            return nil
+        }
+
+        return DateComponents(year: years, month: months)
+    }
+
+    static func displayableBatteryAgeMonthCount(_ components: DateComponents?) -> Int? {
+        guard let components = displayableBatteryAgeComponents(components),
+              let years = components.year,
+              let months = components.month,
+              years <= Int.max / 12 else {
+            return nil
+        }
+
+        let (yearMonths, multipliedOverflow) = years.multipliedReportingOverflow(by: 12)
+        let (totalMonths, addedOverflow) = yearMonths.addingReportingOverflow(months)
+        guard !multipliedOverflow, !addedOverflow else {
+            return nil
+        }
+
+        return totalMonths
+    }
+
+    private static func isOnOrAfterMinimumPlausibleManufactureDay(_ date: Date) -> Bool {
+        isDate(date, onOrAfter: minimumPlausibleManufactureDateComponents, calendar: BatteryCalendar.gregorianUTC)
+            || isDate(date, onOrAfter: minimumPlausibleManufactureDateComponents, calendar: Calendar(identifier: .gregorian))
+    }
+
+    private static func isManufactureDay(_ manufactureDate: Date, onOrBefore now: Date) -> Bool {
+        let manufactureDay = BatteryCalendar.gregorianUTC.startOfDay(for: manufactureDate)
+        let nowDay = BatteryCalendar.gregorianUTC.startOfDay(for: now)
+        return manufactureDay <= nowDay
+    }
+
+    private static func isDate(
+        _ date: Date,
+        onOrAfter minimumComponents: DateComponents,
+        calendar: Calendar
+    ) -> Bool {
+        guard let minimumDate = calendar.date(from: minimumComponents) else {
+            return false
+        }
+
+        return calendar.startOfDay(for: date) >= calendar.startOfDay(for: minimumDate)
     }
 
     static func temperatureCelsius(fromRaw rawValue: Int?) -> Double? {
@@ -152,20 +584,34 @@ enum BatteryCalculations {
         }
 
         let candidateCelsius = Double(rawValue) / 100.0
-        if (-20...120).contains(candidateCelsius) {
+        if isPlausibleTemperatureCelsius(candidateCelsius) {
             return candidateCelsius
         }
 
         let kelvinTenthsCandidate = (Double(rawValue) / 10.0) - 273.15
-        if (-20...120).contains(kelvinTenthsCandidate) {
+        if isPlausibleTemperatureCelsius(kelvinTenthsCandidate) {
             return kelvinTenthsCandidate
         }
 
-        return candidateCelsius
+        return nil
+    }
+
+    static func plausibleTemperatureCelsius(_ value: Double?) -> Double? {
+        guard let value,
+              isPlausibleTemperatureCelsius(value) else {
+            return nil
+        }
+
+        return value
+    }
+
+    static func isPlausibleTemperatureCelsius(_ value: Double) -> Bool {
+        value.isFinite && (-20...120).contains(value)
     }
 
     static func deriveCurrentChargeMilliampHours(publicPercentage: Double?, fullChargeCapacityMilliampHours: Int?) -> Int? {
-        guard let publicPercentage, let fullChargeCapacityMilliampHours else {
+        guard let publicPercentage = publicPercentage.flatMap(normalizedPercent),
+              let fullChargeCapacityMilliampHours = plausibleCapacityMilliampHours(fullChargeCapacityMilliampHours, allowsZero: false) else {
             return nil
         }
 
@@ -174,12 +620,17 @@ enum BatteryCalculations {
 
     static func derivePowerState(
         isCharging: Bool,
+        isCharged: Bool,
         isExternalPowerConnected: Bool,
         signedCurrentMilliamps: Int?,
         currentChargeMilliampHours: Int?,
         fullChargeCapacityMilliampHours: Int?
     ) -> BatteryPowerState {
-        if isCharging {
+        if dischargeRateMilliamps(from: signedCurrentMilliamps) != nil {
+            return isExternalPowerConnected ? .connectedDischarging : .onBattery
+        }
+
+        if chargeRateMilliamps(from: signedCurrentMilliamps) != nil {
             return .charging
         }
 
@@ -187,20 +638,27 @@ enum BatteryCalculations {
             return .onBattery
         }
 
-        if let signedCurrentMilliamps, signedCurrentMilliamps < 0 {
-            return .onBattery
+        if isCharging {
+            return .charging
         }
 
-        if let currentChargeMilliampHours,
-           let fullChargeCapacityMilliampHours,
-           fullChargeCapacityMilliampHours > 0 {
-            let threshold = max(8, Int(Double(fullChargeCapacityMilliampHours) * 0.01))
-            if currentChargeMilliampHours >= fullChargeCapacityMilliampHours - threshold {
-                return .fullOnAC
-            }
+        if isCharged {
+            return .fullOnAC
         }
 
-        return isExternalPowerConnected ? .connectedNotCharging : .unknown
+        if isEffectivelyFull(
+            currentChargeMilliampHours: currentChargeMilliampHours,
+            fullChargeCapacityMilliampHours: fullChargeCapacityMilliampHours,
+            stateOfChargePercent: nil
+        ) {
+            return .fullOnAC
+        }
+
+        return .connectedNotCharging
+    }
+
+    static func normalizedPowerFlags(for powerState: BatteryPowerState) -> (isCharging: Bool, isExternalPowerConnected: Bool) {
+        (powerState == .charging, powerState.isExternallyPowered)
     }
 
     private static func chargeTaperMultiplier(forPercent chargePercent: Double) -> Double {
@@ -216,5 +674,101 @@ enum BatteryCalculations {
         default:
             return 1.75
         }
+    }
+
+    private static func normalizedPercent(_ value: Double) -> Double? {
+        presentationPercent(value, maximumAllowed: 105)
+    }
+
+    private static func plausibleInteger(_ value: Int?, in range: ClosedRange<Int>) -> Int? {
+        guard let value, range.contains(value) else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func plausibleFiniteDouble(_ value: Double?, in range: ClosedRange<Double>) -> Double? {
+        guard let value,
+              value.isFinite,
+              range.contains(value) else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func shouldPreferCapacityPercent(calculated: Double, publicPercentage: Double) -> Bool {
+        if isEmptyPercent(publicPercentage) {
+            return calculated > 1
+        }
+
+        if isTransientLowPercent(publicPercentage) {
+            return calculated > 20
+        }
+
+        if isFullPercent(publicPercentage) {
+            return isNonExtremePercent(calculated)
+        }
+
+        return false
+    }
+
+    private static func shouldPreferPublicPercent(calculated: Double, publicPercentage: Double) -> Bool {
+        guard isStablePublicPercent(publicPercentage) else {
+            return false
+        }
+
+        return abs(calculated - publicPercentage) >= 2
+    }
+
+    private static func shouldPreferFullPublicPercentWhenCapacityIsEmpty(calculated: Double, publicPercentage: Double) -> Bool {
+        isFullPercent(publicPercentage) && isEmptyPercent(calculated)
+    }
+
+    private static func isEmptyPercent(_ value: Double) -> Bool {
+        value <= 1
+    }
+
+    private static func isTransientLowPercent(_ value: Double) -> Bool {
+        value <= 10
+    }
+
+    private static func isFullPercent(_ value: Double) -> Bool {
+        value >= 99
+    }
+
+    private static func isStablePublicPercent(_ value: Double) -> Bool {
+        !isTransientLowPercent(value)
+            && !isFullPercent(value)
+    }
+
+    private static func isNonExtremePercent(_ value: Double) -> Bool {
+        value > 1 && value < 99
+    }
+
+    private static func negativeCurrentMagnitude(_ value: Int?) -> Int? {
+        guard let value = plausibleSignedCurrentMilliamps(value),
+              value < 0,
+              -value > 40 else {
+            return nil
+        }
+
+        return -value
+    }
+
+    private static func isDistinctFromAdapterCapability(
+        _ watts: Double,
+        adapterMaxWatts: Int?,
+        relativeTolerance: Double,
+        minimumToleranceWatts: Double
+    ) -> Bool {
+        guard let adapterMaxWatts = plausibleAdapterWatts(adapterMaxWatts) else {
+            return true
+        }
+
+        let adapterWatts = Double(adapterMaxWatts)
+        let toleranceWatts = max(minimumToleranceWatts, adapterWatts * relativeTolerance)
+        return abs(watts - adapterWatts) > toleranceWatts
     }
 }

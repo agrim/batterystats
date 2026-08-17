@@ -1,12 +1,17 @@
-import Foundation
-
-struct BatteryAlertPolicy: Equatable {
+struct BatteryAlertPolicy {
     var isLowBatteryAlertEnabled = false
     var isChargeCompleteAlertEnabled = false
     var isHighTemperatureAlertEnabled = false
+    var temperatureUnitPreference: TemperatureUnitPreference = .system
 
     var lowBatteryThresholdPercent: Double = 20
     var highTemperatureThresholdCelsius: Double = 40
+
+    var hasEnabledAlerts: Bool {
+        isLowBatteryAlertEnabled
+            || isChargeCompleteAlertEnabled
+            || isHighTemperatureAlertEnabled
+    }
 
     static let disabled = BatteryAlertPolicy()
 }

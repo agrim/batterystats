@@ -1,20 +1,15 @@
 name: BatteryStats
 options:
   minimumXcodeGenVersion: 2.39.0
-  deploymentTarget:
-    macOS: "26.0"
-  defaultConfig: Debug
-
-configs:
-  Debug: debug
-  Release: release
 
 settings:
   base:
     SWIFT_VERSION: 5.0
-    MACOSX_DEPLOYMENT_TARGET: 26.0
-    CURRENT_PROJECT_VERSION: 4
-    MARKETING_VERSION: 1.0.3
+    ARCHS: arm64
+    CURRENT_PROJECT_VERSION: 5
+    MARKETING_VERSION: 1.0.4
+    DEVELOPMENT_TEAM: Q293G85PG5
+    CODE_SIGN_STYLE: Automatic
     CLANG_ENABLE_MODULES: YES
     SWIFT_STRICT_CONCURRENCY: complete
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -27,10 +22,6 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: BatteryStats
-        excludes:
-          - Resources/IconLayers/background.png
-          - Resources/IconLayers/battery.png
-          - Resources/IconLayers/heart.png
     dependencies:
       - target: BatteryStatsWidgetsExtension
         embed: true
@@ -52,19 +43,17 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: BatteryStatsWidgets
-      - path: BatteryStats/Features/Battery/Data/BatteryReadingService.swift
-      - path: BatteryStats/Features/Battery/Data/PowerSourceReader.swift
-      - path: BatteryStats/Features/Battery/Data/PublicPowerSourceSnapshot.swift
-      - path: BatteryStats/Features/Battery/Data/SmartBatteryReader.swift
       - path: BatteryStats/Features/Battery/Domain/BatteryCalculations.swift
       - path: BatteryStats/Features/Battery/Domain/BatteryFormatting.swift
       - path: BatteryStats/Features/Battery/Domain/BatteryPowerState.swift
       - path: BatteryStats/Features/Battery/Domain/BatterySnapshot.swift
+      - path: BatteryStats/Features/Battery/Domain/BatterySnapshot+Preview.swift
+      - path: BatteryStats/Features/Battery/Domain/BatteryTelemetrySanitization.swift
       - path: BatteryStats/Features/Battery/Domain/ManufactureDateDecoder.swift
+      - path: BatteryStats/Features/Battery/Presentation/BatteryPresentationStyle.swift
       - path: BatteryStats/Settings/TemperatureUnitPreference.swift
-      - path: BatteryStats/Shared/Logging/Logger+BatteryStats.swift
       - path: BatteryStats/Shared/Utilities/DateComponentsFormatter+BatteryStats.swift
-      - path: BatteryStats/Shared/Utilities/NSNumber+SignedConversions.swift
+      - path: BatteryStats/Shared/Widget/BatteryWidgetSnapshotStore.swift
     settings:
       base:
         PRODUCT_NAME: BatteryStatsWidgetsExtension
@@ -72,6 +61,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BatteryStatsWidgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: BatteryStatsWidgets/BatteryStatsWidgets.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SWIFT_EMIT_LOC_STRINGS: NO
 

@@ -4,46 +4,77 @@ import WidgetKit
 struct BatteryStatusEntry: TimelineEntry {
     let date: Date
     let snapshot: BatterySnapshot?
+    let displayedTimeMinutes: Int?
 
-    static let placeholder = BatteryStatusEntry(date: .now, snapshot: .previewDischarging)
+    static var placeholder: BatteryStatusEntry {
+        let date = Date.now
+        let snapshot = BatterySnapshot.previewDischarging
+        return BatteryStatusEntry(
+            date: date,
+            snapshot: snapshot,
+            displayedTimeMinutes: snapshot.displayedTimeMinutes
+        )
+    }
+}
+
+private extension BatteryStatusEntry {
+    init(snapshot: BatterySnapshot?, projection: BatteryWidgetTimelinePlan.Entry, date: Date? = nil) {
+        self.init(
+            date: date ?? projection.date,
+            snapshot: projection.snapshotIsDisplayable ? snapshot : nil,
+            displayedTimeMinutes: projection.displayedTimeMinutes
+        )
+    }
 }
 
 struct BatteryStatusProvider: TimelineProvider {
-    private let service = BatteryReadingService()
+    private let snapshotStore: BatteryWidgetSnapshotStore = .shared
 
     func placeholder(in context: Context) -> BatteryStatusEntry {
         .placeholder
     }
 
     func getSnapshot(in context: Context, completion: @escaping (BatteryStatusEntry) -> Void) {
-        completion(makeEntry(at: .now, isPreview: context.isPreview))
+        guard context.isPreview == false else {
+            completion(.placeholder)
+            return
+        }
+
+        let now = Date.now
+        let snapshot = storedSnapshot(at: now)
+        let plan = BatteryWidgetTimelinePlan.make(snapshot: snapshot, now: now)
+        completion(BatteryStatusEntry(snapshot: snapshot, projection: plan.entries[0], date: now))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BatteryStatusEntry>) -> Void) {
-        let entry = makeEntry(at: .now, isPreview: context.isPreview)
-        // Widgets refresh on a coarse schedule, so ask for a modest cadence.
-        let nextRefreshDate = entry.date.addingTimeInterval(300)
-        completion(Timeline(entries: [entry], policy: .after(nextRefreshDate)))
-    }
-
-    private func makeEntry(at date: Date, isPreview: Bool) -> BatteryStatusEntry {
-        if isPreview {
-            return .placeholder
+        guard context.isPreview == false else {
+            completion(Timeline(entries: [.placeholder], policy: .never))
+            return
         }
 
-        return BatteryStatusEntry(date: date, snapshot: service.read(at: date).snapshot)
+        let now = Date.now
+        let snapshot = storedSnapshot(at: now)
+        let plan = BatteryWidgetTimelinePlan.make(snapshot: snapshot, now: now)
+        let entries = plan.entries.map { projection in
+            BatteryStatusEntry(snapshot: snapshot, projection: projection)
+        }
+        let reloadPolicy: TimelineReloadPolicy = plan.reloadAfter.map { .after($0) } ?? .never
+        completion(Timeline(entries: entries, policy: reloadPolicy))
+    }
+
+    private func storedSnapshot(at date: Date) -> BatterySnapshot? {
+        snapshotStore.snapshot(now: date, maximumAge: BatteryWidgetSnapshotStore.defaultRetentionAge)
     }
 }
 
 struct BatteryStatusWidget: Widget {
-    private let kind = "BatteryStatusWidget"
-
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: BatteryStatusProvider()) { entry in
+        StaticConfiguration(kind: BatteryWidgetSnapshotStore.timelineKind, provider: BatteryStatusProvider()) { entry in
             BatteryStatusWidgetView(entry: entry)
         }
         .configurationDisplayName("Battery Circles")
         .description("See battery health, charge, time remaining, and power state at a glance.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
     }
 }
